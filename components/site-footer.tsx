@@ -2,6 +2,7 @@
 
 import type { JSX, ReactNode } from "react";
 import Link from "next/link";
+import Image from "next/image";
 
 interface FooterLink {
   href: string;
@@ -35,17 +36,24 @@ export function SiteFooter({
   const resolvedNavLinks = navLinks ?? DEFAULT_NAV_LINKS;
 
   const defaultLeft = (
-    <p className="text-xs text-muted-foreground">
-      © {currentYear} {ownerName}. Built by{" "}
+    <p className="text-xs text-muted-foreground flex items-center gap-2">
+      <span>© {currentYear} {ownerName}. Built by</span>
       <a
         href={DEFAULT_AUTHOR_LINK.href}
         target="_blank"
         rel="noopener noreferrer"
-        className="font-semibold text-primary hover:text-primary/80"
+        className="inline-flex items-center gap-2 font-semibold text-primary hover:text-primary/80 transition-colors"
       >
+        <Image
+          src="/vlad-pfp.jpg"
+          alt="Vlad profile picture"
+          width={24}
+          height={24}
+          className="rounded-full"
+        />
         {DEFAULT_AUTHOR_LINK.label}
       </a>
-      .
+      <span>.</span>
     </p>
   );
 
