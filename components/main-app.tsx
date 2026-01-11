@@ -106,9 +106,9 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
     previousResultRef.current = null;
   }, [result, setResult]);
 
-  // Auto-close modal when transcription starts
+  // Auto-close modal when transcription actually starts (not during model loading)
   useEffect(() => {
-    if (showLanguageModal && status !== 'idle' && status !== 'ready') {
+    if (showLanguageModal && (status === 'processing' || status === 'extracting' || status === 'transcribing')) {
       setShowLanguageModal(false);
     }
   }, [status, showLanguageModal]);
