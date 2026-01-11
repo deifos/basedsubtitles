@@ -56,10 +56,10 @@ export function LanguageSelectionModal({
           <div className="rounded-md bg-muted/50 p-3 text-sm text-muted-foreground">
             <p className="font-medium mb-1">💡 Translation Feature</p>
             <p>
-              Select a different language to translate your video's speech. For example, if your video is in Spanish but you select English, the transcription will be translated to English.
+              Select a different language to translate your video&apos;s speech. For example, if your video is in Spanish but you select English, the transcription will be translated to English.
             </p>
             <p className="mt-2 text-xs">
-              <strong>Note:</strong> Translation will take longer to process than matching the video's original language.
+              <strong>Note:</strong> Translation will take longer to process than matching the video&apos;s original language.
             </p>
           </div>
         </div>

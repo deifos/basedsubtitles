@@ -36,6 +36,7 @@ class PipelineSingleton {
     device: DeviceType = "webgpu"
   ): Promise<AutomaticSpeechRecognitionPipeline> {
     if (!this.instance) {
+      // @ts-expect-error - Transformers.js pipeline types produce complex union that TS cannot resolve
       this.instance = pipeline(
         "automatic-speech-recognition",
         this.model_id,

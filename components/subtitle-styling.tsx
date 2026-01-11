@@ -331,7 +331,7 @@ export function SubtitleStyling({
       ...base,
       backgroundColor: style.backgroundColor,
     };
-  }, [style, activePresetName]);
+  }, [style]);
 
   const wordEmphasisEnabled = style.wordEmphasisEnabled ?? true;
 

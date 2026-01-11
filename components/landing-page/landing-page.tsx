@@ -6,7 +6,7 @@ import { Cpu, HardDrive, Languages, Lock, Shield, Zap } from "lucide-react";
 
 import { SiteFooter } from "@/components/site-footer";
 
-import { LandingHeader, type HeaderNavLink } from "./landing-header";
+import { LandingHeader } from "./landing-header";
 import { LandingHero } from "./landing-hero";
 
 interface LandingPageProps {
@@ -14,12 +14,6 @@ interface LandingPageProps {
 }
 
 type HeroHighlights = Parameters<typeof LandingHero>[0]["highlights"];
-
-const NAV_LINKS: HeaderNavLink[] = [
-  { href: "#", label: "How it works" },
-  { href: "#", label: "Docs" },
-  { href: "#", label: "GitHub" },
-];
 
 const HERO_HIGHLIGHTS: HeroHighlights = [
   { icon: Shield, label: "No uploads" },
@@ -36,7 +30,7 @@ const TRUST_BADGES: Array<{ icon: LucideIcon; label: string }> = [
 export function LandingPage({ onVideoSelect }: LandingPageProps): JSX.Element {
   return (
     <div className="flex min-h-screen flex-col bg-white text-slate-800">
-      <LandingHeader navLinks={NAV_LINKS} />
+      <LandingHeader />
       <main className="flex-1 flex flex-col items-center justify-center">
         <LandingHero
           highlights={HERO_HIGHLIGHTS}

@@ -3,12 +3,7 @@
 import type { JSX } from "react";
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
-import { BookOpen, ShieldCheck } from "lucide-react";
-
-export interface HeaderNavLink {
-  href: string;
-  label: string;
-}
+import { ShieldCheck } from "lucide-react";
 
 interface HeaderBadge {
   icon: LucideIcon;
@@ -16,9 +11,6 @@ interface HeaderBadge {
 }
 
 interface LandingHeaderProps {
-  navLinks: HeaderNavLink[];
-  docsHref?: string;
-  docsLabel?: string;
   badges?: HeaderBadge[];
 }
 
@@ -27,11 +19,8 @@ const DEFAULT_BADGES: HeaderBadge[] = [
 ];
 
 export function LandingHeader({
-  navLinks,
-  docsHref = "#",
-  docsLabel = "Docs",
   badges = DEFAULT_BADGES,
-}: LandingHeaderProps): JSX.Element {
+}: LandingHeaderProps = {}): JSX.Element {
   return (
     <header className="relative">
       <div className="mx-auto max-w-7xl px-6">
