@@ -25,6 +25,13 @@ import { useVideoDownloadMediaBunny } from "@/hooks/useVideoDownloadMediaBunny";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { type LanguageCode } from "@/components/language-selector";
 import { LanguageSelectionModal } from "@/components/language-selection-modal";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { Settings, FileText } from "lucide-react";
 
 interface MainAppProps {
   initialFile?: File | null;
@@ -56,6 +63,8 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
   const [language, setLanguage] = useState<LanguageCode>("en");
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [showLanguageModal, setShowLanguageModal] = useState(false);
+  const [showStylingDrawer, setShowStylingDrawer] = useState(false);
+  const [showEditingDrawer, setShowEditingDrawer] = useState(false);
   const previousResultRef = useRef<TranscriptionResult | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -184,7 +193,7 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
   const statusMessage = STATUS_MESSAGES[status] ?? "Processing video...";
 
   return (
-    <main className="flex min-h-screen flex-col relative">
+    <main className="flex min-h-screen flex-col relative pb-16 lg:pb-0">
       {/* Header */}
       <header className="w-full py-6 border-b border-border/20">
         <div className="container mx-auto px-4 md:px-6 text-center">
@@ -198,16 +207,17 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
         <div className="mx-auto px-4 md:px-6 w-full">
           <div className="w-full mx-auto space-y-4 p-6 md:p-8 rounded-xl border border-border/50">
             {/* Single Row - 3 Columns Layout */}
-            <div className="grid grid-cols-3 items-center gap-4">
-              {/* Column 1: Upload Text */}
-              <div className="justify-self-start">
+            {/* Desktop: 3-column grid, Mobile: stacked layout */}
+            <div className="flex flex-col lg:grid lg:grid-cols-3 items-center gap-4">
+              {/* Column 1: Upload Text - Hidden on mobile when result exists */}
+              <div className={`justify-self-start ${result ? 'hidden lg:block' : 'block text-center lg:text-left'}`}>
                 <p className="text-muted-foreground">
                   Upload a video (MP4 or WebM) to generate subtitles
                 </p>
               </div>
 
-              {/* Column 2: Controls (Center) */}
-              <div className="justify-self-center">
+              {/* Column 2: Controls (Center) - Hidden on mobile, shown in drawer */}
+              <div className="hidden lg:flex justify-self-center">
                 {result && (
                   <div className="flex flex-col gap-3 items-center">
                     {/* Tab Controls */}
@@ -249,8 +259,8 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
                 )}
               </div>
 
-              {/* Column 3: Action Buttons */}
-              <div className="justify-self-end flex gap-2">
+              {/* Column 3: Action Buttons - Stack vertically on mobile */}
+              <div className="justify-self-center lg:justify-self-end flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                 {uploadedFile && !result && (
                   <Button
                     onClick={() => setShowLanguageModal(true)}
@@ -306,10 +316,93 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
               defaultLanguage={language}
             />
 
+            {/* Mobile Drawers */}
+            {result && (
+              <>
+                <Sheet open={showStylingDrawer} onOpenChange={setShowStylingDrawer}>
+                  <SheetContent side="left" className="w-full sm:w-96 p-0">
+                    <SheetHeader className="p-4 border-b">
+                      <SheetTitle>Subtitle Styling</SheetTitle>
+                    </SheetHeader>
+                    <ScrollArea className="h-[calc(100vh-5rem)]">
+                      <div className="p-4 space-y-6">
+                        {/* Format Controls - Mobile Only */}
+                        <div className="space-y-3 pb-4 border-b">
+                          <h4 className="font-medium text-sm">Format Options</h4>
+                          <div className="space-y-2">
+                            <label className="text-xs text-muted-foreground">Display Mode</label>
+                            <Tabs value={mode} onValueChange={handleModeChange}>
+                              <TabsList className="grid w-full grid-cols-2">
+                                <TabsTrigger value="word">Word by Word</TabsTrigger>
+                                <TabsTrigger value="phrase">Phrases</TabsTrigger>
+                              </TabsList>
+                            </Tabs>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-xs text-muted-foreground">Aspect Ratio</label>
+                            <Tabs value={ratio} onValueChange={handleRatioChange}>
+                              <TabsList className="grid w-full grid-cols-2">
+                                <TabsTrigger value="16:9">Landscape</TabsTrigger>
+                                <TabsTrigger value="9:16">Portrait</TabsTrigger>
+                              </TabsList>
+                            </Tabs>
+                          </div>
+                          {ratio === "9:16" && (
+                            <Button
+                              variant={zoomPortrait ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => handleZoomPortraitChange(!zoomPortrait)}
+                              className="w-full flex items-center gap-2"
+                            >
+                              {zoomPortrait ? <ZoomOut className="h-4 w-4" /> : <ZoomIn className="h-4 w-4" />}
+                              {zoomPortrait ? "Fit to Container" : "Crop/Zoom"}
+                            </Button>
+                          )}
+                        </div>
+                        
+                        {/* Subtitle Styling */}
+                        <SubtitleStyling
+                          style={subtitleStyle}
+                          onChange={setSubtitleStyle}
+                          mode={mode}
+                        />
+                      </div>
+                    </ScrollArea>
+                  </SheetContent>
+                </Sheet>
+
+                <Sheet open={showEditingDrawer} onOpenChange={setShowEditingDrawer}>
+                  <SheetContent side="right" className="w-full sm:w-96 p-0">
+                    <SheetHeader className="p-4 border-b">
+                      <SheetTitle>Edit Transcript</SheetTitle>
+                    </SheetHeader>
+                    <ScrollArea className="h-[calc(100vh-5rem)]">
+                      <div className="p-4">
+                        <TranscriptSidebar
+                          transcript={result}
+                          currentTime={currentTime}
+                          setCurrentTime={(time) => {
+                            if (videoRef.current) {
+                              videoRef.current.currentTime = time;
+                              setCurrentTime(time);
+                            }
+                          }}
+                          onTranscriptUpdate={(updatedTranscript) => {
+                            setResult(updatedTranscript);
+                          }}
+                          mode={mode}
+                        />
+                      </div>
+                    </ScrollArea>
+                  </SheetContent>
+                </Sheet>
+              </>
+            )}
+
             <div className="flex flex-col lg:flex-row gap-6">
-              {/* Subtitle Styling Column - Only show when we have a result */}
+              {/* Subtitle Styling Column - Hidden on mobile, shown on desktop */}
               {result && (
-                <div className="w-full lg:w-96 h-[620px]">
+                <div className="hidden lg:block w-full lg:w-96 h-[620px]">
                   <ScrollArea className="rounded-base h-[620px] w-full text-mtext border-2 border-border bg-main p-2 shadow-shadow">
                     <div className="p-2 space-y-4">
                       <SubtitleStyling
@@ -372,9 +465,9 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
                 )}
               </div>
 
-              {/* Transcript Column */}
+              {/* Transcript Sidebar - Hidden on mobile, shown on desktop */}
               {result && (
-                <div className="w-full lg:w-96 h-[620px]">
+                <div className="hidden lg:block w-full lg:w-96 h-[620px]">
                   <ScrollArea className="rounded-base h-[620px] w-full text-mtext border-2 border-border bg-main p-4 shadow-shadow">
                     <div className="mb-4 pb-2 border-b border-border">
                       <h4 className="text-lg font-semibold">
@@ -414,6 +507,28 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
         canCancel={status !== "idle" && status !== "ready"}
         onCancel={cancelTranscription}
       />
+
+      {/* Mobile Bottom Navigation - Only show when we have a result */}
+      {result && (
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 z-[100] bg-background border-t border-border shadow-lg">
+          <div className="grid grid-cols-2 gap-0">
+            <button
+              onClick={() => setShowStylingDrawer(true)}
+              className="flex flex-col items-center justify-center py-3 px-4 hover:bg-accent transition-colors active:bg-accent/80"
+            >
+              <Settings className="h-5 w-5 mb-1" />
+              <span className="text-xs font-medium">Styling</span>
+            </button>
+            <button
+              onClick={() => setShowEditingDrawer(true)}
+              className="flex flex-col items-center justify-center py-3 px-4 hover:bg-accent transition-colors border-l border-border active:bg-accent/80"
+            >
+              <FileText className="h-5 w-5 mb-1" />
+              <span className="text-xs font-medium">Edit</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       <SiteFooter />
     </main>

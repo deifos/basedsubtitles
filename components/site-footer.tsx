@@ -77,7 +77,7 @@ export function SiteFooter({
         href="https://www.buymeacoffee.com/vladships"
         target="_blank"
         rel="noopener noreferrer"
-        className="fixed bottom-5 right-5 z-50 inline-flex items-center gap-2 rounded-full bg-[#FFDD00] px-4 py-3 text-sm font-semibold text-black shadow-lg transition hover:scale-105 hover:shadow-xl"
+        className="fixed bottom-24 right-3 lg:bottom-5 lg:right-5 z-50 inline-flex items-center gap-1.5 lg:gap-2 rounded-full bg-[#FFDD00] px-3 py-2 lg:px-4 lg:py-3 text-xs lg:text-sm font-semibold text-black shadow-lg transition hover:scale-105 hover:shadow-xl"
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M17 8h1a4 4 0 1 1 0 8h-1"/>

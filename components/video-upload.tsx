@@ -195,7 +195,8 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
     return (
       <div
         className={cn(
-          "relative border-2 border-dashed rounded-lg transition-colors min-h-[300px] overflow-hidden",
+          "relative border-2 border-dashed rounded-lg transition-colors overflow-hidden",
+          videoSrc ? "" : "min-h-[300px]",
           className
         )}
         onDragOver={(e) => {
@@ -204,7 +205,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
         onDrop={handleDrop}
       >
         {videoSrc ? (
-          <div className="relative flex flex-col items-center justify-center w-full h-full">
+          <div className="relative flex items-center justify-center w-full">
             <div className={cn(
               "relative mx-auto flex justify-center",
               ratio === "16:9" ? "w-full" : "w-auto"
