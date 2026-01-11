@@ -368,14 +368,14 @@ function renderSubtitle(
   const displayText = chunk.text;
   const isVerticalVideo = canvas.height > canvas.width;
 
-  // Calculate scale based on video dimensions
-  // Use a reference resolution for consistent scaling
-  const referenceHeight = isVerticalVideo ? 1920 : 1080;
-  const baseScale = canvas.height / referenceHeight;
+  // Calculate scale based on actual video dimensions
+  // The preview shows at max 500px height, so we scale relative to that
+  const previewHeight = 500;
+  const videoScale = canvas.height / previewHeight;
   
-  // Calculate font size to match preview proportions
-  // Apply a scaling factor to match preview appearance
-  const finalFontSize = Math.round(style.fontSize * baseScale * 1.5);
+  // Calculate font size to match preview proportions exactly
+  // Use the video scale to maintain the same visual proportion
+  const finalFontSize = Math.round(style.fontSize * videoScale);
 
   // Handle font family - resolve CSS custom properties to actual font names
   let fontFamily = style.fontFamily;
@@ -447,16 +447,16 @@ function renderSubtitle(
   }
 
   const lineHeight = finalFontSize;
-  const lineGap = 4 * baseScale;
+  const lineGap = 4 * videoScale;
   const totalHeight =
     lines.length * lineHeight + Math.max(0, lines.length - 1) * lineGap;
   const startY = baseY - totalHeight / 2 + lineHeight / 2;
 
   // Draw background if specified
   if (style.backgroundColor && style.backgroundColor !== "transparent") {
-    const borderRadius = 8 * baseScale;
-    const paddingX = 12 * baseScale;
-    const paddingY = 8 * baseScale;
+    const borderRadius = 8 * videoScale;
+    const paddingX = 12 * videoScale;
+    const paddingY = 8 * videoScale;
     
     // Measure maximum line width
     let maxWidth = 0;
@@ -501,7 +501,7 @@ function renderSubtitle(
         x,
         lineY,
         style,
-        baseScale,
+        videoScale,
         currentTime,
         finalFontSize
       );
@@ -511,7 +511,7 @@ function renderSubtitle(
 
   lines.forEach((line, index) => {
     const lineY = startY + index * (lineHeight + lineGap);
-    renderTextLine(ctx, line, x, lineY, style, baseScale);
+    renderTextLine(ctx, line, x, lineY, style, videoScale);
   });
 }
 

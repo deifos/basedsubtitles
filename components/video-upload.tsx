@@ -206,10 +206,15 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
       >
         {videoSrc ? (
           <div className="relative flex items-center justify-center w-full">
-            <div className={cn(
-              "relative mx-auto flex justify-center",
-              ratio === "16:9" ? "w-full" : "w-auto"
-            )}>
+            <div 
+              className={cn(
+                "relative mx-auto flex justify-center",
+                ratio === "16:9" ? "w-full" : "w-auto"
+              )}
+              style={{
+                aspectRatio: ratio === "16:9" ? "16/9" : "9/16"
+              }}
+            >
               <video
                 ref={ref}
                 src={videoSrc}

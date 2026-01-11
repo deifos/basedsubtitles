@@ -248,6 +248,10 @@ export function VideoCaption({
     line2 = words.slice(splitPoint).join(" ");
   }
 
+  // Calculate responsive font size based on video container
+  // On mobile, the video is smaller so we need to scale the font proportionally
+  const responsiveFontSize = `clamp(12px, ${style.fontSize * 0.06}vw, ${style.fontSize}px)`;
+
   // Animation states - more subtle with shake
   return (
     <div
@@ -259,7 +263,7 @@ export function VideoCaption({
       )}
       style={{
         fontFamily: style.fontFamily,
-        fontSize: style.fontSize,
+        fontSize: responsiveFontSize,
         fontWeight: style.fontWeight,
       }}
     >
