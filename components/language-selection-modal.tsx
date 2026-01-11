@@ -36,7 +36,7 @@ export function LanguageSelectionModal({
 
   const handleConfirm = () => {
     onConfirm(selectedLanguage);
-    onClose();
+    // Modal will auto-close when transcription status changes
   };
 
   return (

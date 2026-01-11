@@ -1,7 +1,7 @@
 "use client";
 
 import type { JSX } from "react";
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useEffect } from "react";
 import { SiteFooter } from "@/components/site-footer";
 import { VideoUpload } from "@/components/video-upload";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -86,6 +86,7 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
     if (uploadedFile) {
       startTranscription(uploadedFile, selectedLanguage);
     }
+    // Don't close modal here - let useEffect handle it when status changes
   }, [uploadedFile, startTranscription]);
 
   const handleChangeLanguage = useCallback(() => {
@@ -104,6 +105,13 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
     setShowLanguageModal(false);
     previousResultRef.current = null;
   }, [result, setResult]);
+
+  // Auto-close modal when transcription starts
+  useEffect(() => {
+    if (showLanguageModal && status !== 'idle' && status !== 'ready') {
+      setShowLanguageModal(false);
+    }
+  }, [status, showLanguageModal]);
 
   const {
     downloadVideo,
