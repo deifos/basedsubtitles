@@ -90,6 +90,14 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
     [handleVideoSelectBase]
   );
 
+  const handleAspectRatioDetected = useCallback((detectedRatio: "16:9" | "9:16") => {
+    setRatio(detectedRatio);
+    // Reset zoom when aspect ratio changes
+    if (detectedRatio === "16:9") {
+      setZoomPortrait(false);
+    }
+  }, []);
+
   const handleLanguageConfirm = useCallback((selectedLanguage: LanguageCode) => {
     setLanguage(selectedLanguage);
     if (uploadedFile) {
@@ -422,6 +430,7 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
                   key={uploadKey}
                   className="w-full"
                   onVideoSelect={handleVideoSelect}
+                  onAspectRatioDetected={handleAspectRatioDetected}
                   ref={videoRef}
                   onTimeUpdate={handleTimeUpdate}
                   transcript={result}

@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { LanguageSelector, type LanguageCode } from "@/components/language-selector";
-import { Video } from "lucide-react";
+import { Video, Loader2 } from "lucide-react";
 
 interface LanguageSelectionModalProps {
   open: boolean;
@@ -26,15 +26,18 @@ export function LanguageSelectionModal({
   defaultLanguage = "en",
 }: LanguageSelectionModalProps) {
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>(defaultLanguage);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Sync with defaultLanguage when modal opens
   useEffect(() => {
     if (open) {
       setSelectedLanguage(defaultLanguage);
+      setIsProcessing(false);
     }
   }, [open, defaultLanguage]);
 
   const handleConfirm = () => {
+    setIsProcessing(true);
     onConfirm(selectedLanguage);
     // Modal will auto-close when transcription status changes
   };
@@ -68,15 +71,26 @@ export function LanguageSelectionModal({
             variant="outline"
             onClick={onClose}
             className="flex-1"
+            disabled={isProcessing}
           >
             Cancel
           </Button>
           <Button
             onClick={handleConfirm}
             className="flex-1"
+            disabled={isProcessing}
           >
-            <Video className="w-4 h-4 mr-2" />
-            Transcribe
+            {isProcessing ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              <>
+                <Video className="w-4 h-4 mr-2" />
+                Transcribe
+              </>
+            )}
           </Button>
         </div>
       </DialogContent>

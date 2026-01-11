@@ -9,6 +9,7 @@ import { UploadIcon } from "lucide-react";
 interface VideoUploadProps {
   onVideoSelect: (file: File) => void;
   onTimeUpdate?: (time: number) => void;
+  onAspectRatioDetected?: (ratio: "16:9" | "9:16") => void;
   className?: string;
   transcript?: {
     text: string;
@@ -31,6 +32,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
     {
       onVideoSelect,
       onTimeUpdate,
+      onAspectRatioDetected,
       className,
       transcript,
       currentTime = 0,
@@ -85,15 +87,23 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
             throw new Error("Video must be less than 5 minutes");
           }
 
+          // Detect aspect ratio from video dimensions
+          const detectedRatio: "16:9" | "9:16" = video.videoHeight > video.videoWidth ? "9:16" : "16:9";
+          
           setVideoSrc(video.src);
           setError(null);
           onVideoSelect(file);
+          
+          // Notify parent of detected aspect ratio
+          if (onAspectRatioDetected) {
+            onAspectRatioDetected(detectedRatio);
+          }
         } catch (err) {
           setError(err instanceof Error ? err.message : "Error loading video");
           setVideoSrc(null);
         }
       },
-      [onVideoSelect]
+      [onVideoSelect, onAspectRatioDetected]
     );
 
     const handleDrop = useCallback(
