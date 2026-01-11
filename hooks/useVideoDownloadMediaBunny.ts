@@ -109,8 +109,6 @@ export function useVideoDownloadMediaBunny({
         throw new Error('Failed to create canvas context');
       }
 
-      console.log(`Canvas size: ${canvas.width}x${canvas.height}`);
-
       // Setup MediaBunny input
       setStatus('Reading original video...');
       const videoBlob = await fetch(video.src).then(r => r.blob());
@@ -123,8 +121,6 @@ export function useVideoDownloadMediaBunny({
       const duration = await input.computeDuration();
       const originalVideoTrack = await input.getPrimaryVideoTrack();
       const originalAudioTrack = await input.getPrimaryAudioTrack();
-
-      console.log(`Video duration: ${duration}s`);
 
       const outputFormat = format === 'webm' 
         ? new WebMOutputFormat() 
@@ -164,7 +160,6 @@ export function useVideoDownloadMediaBunny({
           audioSource.close();
           await audioContext.close();
         } catch (error) {
-          console.warn('Audio processing failed:', error);
           await output.start();
         }
       } else {
@@ -237,7 +232,7 @@ export function useVideoDownloadMediaBunny({
               sample.close();
             }
           } catch (error) {
-            console.warn(`Failed to get video sample at time ${time}:`, error);
+            // Skip failed frames silently
           }
         }
 
@@ -274,7 +269,7 @@ export function useVideoDownloadMediaBunny({
         try {
           await sampleIterator.return?.();
         } catch (error) {
-          console.warn('Failed to clean up sample iterator:', error);
+          // Cleanup error - safe to ignore
         }
       }
 
@@ -282,14 +277,13 @@ export function useVideoDownloadMediaBunny({
       try {
         videoSource.close();
       } catch (closeError) {
-        console.warn('Failed to close video source:', closeError);
+        // Close error - safe to ignore
       }
 
       if (cancelled) {
         await output.cancel();
         setProgress(0);
         setStatus('Download cancelled');
-        console.log('Video export cancelled by user');
       } else {
         setStatus('Finalizing video...');
         await output.finalize();
@@ -316,7 +310,6 @@ export function useVideoDownloadMediaBunny({
 
         setStatus('Export complete!');
         setProgress(100);
-        console.log('Video export completed successfully');
       }
 
     } catch (error) {
@@ -347,7 +340,7 @@ export function useVideoDownloadMediaBunny({
       try {
         cancelContextRef.current.videoSource.close();
       } catch (error) {
-        console.warn('Failed to close video source during cancel:', error);
+        // Close error during cancel - safe to ignore
       } finally {
         cancelContextRef.current.videoSource = null;
       }
@@ -375,21 +368,14 @@ function renderSubtitle(
   const displayText = chunk.text;
   const isVerticalVideo = canvas.height > canvas.width;
 
-  // Calculate scale based on preview container size
-  const previewContainer = document.querySelector('.video-container') as HTMLElement | null;
-  const previewWidth = previewContainer?.clientWidth || 281;
-  const previewHeight = previewContainer?.clientHeight || 500;
-  
-  const scaleX = canvas.width / previewWidth;
-  const scaleY = canvas.height / previewHeight;
-  const baseScale = Math.min(scaleX, scaleY);
+  // Calculate scale based on video dimensions
+  // Use a reference resolution for consistent scaling
+  const referenceHeight = isVerticalVideo ? 1920 : 1080;
+  const baseScale = canvas.height / referenceHeight;
   
   // Calculate font size to match preview proportions
-  const finalFontSize = Math.round(style.fontSize * baseScale);
-  
-  console.log(`Preview: ${previewWidth}x${previewHeight}, Export: ${canvas.width}x${canvas.height}`);
-  console.log(`Font: ${style.fontSize} -> ${finalFontSize} (scale: ${baseScale})`);
-  console.log(`Style - Border: ${style.borderWidth}px ${style.borderColor}, Shadow: ${style.dropShadowIntensity}, BG: ${style.backgroundColor}`);
+  // Apply a scaling factor to match preview appearance
+  const finalFontSize = Math.round(style.fontSize * baseScale * 1.5);
 
   // Handle font family - resolve CSS custom properties to actual font names
   let fontFamily = style.fontFamily;
@@ -431,19 +417,6 @@ function renderSubtitle(
   ctx.font = fontString;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  
-  console.log(`Canvas font: "${fontString}" (resolved from "${style.fontFamily}")`);
-  
-  // Check if font is actually loaded by testing with document.fonts
-  if ('fonts' in document) {
-    const fontName = fontFamily.split(',')[0].trim().replace(/['"]/g, '');
-    const isLoaded = document.fonts.check(`${style.fontWeight} ${finalFontSize}px "${fontName}"`);
-    console.log(`Font "${fontName}" loaded:`, isLoaded);
-    
-    if (!isLoaded) {
-      console.warn(`Font "${fontName}" not loaded, canvas will use fallback`);
-    }
-  }
 
   // Calculate positioning
   const x = canvas.width / 2;
@@ -598,6 +571,19 @@ function renderTextLine(
   ctx.restore();
 }
 
+// Helper to determine if a color is light or dark (matches video-caption.tsx logic)
+function isLightColor(color: string): boolean {
+  if (color.startsWith('#')) {
+    const hex = color.slice(1);
+    const r = parseInt(hex.slice(0, 2), 16);
+    const g = parseInt(hex.slice(2, 4), 16);
+    const b = parseInt(hex.slice(4, 6), 16);
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return luminance > 0.5;
+  }
+  return false;
+}
+
 function renderPhraseLineWithEmphasis(
   ctx: CanvasRenderingContext2D,
   words: WordTiming[],
@@ -631,6 +617,11 @@ function renderPhraseLineWithEmphasis(
   const highlightPaddingY = finalFontSize * 0.08;
   const highlightRadius = finalFontSize * 0.35;
 
+  // Determine emphasis colors based on text color (matches preview logic)
+  const textIsLight = isLightColor(style.color);
+  const emphasisBgColor = textIsLight ? 'rgba(0, 0, 0, 0.65)' : 'rgba(255, 255, 255, 0.85)';
+  const emphasisTextColor = textIsLight ? '#FFFFFF' : '#000000';
+
   words.forEach((word, index) => {
     const displayText = uppercaseWords[index];
     const scale = scales[index];
@@ -644,7 +635,7 @@ function renderPhraseLineWithEmphasis(
       const boxHeight = finalFontSize * scale + highlightPaddingY * 2;
 
       ctx.save();
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+      ctx.fillStyle = emphasisBgColor;
       ctx.beginPath();
       ctx.roundRect(
         wordCenterX - boxWidth / 2,
@@ -657,9 +648,7 @@ function renderPhraseLineWithEmphasis(
       ctx.restore();
     }
 
-    const fillColor = isActive && (!style.backgroundColor || style.backgroundColor === 'transparent')
-      ? '#FFFFFF'
-      : style.color;
+    const fillColor = isActive ? emphasisTextColor : style.color;
 
     drawWordText(
       ctx,

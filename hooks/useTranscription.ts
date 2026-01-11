@@ -193,23 +193,38 @@ export function useTranscription() {
       setResult(null);
       setProgress(0);
 
-      console.log(
-        "Processing video:",
-        file.name,
-        "Size:",
-        file.size,
-        "Type:",
-        file.type
-      );
+      // Just preload the model, don't transcribe yet
+      if (!modelReadyRef.current) {
+        updateStatus("loading");
+        await ensureModelLoaded();
+      }
+      
+      updateStatus("ready");
+    } catch (err) {
+      console.error("Error in handleVideoSelect:", err);
+      if (err instanceof Error) {
+        console.error("Error stack:", err.stack);
+      }
+      setError(err instanceof Error ? err.message : String(err));
+      updateStatus("idle");
+      setProgress(0);
+    }
+  };
+
+  const startTranscription = async (file: File, language: string = "en") => {
+    try {
+      // Reset states
+      setError(null);
+      setResult(null);
+      setProgress(0);
 
       updateStatus("processing");
       setProgress(5);
 
       if (!modelReadyRef.current) {
         updateStatus("loading");
+        await ensureModelLoaded();
       }
-
-      await ensureModelLoaded();
 
       updateStatus("extracting");
       setProgress(30);
@@ -225,7 +240,7 @@ export function useTranscription() {
         type: "run",
         data: {
           audio: audioData,
-          language: "en",
+          language,
           device: deviceRef.current,
         },
       });
@@ -287,10 +302,10 @@ export function useTranscription() {
     result,
     progress,
     setResult,
-    setStatus: updateStatus,
-    setProgress,
     handleVideoSelect,
+    startTranscription,
     resetTranscription,
     cancelTranscription,
+    isModelReady: modelReadyRef.current,
   };
 }

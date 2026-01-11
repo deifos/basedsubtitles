@@ -38,23 +38,12 @@ export function LandingHeader({
         <div className="flex items-center justify-between py-6">
           <Link href="#" className="inline-flex items-center gap-2.5">
             <span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-slate-900 text-sm font-medium tracking-tight text-white">
-              LS
+              BS
             </span>
             <span className="text-sm font-medium tracking-tight text-slate-900">
-              Local Subtitles
+              basedsubtitles
             </span>
           </Link>
-          <nav className="hidden items-center gap-6 sm:flex">
-            {navLinks.map((link) => (
-              <Link
-                key={link.label}
-                href={link.href}
-                className="text-sm text-slate-600 transition-colors hover:text-slate-900"
-              >
-                {link.label}
-              </Link>
-            ))}
-          </nav>
           <div className="flex items-center gap-3">
             {badges.map((badge) => (
               <span
@@ -65,13 +54,6 @@ export function LandingHeader({
                 {badge.label}
               </span>
             ))}
-            <Link
-              href={docsHref}
-              className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
-            >
-              <BookOpen className="h-4 w-4" strokeWidth={1.5} />
-              {docsLabel}
-            </Link>
           </div>
         </div>
       </div>

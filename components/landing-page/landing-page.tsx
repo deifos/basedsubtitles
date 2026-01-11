@@ -37,7 +37,7 @@ export function LandingPage({ onVideoSelect }: LandingPageProps): JSX.Element {
   return (
     <div className="flex min-h-screen flex-col bg-white text-slate-800">
       <LandingHeader navLinks={NAV_LINKS} />
-      <main className="flex-1">
+      <main className="flex-1 flex flex-col items-center justify-center">
         <LandingHero
           highlights={HERO_HIGHLIGHTS}
           onVideoSelect={onVideoSelect}

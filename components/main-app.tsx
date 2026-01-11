@@ -20,25 +20,27 @@ import {
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ProcessingOverlay } from "@/components/processing-overlay";
-import { useTranscription, STATUS_MESSAGES } from "@/hooks/useTranscription";
+import { useTranscription, STATUS_MESSAGES, type TranscriptionResult } from "@/hooks/useTranscription";
 import { useVideoDownloadMediaBunny } from "@/hooks/useVideoDownloadMediaBunny";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { type LanguageCode } from "@/components/language-selector";
+import { LanguageSelectionModal } from "@/components/language-selection-modal";
 
 interface MainAppProps {
   initialFile?: File | null;
   onReturnToLanding?: () => void;
 }
 
-// Default subtitle style
+// Default subtitle style - Gold preset
 const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
-  fontFamily: "Arial, sans-serif",
+  fontFamily: "var(--font-open-sans), 'Open Sans', sans-serif",
   fontSize: 20,
-  fontWeight: "900",
-  color: "#CCCCCC", // Silver metallic color
-  backgroundColor: "transparent", // No background
-  borderWidth: 2,
-  borderColor: "#000000", // Black border
-  dropShadowIntensity: 0.9, // Default shadow intensity
+  fontWeight: "600",
+  color: "#F4D35E",
+  backgroundColor: "#1F1300",
+  borderWidth: 0,
+  borderColor: "#000000",
+  dropShadowIntensity: 0.4,
   wordEmphasisEnabled: true,
 };
 
@@ -48,9 +50,13 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
     DEFAULT_SUBTITLE_STYLE
   );
   const [uploadKey, setUploadKey] = useState(0);
-  const [mode, setMode] = useState<"word" | "phrase">("word");
+  const [mode, setMode] = useState<"word" | "phrase">("phrase");
   const [ratio, setRatio] = useState<"16:9" | "9:16">("16:9");
   const [zoomPortrait, setZoomPortrait] = useState(false);
+  const [language, setLanguage] = useState<LanguageCode>("en");
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [showLanguageModal, setShowLanguageModal] = useState(false);
+  const previousResultRef = useRef<TranscriptionResult | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const {
@@ -59,10 +65,45 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
     result,
     progress,
     setResult,
-    handleVideoSelect,
+    handleVideoSelect: handleVideoSelectBase,
+    startTranscription,
     resetTranscription,
     cancelTranscription,
   } = useTranscription();
+
+  const handleVideoSelect = useCallback(
+    (file: File) => {
+      setUploadedFile(file);
+      handleVideoSelectBase(file);
+      // Show language selection modal after video loads
+      setShowLanguageModal(true);
+    },
+    [handleVideoSelectBase]
+  );
+
+  const handleLanguageConfirm = useCallback((selectedLanguage: LanguageCode) => {
+    setLanguage(selectedLanguage);
+    if (uploadedFile) {
+      startTranscription(uploadedFile, selectedLanguage);
+    }
+  }, [uploadedFile, startTranscription]);
+
+  const handleChangeLanguage = useCallback(() => {
+    // Store current result before clearing
+    previousResultRef.current = result;
+    // Clear current result and show language modal again
+    setResult(null);
+    setShowLanguageModal(true);
+  }, [result, setResult]);
+
+  const handleModalClose = useCallback(() => {
+    // If user cancels and we have a previous result, restore it
+    if (previousResultRef.current && !result) {
+      setResult(previousResultRef.current);
+    }
+    setShowLanguageModal(false);
+    previousResultRef.current = null;
+  }, [result, setResult]);
 
   const {
     downloadVideo,
@@ -85,6 +126,9 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
     // Reset transcription state
     resetTranscription();
 
+    // Clear uploaded file
+    setUploadedFile(null);
+
     // Reset current time
     setCurrentTime(0);
 
@@ -102,7 +146,7 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
     }
 
     onReturnToLanding?.();
-  }, [resetTranscription]);
+  }, [resetTranscription, onReturnToLanding]);
 
   const handleTimeUpdate = useCallback((time: number) => {
     setCurrentTime(time);
@@ -126,8 +170,9 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
   }, []);
 
   // Determine if we should show the loading overlay
+  // Don't show overlay when status is 'ready' and we're just waiting for user to transcribe
   const isProcessing =
-    status !== "idle" && (status !== "ready" || (progress > 0 && progress < 100));
+    status !== "idle" && status !== "ready" && progress < 100;
   const statusMessage = STATUS_MESSAGES[status] ?? "Processing video...";
 
   return (
@@ -196,16 +241,35 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
                 )}
               </div>
 
-              {/* Column 3: Upload Button */}
-              <div className="justify-self-end">
-                {result && (
+              {/* Column 3: Action Buttons */}
+              <div className="justify-self-end flex gap-2">
+                {uploadedFile && !result && (
                   <Button
-                    onClick={handleResetVideo}
+                    onClick={() => setShowLanguageModal(true)}
                     className="flex items-center gap-2 px-4 py-2"
                   >
-                    <Upload className="w-4 h-4" />
-                    Upload Another Video
+                    <Video className="w-4 h-4" />
+                    Transcribe Video
                   </Button>
+                )}
+                {result && (
+                  <>
+                    <Button
+                      onClick={handleChangeLanguage}
+                      variant="outline"
+                      className="flex items-center gap-2 px-4 py-2"
+                    >
+                      <Video className="w-4 h-4" />
+                      Change Language
+                    </Button>
+                    <Button
+                      onClick={handleResetVideo}
+                      className="flex items-center gap-2 px-4 py-2"
+                    >
+                      <Upload className="w-4 h-4" />
+                      Upload Another Video
+                    </Button>
+                  </>
                 )}
               </div>
             </div>
@@ -226,15 +290,24 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
               </Alert>
             )}
 
+            {/* Language selection modal */}
+            <LanguageSelectionModal
+              open={showLanguageModal}
+              onClose={handleModalClose}
+              onConfirm={handleLanguageConfirm}
+              defaultLanguage={language}
+            />
+
             <div className="flex flex-col lg:flex-row gap-6">
               {/* Subtitle Styling Column - Only show when we have a result */}
               {result && (
                 <div className="w-full lg:w-96 h-[620px]">
                   <ScrollArea className="rounded-base h-[620px] w-full text-mtext border-2 border-border bg-main p-2 shadow-shadow">
-                    <div className="p-2">
+                    <div className="p-2 space-y-4">
                       <SubtitleStyling
                         style={subtitleStyle}
                         onChange={setSubtitleStyle}
+                        mode={mode}
                       />
                     </div>
                   </ScrollArea>

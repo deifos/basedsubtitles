@@ -152,7 +152,8 @@ export function VideoCaption({
     : {};
 
   const renderPhraseWithHighlight = () => {
-    if (mode !== "phrase" || !currentChunk.words) {
+    // For word mode, just display the single word
+    if (mode === "word") {
       return (
         <span style={{ ...baseTypographyStyles, ...metallicTypographyStyles }}>
           {text}
@@ -160,6 +161,16 @@ export function VideoCaption({
       );
     }
 
+    // For phrase mode without words array, display as plain text
+    if (!currentChunk.words) {
+      return (
+        <span style={{ ...baseTypographyStyles, ...metallicTypographyStyles }}>
+          {text}
+        </span>
+      );
+    }
+
+    // For phrase mode with word highlighting
     return (
       <span>
         {currentChunk.words.map((word: ProcessedWord, index: number) => {
@@ -168,9 +179,15 @@ export function VideoCaption({
             word.text === currentWordInPhrase.text &&
             word.timestamp[0] === currentWordInPhrase.timestamp[0];
 
+          // Determine emphasis colors based on text color
+          const textIsLight = isLightColor(style.color);
+          const emphasisBgColor = textIsLight ? "rgba(0, 0, 0, 0.65)" : "rgba(255, 255, 255, 0.85)";
+          const emphasisTextColor = textIsLight ? "#FFFFFF" : "#000000";
+          const isActive = isCurrentWord && (style.wordEmphasisEnabled ?? true);
+
           const baseWordStyles: React.CSSProperties = {
             ...baseTypographyStyles,
-            ...metallicTypographyStyles,
+            ...(isActive ? {} : metallicTypographyStyles),
             display: "inline-block",
             transition: "transform 0.18s ease, background-color 0.18s ease",
             padding: "0 0.15em",
@@ -179,19 +196,13 @@ export function VideoCaption({
             backgroundColor: "transparent",
           };
 
-          // Determine emphasis colors based on text color
-          const textIsLight = isLightColor(style.color);
-          const emphasisBgColor = textIsLight ? "rgba(0, 0, 0, 0.65)" : "rgba(255, 255, 255, 0.85)";
-          const emphasisTextColor = textIsLight ? "#FFFFFF" : "#000000";
-
-          const activeWordStyles: React.CSSProperties =
-            isCurrentWord && (style.wordEmphasisEnabled ?? true)
+          const activeWordStyles: React.CSSProperties = isActive
             ? {
-                ...baseTypographyStyles,
                 transform: "scale(1.18)",
                 backgroundColor: emphasisBgColor,
                 color: emphasisTextColor,
-                WebkitTextStroke: "none", // Remove stroke for cleaner emphasis
+                WebkitTextStroke: "none",
+                background: "none",
                 WebkitBackgroundClip: "initial",
                 WebkitTextFillColor: "inherit",
               }

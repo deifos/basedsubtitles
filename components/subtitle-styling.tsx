@@ -56,6 +56,7 @@ export interface SubtitleStyle {
 interface SubtitleStylingProps {
   style: SubtitleStyle;
   onChange: (style: SubtitleStyle) => void;
+  mode?: "word" | "phrase";
   className?: string;
 }
 
@@ -107,7 +108,6 @@ const borderWidthOptions = [
 ];
 
 type SubtitlePresetName =
-  | "important"
   | "green"
   | "gold"
   | "subtitle"
@@ -122,29 +122,6 @@ interface SubtitlePreset {
 }
 
 const PRESETS: SubtitlePreset[] = [
-  {
-    name: "important",
-    label: "Important",
-    previewText: "IMPORTANT",
-    style: {
-      fontFamily: FONT_FAMILIES.helvetica.value,
-      fontSize: 22,
-      fontWeight: "700",
-      color: "#CCCCCC",
-      backgroundColor: "transparent",
-      borderWidth: 2,
-      borderColor: "#000000",
-      dropShadowIntensity: 0.6,
-    },
-    inactiveStyles: {
-      background:
-        "linear-gradient(to bottom, #FFFFFF 0%, #CCCCCC 50%, #999999 100%)",
-      WebkitBackgroundClip: "text",
-      WebkitTextFillColor: "transparent",
-      textShadow: "0px 1px 2px rgba(0, 0, 0, 0.5)",
-      border: "1px solid rgba(0,0,0,0.15)",
-    },
-  },
   {
     name: "green",
     label: "Green",
@@ -283,6 +260,7 @@ function isPresetActive(style: SubtitleStyle, preset: SubtitlePreset) {
 export function SubtitleStyling({
   style,
   onChange,
+  mode = "phrase",
   className = "",
 }: SubtitleStylingProps) {
   const activePresetName = useMemo<SubtitlePresetName | null>(() => {
@@ -348,17 +326,6 @@ export function SubtitleStyling({
       borderRadius: "0.5rem",
       transition: "all 0.2s ease",
     };
-
-    if (activePresetName === "important") {
-      const { backgroundColor, ...baseWithoutBg } = base;
-      return {
-        ...baseWithoutBg,
-        background:
-          "linear-gradient(to bottom, #FFFFFF 0%, #CCCCCC 50%, #999999 100%)",
-        WebkitBackgroundClip: "text",
-        WebkitTextFillColor: "transparent",
-      };
-    }
 
     return {
       ...base,
@@ -536,12 +503,16 @@ export function SubtitleStyling({
           <div>
             <p className="text-sm font-medium">Active word emphasis</p>
             <p className="text-xs text-muted-foreground">
-              Scale the spoken word and add a subtle dark backdrop.
+              {mode === "word" 
+                ? "Only available in phrase mode"
+                : "Scale the spoken word and add a subtle dark backdrop."
+              }
             </p>
           </div>
           <Switch
             checked={wordEmphasisEnabled}
             onCheckedChange={handleWordEmphasisToggle}
+            disabled={mode === "word"}
             aria-label="Toggle active word emphasis"
           />
         </div>
