@@ -18,6 +18,7 @@ export interface TranscriptionResult {
     text: string;
     timestamp: [number, number];
   }>;
+  generationTime?: number;
 }
 
 export const STATUS_MESSAGES: Record<TranscriptionStatus, string> = {
@@ -100,7 +101,9 @@ export function useTranscription() {
         break;
 
       case "complete":
-        setResult(e.data.result);
+        // Add generation time from worker
+        const resultWithTime = { ...e.data.result, generationTime: e.data.time };
+        setResult(resultWithTime);
         updateStatus("ready");
         setProgress(100);
         break;
@@ -301,6 +304,7 @@ export function useTranscription() {
     error,
     result,
     progress,
+    device,
     setResult,
     handleVideoSelect,
     startTranscription,

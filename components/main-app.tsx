@@ -73,6 +73,7 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
     error,
     result,
     progress,
+    device,
     setResult,
     handleVideoSelect: handleVideoSelectBase,
     startTranscription,
@@ -444,6 +445,11 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
 
                 {result && (
                   <div className="mt-4 flex flex-col items-center gap-3">
+                    {result.generationTime && (
+                      <div className="text-xs text-muted-foreground">
+                        Generation time: {(result.generationTime / 1000).toFixed(2)}s ({device === "webgpu" ? "WebGPU" : "WASM"})
+                      </div>
+                    )}
                     <Button
                       onClick={downloadVideo}
                       className="flex items-center gap-2"
