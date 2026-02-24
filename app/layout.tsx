@@ -6,6 +6,14 @@ import {
   Bebas_Neue,
   Poppins,
   Oswald,
+  Anton,
+  Bangers,
+  Fredoka,
+  Righteous,
+  Nunito,
+  Roboto,
+  Open_Sans,
+  Inter,
 } from "next/font/google";
 import "./globals.css";
 
@@ -44,6 +52,62 @@ const oswald = Oswald({
   variable: "--font-oswald",
   subsets: ["latin"],
   weight: ["400", "500", "600"],
+  display: "swap",
+});
+
+const anton = Anton({
+  variable: "--font-anton",
+  subsets: ["latin"],
+  weight: "400",
+  display: "swap",
+});
+
+const bangers = Bangers({
+  variable: "--font-bangers",
+  subsets: ["latin"],
+  weight: "400",
+  display: "swap",
+});
+
+const fredoka = Fredoka({
+  variable: "--font-fredoka",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+});
+
+const righteous = Righteous({
+  variable: "--font-righteous",
+  subsets: ["latin"],
+  weight: "400",
+  display: "swap",
+});
+
+const nunito = Nunito({
+  variable: "--font-nunito",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+});
+
+const roboto = Roboto({
+  variable: "--font-roboto",
+  subsets: ["latin"],
+  weight: ["400", "500", "700"],
+  display: "swap",
+});
+
+const openSans = Open_Sans({
+  variable: "--font-open-sans",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+});
+
+const inter = Inter({
+  variable: "--font-inter",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
   display: "swap",
 });
 
@@ -94,7 +158,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${montserrat.variable} ${bebasNeue.variable} ${poppins.variable} ${oswald.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${montserrat.variable} ${bebasNeue.variable} ${poppins.variable} ${oswald.variable} ${anton.variable} ${bangers.variable} ${fredoka.variable} ${righteous.variable} ${nunito.variable} ${roboto.variable} ${openSans.variable} ${inter.variable} antialiased`}
       >
         {children}
       </body>

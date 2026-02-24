@@ -225,7 +225,7 @@ export function VideoCaption({
 
   // Better text wrapping logic
   const words = text.split(" ");
-  const maxWordsPerLine = ratio === "9:16" ? 4 : 6; // Shorter lines for portrait
+  const maxWordsPerLine = style.maxWordsPerLine ?? (ratio === "9:16" ? 4 : 6);
   const shouldSplitText = words.length > maxWordsPerLine;
   
   let line1 = text;
@@ -252,14 +252,32 @@ export function VideoCaption({
   // On mobile, the video is smaller so we need to scale the font proportionally
   const responsiveFontSize = `clamp(12px, ${style.fontSize * 0.06}vw, ${style.fontSize}px)`;
 
+  // Compute position classes and styles based on style.position
+  const position = style.position ?? "bottom";
+  const positionClasses = (() => {
+    const isPortrait = ratio === "9:16";
+    const widthClass = isPortrait ? "w-[85%]" : "w-[90%]";
+    switch (position) {
+      case "top":
+        return isPortrait
+          ? `top-[6%] ${widthClass}`
+          : `top-[12%] ${widthClass}`;
+      case "middle":
+        return `top-1/2 -translate-y-1/2 ${widthClass}`;
+      case "bottom":
+      default:
+        return isPortrait
+          ? `bottom-[8%] ${widthClass}`
+          : `bottom-[16%] ${widthClass}`;
+    }
+  })();
+
   // Animation states - more subtle with shake
   return (
     <div
       className={cn(
         "absolute left-1/2 -translate-x-1/2 text-center pointer-events-none z-10",
-        ratio === "16:9"
-          ? "bottom-[16%] w-[90%]" // Landscape mode
-          : "bottom-[8%] w-[85%]" // Portrait mode
+        positionClasses
       )}
       style={{
         fontFamily: style.fontFamily,

@@ -13,6 +13,7 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // Helper to check if a color is effectively transparent
 function isTransparentColor(color: string): boolean {
@@ -49,49 +50,122 @@ export interface SubtitleStyle {
   borderColor: string;
   dropShadowIntensity: number;
   wordEmphasisEnabled: boolean;
-  // Removed: animated, wordHighlightEnabled, wordHighlightColor, wordHighlightAnimation, wordHighlightIntensity
-  // FFmpeg drawtext doesn't support animations or word highlighting
+  position: "top" | "middle" | "bottom";
+  maxWordsPerLine: number;
 }
 
 interface SubtitleStylingProps {
   style: SubtitleStyle;
   onChange: (style: SubtitleStyle) => void;
   mode?: "word" | "phrase";
+  onModeChange?: (mode: "word" | "phrase") => void;
   className?: string;
 }
 
 const FONT_FAMILIES = {
-  arial: {
-    label: "Arial",
-    value: "Arial, sans-serif",
+  inter: {
+    label: "Inter",
+    value: "var(--font-inter), 'Inter', sans-serif",
+    cssFont: "var(--font-inter), Inter, sans-serif",
   },
   roboto: {
     label: "Roboto",
-    value: "Roboto, sans-serif",
-  },
-  verdana: {
-    label: "Verdana",
-    value: "Verdana, sans-serif",
-  },
-  helvetica: {
-    label: "Helvetica",
-    value: "Helvetica, Arial, sans-serif",
+    value: "var(--font-roboto), 'Roboto', sans-serif",
+    cssFont: "var(--font-roboto), Roboto, sans-serif",
   },
   openSans: {
     label: "Open Sans",
     value: "var(--font-open-sans), 'Open Sans', sans-serif",
+    cssFont: "var(--font-open-sans), 'Open Sans', sans-serif",
   },
-} satisfies Record<string, { label: string; value: string }>;
+  nunito: {
+    label: "Nunito",
+    value: "var(--font-nunito), 'Nunito', sans-serif",
+    cssFont: "var(--font-nunito), Nunito, sans-serif",
+  },
+  montserrat: {
+    label: "Montserrat",
+    value: "var(--font-montserrat), 'Montserrat', sans-serif",
+    cssFont: "var(--font-montserrat), Montserrat, sans-serif",
+  },
+  poppins: {
+    label: "Poppins",
+    value: "var(--font-poppins), 'Poppins', sans-serif",
+    cssFont: "var(--font-poppins), Poppins, sans-serif",
+  },
+  fredoka: {
+    label: "Fredoka",
+    value: "var(--font-fredoka), 'Fredoka', sans-serif",
+    cssFont: "var(--font-fredoka), Fredoka, sans-serif",
+  },
+  righteous: {
+    label: "Righteous",
+    value: "var(--font-righteous), 'Righteous', sans-serif",
+    cssFont: "var(--font-righteous), Righteous, sans-serif",
+  },
+  anton: {
+    label: "Anton",
+    value: "var(--font-anton), 'Anton', sans-serif",
+    cssFont: "var(--font-anton), Anton, sans-serif",
+  },
+  bangers: {
+    label: "Bangers",
+    value: "var(--font-bangers), 'Bangers', cursive",
+    cssFont: "var(--font-bangers), Bangers, cursive",
+  },
+  oswald: {
+    label: "Oswald",
+    value: "var(--font-oswald), 'Oswald', sans-serif",
+    cssFont: "var(--font-oswald), Oswald, sans-serif",
+  },
+  bebasNeue: {
+    label: "Bebas Neue",
+    value: "var(--font-bebas-neue), 'Bebas Neue', sans-serif",
+    cssFont: "var(--font-bebas-neue), 'Bebas Neue', sans-serif",
+  },
+  arial: {
+    label: "Arial",
+    value: "Arial, sans-serif",
+    cssFont: "Arial, sans-serif",
+  },
+  verdana: {
+    label: "Verdana",
+    value: "Verdana, sans-serif",
+    cssFont: "Verdana, sans-serif",
+  },
+  helvetica: {
+    label: "Helvetica",
+    value: "Helvetica, Arial, sans-serif",
+    cssFont: "Helvetica, Arial, sans-serif",
+  },
+} satisfies Record<string, { label: string; value: string; cssFont: string }>;
 
 const fontOptions = Object.values(FONT_FAMILIES);
 
-const fontSizeOptions = [
-  { value: 12, label: "Extra Small" },
+const FONT_SIZE_STOPS = [
   { value: 16, label: "Small" },
-  { value: 20, label: "Medium" },
-  { value: 24, label: "Large" },
-  { value: 28, label: "Extra Large" },
-];
+  { value: 22, label: "Medium" },
+  { value: 28, label: "Big" },
+] as const;
+
+// Map slider index (0, 1, 2) to font size values
+function sliderIndexToFontSize(index: number): number {
+  return FONT_SIZE_STOPS[index]?.value ?? 22;
+}
+
+function fontSizeToSliderIndex(fontSize: number): number {
+  // Find closest stop
+  let closestIndex = 1;
+  let closestDist = Infinity;
+  FONT_SIZE_STOPS.forEach((stop, i) => {
+    const dist = Math.abs(stop.value - fontSize);
+    if (dist < closestDist) {
+      closestDist = dist;
+      closestIndex = i;
+    }
+  });
+  return closestIndex;
+}
 
 const fontWeightOptions = [
   { value: "400", label: "Regular" },
@@ -128,13 +202,15 @@ const PRESETS: SubtitlePreset[] = [
     previewText: "GREEN",
     style: {
       fontFamily: FONT_FAMILIES.roboto.value,
-      fontSize: 20,
+      fontSize: 22,
       fontWeight: "600",
       color: "#00FF41",
       backgroundColor: "#0B0B0B",
       borderWidth: 0,
       borderColor: "#000000",
       dropShadowIntensity: 0.4,
+      position: "bottom",
+      maxWordsPerLine: 6,
     },
     inactiveStyles: {
       color: "#00FF41",
@@ -150,13 +226,15 @@ const PRESETS: SubtitlePreset[] = [
     previewText: "GOLD",
     style: {
       fontFamily: FONT_FAMILIES.openSans.value,
-      fontSize: 20,
+      fontSize: 22,
       fontWeight: "600",
       color: "#F4D35E",
       backgroundColor: "#1F1300",
       borderWidth: 0,
       borderColor: "#000000",
       dropShadowIntensity: 0.4,
+      position: "bottom",
+      maxWordsPerLine: 6,
     },
     inactiveStyles: {
       color: "#F4D35E",
@@ -172,13 +250,15 @@ const PRESETS: SubtitlePreset[] = [
     previewText: "SUBTITLE",
     style: {
       fontFamily: FONT_FAMILIES.arial.value,
-      fontSize: 20,
+      fontSize: 22,
       fontWeight: "500",
       color: "#FFFFFF",
       backgroundColor: "rgba(0, 0, 0, 0.75)",
       borderWidth: 0,
       borderColor: "#000000",
       dropShadowIntensity: 0.3,
+      position: "bottom",
+      maxWordsPerLine: 6,
     },
     inactiveStyles: {
       color: "#FFFFFF",
@@ -194,13 +274,15 @@ const PRESETS: SubtitlePreset[] = [
     previewText: "GAMER",
     style: {
       fontFamily: FONT_FAMILIES.verdana.value,
-      fontSize: 24,
+      fontSize: 28,
       fontWeight: "700",
       color: "#94FBAB",
       backgroundColor: "#141414",
       borderWidth: 0,
       borderColor: "#FF00FF",
       dropShadowIntensity: 0.6,
+      position: "bottom",
+      maxWordsPerLine: 6,
     },
     inactiveStyles: {
       color: "#94FBAB",
@@ -257,10 +339,23 @@ function isPresetActive(style: SubtitleStyle, preset: SubtitlePreset) {
   });
 }
 
+function PositionIcon({ position, isActive }: { position: "top" | "middle" | "bottom"; isActive: boolean }) {
+  const lineColor = isActive ? "currentColor" : "currentColor";
+  return (
+    <svg width="20" height="24" viewBox="0 0 20 24" fill="none" className="shrink-0">
+      <rect x="1" y="1" width="18" height="22" rx="2" stroke={lineColor} strokeWidth="1.5" fill="none" opacity={0.4} />
+      {position === "top" && <rect x="5" y="4" width="10" height="2.5" rx="1" fill={lineColor} />}
+      {position === "middle" && <rect x="5" y="10.75" width="10" height="2.5" rx="1" fill={lineColor} />}
+      {position === "bottom" && <rect x="5" y="17.5" width="10" height="2.5" rx="1" fill={lineColor} />}
+    </svg>
+  );
+}
+
 export function SubtitleStyling({
   style,
   onChange,
   mode = "phrase",
+  onModeChange,
   className = "",
 }: SubtitleStylingProps) {
   const activePresetName = useMemo<SubtitlePresetName | null>(() => {
@@ -275,10 +370,6 @@ export function SubtitleStyling({
 
   const handleFontFamilyChange = (value: string) => {
     onChange({ ...style, fontFamily: value });
-  };
-
-  const handleFontSizeChange = (value: string) => {
-    onChange({ ...style, fontSize: Number(value) });
   };
 
   const handleFontWeightChange = (value: string) => {
@@ -313,6 +404,12 @@ export function SubtitleStyling({
     onChange({ ...style, ...preset.style });
   };
 
+  // Find the current font's cssFont value for the trigger preview
+  const currentFontCss = useMemo(() => {
+    const match = fontOptions.find((f) => f.value === style.fontFamily);
+    return match?.cssFont ?? style.fontFamily;
+  }, [style.fontFamily]);
+
   const previewStyles = useMemo(() => {
     const base: CSSProperties = {
       fontFamily: style.fontFamily,
@@ -334,9 +431,25 @@ export function SubtitleStyling({
   }, [style]);
 
   const wordEmphasisEnabled = style.wordEmphasisEnabled ?? true;
+  const fontSizeSliderIndex = fontSizeToSliderIndex(style.fontSize);
 
   return (
     <div className={`flex flex-col h-full overflow-hidden ${className}`}>
+      {/* Mode Toggle at top */}
+      {onModeChange && (
+        <div className="px-4 mb-3">
+          <Tabs
+            value={mode}
+            onValueChange={(value) => onModeChange(value as "word" | "phrase")}
+          >
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="word">Word by Word</TabsTrigger>
+              <TabsTrigger value="phrase">Phrases</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+      )}
+
       <div className="px-4 mb-2">
         <h3 className="font-medium text-lg">Subtitle Styling</h3>
       </div>
@@ -356,15 +469,24 @@ export function SubtitleStyling({
           </div>
         </div>
 
+        {/* Font Family with preview */}
         <div className="space-y-2 rounded-lg border border-border/40 bg-muted/40 p-3">
           <Select value={style.fontFamily} onValueChange={handleFontFamilyChange}>
-            <SelectTrigger className="w-full rounded-md border-none bg-background px-3 py-2 text-sm shadow-sm">
+            <SelectTrigger
+              className="w-full rounded-md border-none bg-background px-3 py-2 text-sm shadow-sm"
+              style={{ fontFamily: currentFontCss }}
+            >
               <SelectValue placeholder="Select a font" className="text-sm" />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
                 {fontOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value} className="text-sm">
+                  <SelectItem
+                    key={option.value}
+                    value={option.value}
+                    className="text-sm"
+                    style={{ fontFamily: option.cssFont }}
+                  >
                     {option.label}
                   </SelectItem>
                 ))}
@@ -373,22 +495,33 @@ export function SubtitleStyling({
           </Select>
         </div>
 
+        {/* Font Size - 3-step slider */}
         <div className="space-y-2">
           <label className="text-sm font-medium block">Font Size</label>
-          <Select value={style.fontSize.toString()} onValueChange={handleFontSizeChange}>
-            <SelectTrigger className="w-full rounded-md border border-border/40 bg-background px-3 py-2 text-sm shadow-sm">
-              <SelectValue placeholder="Select a size" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                {fontSizeOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value.toString()}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
+          <Slider
+            value={[fontSizeSliderIndex]}
+            onValueChange={(values) => {
+              onChange({ ...style, fontSize: sliderIndexToFontSize(values[0]) });
+            }}
+            min={0}
+            max={2}
+            step={1}
+            className="w-full"
+          />
+          <div className="flex justify-between text-xs mt-1">
+            {FONT_SIZE_STOPS.map((stop, i) => (
+              <span
+                key={stop.value}
+                className={
+                  fontSizeSliderIndex === i
+                    ? "text-foreground font-semibold"
+                    : "text-muted-foreground"
+                }
+              >
+                {stop.label}
+              </span>
+            ))}
+          </div>
         </div>
 
         <div className="space-y-2">
@@ -408,6 +541,54 @@ export function SubtitleStyling({
             </SelectContent>
           </Select>
         </div>
+
+        {/* Position selector */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium block">Position</label>
+          <div className="grid grid-cols-3 gap-2">
+            {(["top", "middle", "bottom"] as const).map((pos) => {
+              const isActive = style.position === pos;
+              return (
+                <button
+                  key={pos}
+                  onClick={() => onChange({ ...style, position: pos })}
+                  className={`flex flex-col items-center gap-1 rounded-md border px-2 py-2 text-xs font-medium transition-all ${
+                    isActive
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border/50 bg-background text-muted-foreground hover:border-border hover:text-foreground"
+                  }`}
+                >
+                  <PositionIcon position={pos} isActive={isActive} />
+                  <span className="capitalize">{pos}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Max Words Per Line slider - phrase mode only */}
+        {mode === "phrase" && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium">Max Words/Line</label>
+              <span className="text-sm text-muted-foreground tabular-nums">{style.maxWordsPerLine}</span>
+            </div>
+            <Slider
+              value={[style.maxWordsPerLine]}
+              onValueChange={(values) => {
+                onChange({ ...style, maxWordsPerLine: values[0] });
+              }}
+              min={3}
+              max={8}
+              step={1}
+              className="w-full"
+            />
+            <div className="flex justify-between text-xs text-muted-foreground mt-1">
+              <span>3</span>
+              <span>8</span>
+            </div>
+          </div>
+        )}
 
         <div className="space-y-2">
           <label className="text-sm font-medium block">Text Color</label>
@@ -503,7 +684,7 @@ export function SubtitleStyling({
           <div>
             <p className="text-sm font-medium">Active word emphasis</p>
             <p className="text-xs text-muted-foreground">
-              {mode === "word" 
+              {mode === "word"
                 ? "Only available in phrase mode"
                 : "Scale the spoken word and add a subtle dark backdrop."
               }

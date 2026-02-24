@@ -41,7 +41,7 @@ interface MainAppProps {
 // Default subtitle style - Gold preset
 const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
   fontFamily: "var(--font-open-sans), 'Open Sans', sans-serif",
-  fontSize: 20,
+  fontSize: 22,
   fontWeight: "600",
   color: "#F4D35E",
   backgroundColor: "#1F1300",
@@ -49,6 +49,8 @@ const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
   borderColor: "#000000",
   dropShadowIntensity: 0.4,
   wordEmphasisEnabled: true,
+  position: "bottom",
+  maxWordsPerLine: 6,
 };
 
 export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps): JSX.Element {
@@ -178,8 +180,8 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
     setCurrentTime(time);
   }, []);
 
-  const handleModeChange = useCallback((value: string) => {
-    setMode(value as "word" | "phrase");
+  const handleModeChange = useCallback((value: "word" | "phrase") => {
+    setMode(value);
   }, []);
 
   const handleRatioChange = useCallback((value: string) => {
@@ -204,111 +206,64 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
   return (
     <main className="flex min-h-screen flex-col relative pb-16 lg:pb-0">
       {/* Header */}
-      <header className="w-full py-6 border-b border-border/20">
-        <div className="container mx-auto px-4 md:px-6 text-center">
-          <h1 className="text-3xl md:text-4xl font-bold mb-2">Based Subtitles</h1>
-          <p className="text-muted-foreground text-lg">100% local powered by transformers.js</p>
+      <header className="w-full py-4 border-b border-border/20">
+        <div className="container mx-auto px-4 md:px-6 flex flex-col sm:flex-row items-center justify-between gap-2">
+          <div className="text-center sm:text-left">
+            <h1 className="text-3xl md:text-4xl font-bold mb-1">Based Subtitles</h1>
+            <p className="text-muted-foreground text-lg">100% local powered by transformers.js</p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2">
+            {uploadedFile && !result && (
+              <Button
+                onClick={() => setShowLanguageModal(true)}
+                className="flex items-center gap-2 px-4 py-2"
+              >
+                <Video className="w-4 h-4" />
+                Transcribe Video
+              </Button>
+            )}
+            {result && (
+              <>
+                <Button
+                  onClick={handleChangeLanguage}
+                  variant="outline"
+                  className="flex items-center gap-2 px-4 py-2"
+                >
+                  <Video className="w-4 h-4" />
+                  Change Language
+                </Button>
+                <Button
+                  onClick={handleResetVideo}
+                  className="flex items-center gap-2 px-4 py-2"
+                >
+                  <Upload className="w-4 h-4" />
+                  Upload Another Video
+                </Button>
+              </>
+            )}
+          </div>
         </div>
       </header>
 
       {/* App Section */}
-      <section className="flex-1 flex items-center justify-center w-full py-8">
+      <section className="flex-1 flex items-center justify-center w-full py-4">
         <div className="mx-auto px-4 md:px-6 w-full">
-          <div className="w-full mx-auto space-y-4 p-6 md:p-8 rounded-xl border border-border/50">
-            {/* Single Row - 3 Columns Layout */}
-            {/* Desktop: 3-column grid, Mobile: stacked layout */}
-            <div className="flex flex-col lg:grid lg:grid-cols-3 items-center gap-4">
-              {/* Column 1: Upload Text - Hidden on mobile when result exists */}
-              <div className={`justify-self-start ${result ? 'hidden lg:block' : 'block text-center lg:text-left'}`}>
-                <p className="text-muted-foreground">
-                  Upload a video (MP4 or WebM) to generate subtitles
-                </p>
-              </div>
-
-              {/* Column 2: Controls (Center) - Hidden on mobile, shown in drawer */}
-              <div className="hidden lg:flex justify-self-center">
-                {result && (
-                  <div className="flex flex-col gap-3 items-center">
-                    {/* Tab Controls */}
-                    <div className="flex flex-col gap-2 items-center">
-                      <Tabs
-                        value={mode}
-                        onValueChange={handleModeChange}
-                      >
-                        <TabsList className="grid w-[280px] sm:w-[320px] grid-cols-2">
-                          <TabsTrigger value="word">Word by Word</TabsTrigger>
-                          <TabsTrigger value="phrase">Phrases</TabsTrigger>
-                        </TabsList>
-                      </Tabs>
-                      
-                      <Tabs
-                        value={ratio}
-                        onValueChange={handleRatioChange}
-                      >
-                        <TabsList className="grid w-[280px] sm:w-[320px] grid-cols-2">
-                          <TabsTrigger value="16:9">Landscape (16:9)</TabsTrigger>
-                          <TabsTrigger value="9:16">Portrait (9:16)</TabsTrigger>
-                        </TabsList>
-                      </Tabs>
-                    </div>
-                    
-                    {/* Portrait Zoom Control - Below the tabs */}
-                    {ratio === "9:16" && (
-                      <Button
-                        variant={zoomPortrait ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => handleZoomPortraitChange(!zoomPortrait)}
-                        className="flex items-center gap-2"
-                      >
-                        {zoomPortrait ? <ZoomOut className="h-4 w-4" /> : <ZoomIn className="h-4 w-4" />}
-                        {zoomPortrait ? "Fit to Container" : "Crop/Zoom"}
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Column 3: Action Buttons - Stack vertically on mobile */}
-              <div className="justify-self-center lg:justify-self-end flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                {uploadedFile && !result && (
-                  <Button
-                    onClick={() => setShowLanguageModal(true)}
-                    className="flex items-center gap-2 px-4 py-2"
-                  >
-                    <Video className="w-4 h-4" />
-                    Transcribe Video
-                  </Button>
-                )}
-                {result && (
-                  <>
-                    <Button
-                      onClick={handleChangeLanguage}
-                      variant="outline"
-                      className="flex items-center gap-2 px-4 py-2"
-                    >
-                      <Video className="w-4 h-4" />
-                      Change Language
-                    </Button>
-                    <Button
-                      onClick={handleResetVideo}
-                      className="flex items-center gap-2 px-4 py-2"
-                    >
-                      <Upload className="w-4 h-4" />
-                      Upload Another Video
-                    </Button>
-                  </>
-                )}
-              </div>
-            </div>
-
+          <div className="w-full mx-auto space-y-4 p-4 md:p-6 rounded-xl border border-border/50">
             {!result && (
-              <Alert className="">
-                <Video className="h-4 w-4 text-primary" />
-                <AlertDescription>
-                  Supported formats: MP4 and WebM. Maximum video length: 5
-                  minutes.
-                </AlertDescription>
-              </Alert>
+              <>
+                <div className="text-center">
+                  <p className="text-muted-foreground">
+                    Upload a video (MP4 or WebM) to generate subtitles
+                  </p>
+                </div>
+                <Alert>
+                  <Video className="h-4 w-4 text-primary" />
+                  <AlertDescription>
+                    Supported formats: MP4 and WebM. Maximum video length: 5
+                    minutes.
+                  </AlertDescription>
+                </Alert>
+              </>
             )}
 
             {error && (
@@ -334,46 +289,12 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
                       <SheetTitle>Subtitle Styling</SheetTitle>
                     </SheetHeader>
                     <ScrollArea className="h-[calc(100vh-5rem)]">
-                      <div className="p-4 space-y-6">
-                        {/* Format Controls - Mobile Only */}
-                        <div className="space-y-3 pb-4 border-b">
-                          <h4 className="font-medium text-sm">Format Options</h4>
-                          <div className="space-y-2">
-                            <label className="text-xs text-muted-foreground">Display Mode</label>
-                            <Tabs value={mode} onValueChange={handleModeChange}>
-                              <TabsList className="grid w-full grid-cols-2">
-                                <TabsTrigger value="word">Word by Word</TabsTrigger>
-                                <TabsTrigger value="phrase">Phrases</TabsTrigger>
-                              </TabsList>
-                            </Tabs>
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-xs text-muted-foreground">Aspect Ratio</label>
-                            <Tabs value={ratio} onValueChange={handleRatioChange}>
-                              <TabsList className="grid w-full grid-cols-2">
-                                <TabsTrigger value="16:9">Landscape</TabsTrigger>
-                                <TabsTrigger value="9:16">Portrait</TabsTrigger>
-                              </TabsList>
-                            </Tabs>
-                          </div>
-                          {ratio === "9:16" && (
-                            <Button
-                              variant={zoomPortrait ? "default" : "outline"}
-                              size="sm"
-                              onClick={() => handleZoomPortraitChange(!zoomPortrait)}
-                              className="w-full flex items-center gap-2"
-                            >
-                              {zoomPortrait ? <ZoomOut className="h-4 w-4" /> : <ZoomIn className="h-4 w-4" />}
-                              {zoomPortrait ? "Fit to Container" : "Crop/Zoom"}
-                            </Button>
-                          )}
-                        </div>
-                        
-                        {/* Subtitle Styling */}
+                      <div className="p-4">
                         <SubtitleStyling
                           style={subtitleStyle}
                           onChange={setSubtitleStyle}
                           mode={mode}
+                          onModeChange={handleModeChange}
                         />
                       </div>
                     </ScrollArea>
@@ -411,13 +332,14 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
             <div className="flex flex-col lg:flex-row gap-6">
               {/* Subtitle Styling Column - Hidden on mobile, shown on desktop */}
               {result && (
-                <div className="hidden lg:block w-full lg:w-96 h-[620px]">
-                  <ScrollArea className="rounded-base h-[620px] w-full text-mtext border-2 border-border bg-main p-2 shadow-shadow">
+                <div className="hidden lg:block w-full lg:w-96 h-[560px]">
+                  <ScrollArea className="rounded-base h-[560px] w-full text-mtext border-2 border-border bg-main p-2 shadow-shadow">
                     <div className="p-2 space-y-4">
                       <SubtitleStyling
                         style={subtitleStyle}
                         onChange={setSubtitleStyle}
                         mode={mode}
+                        onModeChange={handleModeChange}
                       />
                     </div>
                   </ScrollArea>
@@ -444,7 +366,31 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
                 />
 
                 {result && (
-                  <div className="mt-4 flex flex-col items-center gap-3">
+                  <div className="mt-3 flex flex-col items-center gap-3">
+                    {/* Aspect Ratio + Zoom Controls */}
+                    <div className="flex items-center gap-3">
+                      <Tabs
+                        value={ratio}
+                        onValueChange={handleRatioChange}
+                      >
+                        <TabsList className="grid w-[260px] grid-cols-2">
+                          <TabsTrigger value="16:9">Landscape (16:9)</TabsTrigger>
+                          <TabsTrigger value="9:16">Portrait (9:16)</TabsTrigger>
+                        </TabsList>
+                      </Tabs>
+                      {ratio === "9:16" && (
+                        <Button
+                          variant={zoomPortrait ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handleZoomPortraitChange(!zoomPortrait)}
+                          className="flex items-center gap-2"
+                        >
+                          {zoomPortrait ? <ZoomOut className="h-4 w-4" /> : <ZoomIn className="h-4 w-4" />}
+                          {zoomPortrait ? "Fit" : "Zoom"}
+                        </Button>
+                      )}
+                    </div>
+
                     {result.generationTime && (
                       <div className="text-xs text-muted-foreground">
                         Generation time: {(result.generationTime / 1000).toFixed(2)}s ({device === "webgpu" ? "WebGPU" : "WASM"})
@@ -482,8 +428,8 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
 
               {/* Transcript Sidebar - Hidden on mobile, shown on desktop */}
               {result && (
-                <div className="hidden lg:block w-full lg:w-96 h-[620px]">
-                  <ScrollArea className="rounded-base h-[620px] w-full text-mtext border-2 border-border bg-main p-4 shadow-shadow">
+                <div className="hidden lg:block w-full lg:w-96 h-[560px]">
+                  <ScrollArea className="rounded-base h-[560px] w-full text-mtext border-2 border-border bg-main p-4 shadow-shadow">
                     <div className="mb-4 pb-2 border-b border-border">
                       <h4 className="text-lg font-semibold">
                         Edit Transcript

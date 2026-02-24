@@ -420,11 +420,10 @@ function renderSubtitle(
 
   // Calculate positioning
   const x = canvas.width / 2;
-  const baseY = canvas.height - (canvas.height * (isVerticalVideo ? 0.08 : 0.16));
-  
+
   // Text wrapping logic
   const wordsInText = displayText.split(" ");
-  const maxWordsPerLine = isVerticalVideo ? 4 : 6;
+  const maxWordsPerLine = style.maxWordsPerLine ?? (isVerticalVideo ? 4 : 6);
   const shouldSplitText = wordsInText.length > maxWordsPerLine;
 
   let lines = [displayText];
@@ -450,6 +449,23 @@ function renderSubtitle(
   const lineGap = 4 * videoScale;
   const totalHeight =
     lines.length * lineHeight + Math.max(0, lines.length - 1) * lineGap;
+
+  // Compute baseY based on position
+  const position = style.position ?? "bottom";
+  let baseY: number;
+  switch (position) {
+    case "top":
+      baseY = canvas.height * (isVerticalVideo ? 0.06 : 0.12) + totalHeight / 2;
+      break;
+    case "middle":
+      baseY = canvas.height / 2;
+      break;
+    case "bottom":
+    default:
+      baseY = canvas.height - (canvas.height * (isVerticalVideo ? 0.08 : 0.16));
+      break;
+  }
+
   const startY = baseY - totalHeight / 2 + lineHeight / 2;
 
   // Draw background if specified
