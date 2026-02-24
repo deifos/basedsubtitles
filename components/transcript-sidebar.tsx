@@ -16,6 +16,7 @@ interface TranscriptChunk {
   text: string;
   timestamp: [number, number];
   disabled?: boolean;
+  dynamicPosition?: "behind" | "front";
 }
 
 interface TranscriptSidebarProps {
@@ -30,7 +31,8 @@ interface TranscriptSidebarProps {
     chunks: TranscriptChunk[];
   }) => void;
   className?: string;
-  mode: "word" | "phrase";
+  mode: "word" | "phrase" | "dynamic";
+  maxWordsPerLine?: number;
 }
 
 export function TranscriptSidebar({
@@ -40,6 +42,7 @@ export function TranscriptSidebar({
   onTranscriptUpdate,
   className = "",
   mode,
+  maxWordsPerLine,
 }: TranscriptSidebarProps) {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editText, setEditText] = useState("");
@@ -55,10 +58,10 @@ export function TranscriptSidebar({
 
   // Process transcript chunks based on the current mode
   const displayChunks: ProcessedChunk[] = useMemo(() => {
-    const processed = processTranscriptChunks(transcript, mode);
+    const processed = processTranscriptChunks(transcript, mode, maxWordsPerLine);
 
     return processed.map((chunk, index) => {
-      if (mode === "phrase" && chunk.words) {
+      if ((mode === "phrase" || mode === "dynamic") && chunk.words) {
         const everyWordDisabled = chunk.words.every((word) =>
           transcript.chunks.some(
             (originalChunk) =>
@@ -175,8 +178,8 @@ export function TranscriptSidebar({
         ...updatedChunks[editingIndex],
         text: editText,
       };
-    } else if (mode === "phrase") {
-      // For phrase mode, we need to update the original word chunks that make up this phrase
+    } else if (mode === "phrase" || mode === "dynamic") {
+      // For phrase/dynamic mode, we need to update the original word chunks that make up this phrase
       const phraseToEdit = displayChunks[editingIndex];
       if (phraseToEdit.words && phraseToEdit.words.length > 0) {
         // Split the edited text into words
@@ -234,8 +237,8 @@ export function TranscriptSidebar({
   };
 
   const toggleChunkDisabled = (index: number) => {
-    if (mode === "phrase") {
-      // For phrase mode, we need to toggle the disabled state of all word chunks
+    if (mode === "phrase" || mode === "dynamic") {
+      // For phrase/dynamic mode, we need to toggle the disabled state of all word chunks
       // that make up this phrase
       const phraseToToggle = displayChunks[index];
       if (phraseToToggle.words) {
@@ -283,6 +286,29 @@ export function TranscriptSidebar({
         onTranscriptUpdate(updatedTranscript);
       }
     }
+  };
+
+  const toggleWordDynamicPosition = (wordTimestamp: [number, number]) => {
+    if (!onTranscriptUpdate) return;
+
+    const updatedChunks = transcript.chunks.map((chunk) => {
+      if (
+        chunk.timestamp[0] === wordTimestamp[0] &&
+        chunk.timestamp[1] === wordTimestamp[1]
+      ) {
+        const currentPos = chunk.dynamicPosition || "front";
+        return {
+          ...chunk,
+          dynamicPosition: (currentPos === "behind" ? "front" : "behind") as "behind" | "front",
+        };
+      }
+      return chunk;
+    });
+
+    onTranscriptUpdate({
+      text: updatedChunks.map((c) => c.text).join(" "),
+      chunks: updatedChunks,
+    });
   };
 
   // Helper to parse time input (supports "21" or "0:21" or "00:21" formats)
@@ -514,44 +540,75 @@ export function TranscriptSidebar({
                     </div>
                   </div>
                 ) : (
-                  <div className="flex justify-between items-start">
-                    <p className={`${isActive ? "font-medium" : ""} ${isDisabled ? "line-through text-gray-500" : ""}`}>
-                      {chunk.text}
-                    </p>
-                    <div className="flex gap-1">
-                      <Button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          startEditing(i);
-                        }}
-                        className="p-1"
-                        title="Edit text"
-                        size="icon"
-                        variant="default"
-                      >
-                        <Edit className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleChunkDisabled(i);
-                        }}
-                        className={`p-1 ${
-                          isDisabled
-                            ? "text-emerald-600 hover:text-emerald-800"
-                            : "text-gray-500 hover:text-gray-700"
-                        }`}
-                        title={isDisabled ? "Enable section" : "Disable section"}
-                        size="icon"
-                        variant="default"
-                      >
-                        {isDisabled ? (
-                          <Undo2 className="h-3 w-3" />
-                        ) : (
-                          <Ban className="h-3 w-3" />
-                        )}
-                      </Button>
+                  <div>
+                    <div className="flex justify-between items-start">
+                      <p className={`${isActive ? "font-medium" : ""} ${isDisabled ? "line-through text-gray-500" : ""}`}>
+                        {chunk.text}
+                      </p>
+                      <div className="flex gap-1">
+                        <Button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            startEditing(i);
+                          }}
+                          className="p-1"
+                          title="Edit text"
+                          size="icon"
+                          variant="default"
+                        >
+                          <Edit className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleChunkDisabled(i);
+                          }}
+                          className={`p-1 ${
+                            isDisabled
+                              ? "text-emerald-600 hover:text-emerald-800"
+                              : "text-gray-500 hover:text-gray-700"
+                          }`}
+                          title={isDisabled ? "Enable section" : "Disable section"}
+                          size="icon"
+                          variant="default"
+                        >
+                          {isDisabled ? (
+                            <Undo2 className="h-3 w-3" />
+                          ) : (
+                            <Ban className="h-3 w-3" />
+                          )}
+                        </Button>
+                      </div>
                     </div>
+                    {/* Word pills for dynamic mode behind/front toggling */}
+                    {mode === "dynamic" && chunk.words && chunk.words.length > 0 && !isDisabled && (
+                      <div className="flex flex-wrap gap-1 mt-1.5">
+                        {chunk.words.map((word: ProcessedWord, wordIdx: number) => {
+                          const pos = word.dynamicPosition || "front";
+                          const isBehind = pos === "behind";
+                          return (
+                            <button
+                              key={`${word.timestamp[0]}-${wordIdx}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleWordDynamicPosition(word.timestamp);
+                              }}
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
+                                isBehind
+                                  ? "bg-purple-100 text-purple-800 hover:bg-purple-200 border border-purple-300"
+                                  : "bg-blue-100 text-blue-700 hover:bg-blue-200 border border-blue-300"
+                              }`}
+                              title={isBehind ? "Behind person (click to move to front)" : "In front of person (click to move behind)"}
+                            >
+                              <span className={`text-[10px] font-bold ${isBehind ? "text-purple-600" : "text-blue-500"}`}>
+                                {isBehind ? "B" : "F"}
+                              </span>
+                              {word.text}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

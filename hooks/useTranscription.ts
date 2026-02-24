@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { extractAudioFromVideo } from "@/lib/audio-utils";
 
 type DeviceType = "webgpu" | "wasm";
+export type ModelSize = "tiny" | "base" | "small";
 
 export type TranscriptionStatus =
   | "idle"
@@ -52,6 +53,7 @@ export function useTranscription() {
   const [device, setDevice] = useState<DeviceType>("wasm");
   const worker = useRef<Worker | null>(null);
   const deviceRef = useRef<DeviceType>("wasm");
+  const modelSizeRef = useRef<ModelSize>("base");
   const modelReadyRef = useRef(false);
   const modelLoadingPromiseRef = useRef<Promise<void> | null>(null);
   const modelLoadResolveRef = useRef<(() => void) | null>(null);
@@ -158,16 +160,24 @@ export function useTranscription() {
     };
   }, [initializeWorker, workerMessageHandler]);
 
-  const ensureModelLoaded = useCallback(async () => {
+  const ensureModelLoaded = useCallback(async (modelSize: ModelSize = "base") => {
     initializeWorker();
 
-    if (modelReadyRef.current) {
+    if (modelReadyRef.current && modelSizeRef.current === modelSize) {
       return;
     }
 
     if (!worker.current) {
       throw new Error("Worker not initialized properly");
     }
+
+    // If model size changed, need to reload
+    if (modelSizeRef.current !== modelSize) {
+      modelReadyRef.current = false;
+      modelLoadingPromiseRef.current = null;
+    }
+
+    modelSizeRef.current = modelSize;
 
     if (!modelLoadingPromiseRef.current) {
       modelLoadingPromiseRef.current = new Promise<void>((resolve, reject) => {
@@ -177,7 +187,7 @@ export function useTranscription() {
 
       worker.current.postMessage({
         type: "load",
-        data: { device: deviceRef.current },
+        data: { device: deviceRef.current, modelSize },
       });
     }
 
@@ -214,7 +224,7 @@ export function useTranscription() {
     }
   };
 
-  const startTranscription = async (file: File, language: string = "en") => {
+  const startTranscription = async (file: File, language: string = "en", modelSize: ModelSize = "base") => {
     try {
       // Reset states
       setError(null);
@@ -224,9 +234,9 @@ export function useTranscription() {
       updateStatus("processing");
       setProgress(5);
 
-      if (!modelReadyRef.current) {
+      if (!modelReadyRef.current || modelSizeRef.current !== modelSize) {
         updateStatus("loading");
-        await ensureModelLoaded();
+        await ensureModelLoaded(modelSize);
       }
 
       updateStatus("extracting");
@@ -245,6 +255,7 @@ export function useTranscription() {
           audio: audioData,
           language,
           device: deviceRef.current,
+          modelSize,
         },
       });
     } catch (err) {

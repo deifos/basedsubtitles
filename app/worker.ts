@@ -4,6 +4,13 @@ import {
 } from "@huggingface/transformers";
 
 type DeviceType = "webgpu" | "wasm";
+export type ModelSize = "tiny" | "base" | "small";
+
+const MODEL_IDS: Record<ModelSize, string> = {
+  tiny: "onnx-community/whisper-tiny_timestamped",
+  base: "onnx-community/whisper-base_timestamped",
+  small: "onnx-community/whisper-small_timestamped",
+};
 
 // Device configurations optimized as sample app
 const PER_DEVICE_CONFIG = {
@@ -24,22 +31,32 @@ const PER_DEVICE_CONFIG = {
  * Simplified singleton pattern like the sample app
  */
 class PipelineSingleton {
-  static model_id = "onnx-community/whisper-base_timestamped";
+  static currentModelId: string | null = null;
   static instance: Promise<AutomaticSpeechRecognitionPipeline> | null = null;
 
   static resetInstance(): void {
     this.instance = null;
+    this.currentModelId = null;
   }
 
   static async getInstance(
+    modelSize: ModelSize = "base",
     progress_callback?: (progress: { status?: string; data?: unknown; loaded?: number; total?: number; progress?: number }) => void,
     device: DeviceType = "webgpu"
   ): Promise<AutomaticSpeechRecognitionPipeline> {
+    const modelId = MODEL_IDS[modelSize];
+
+    // If model changed, reset instance
+    if (this.currentModelId && this.currentModelId !== modelId) {
+      this.resetInstance();
+    }
+
     if (!this.instance) {
+      this.currentModelId = modelId;
       // @ts-expect-error - Transformers.js pipeline types produce complex union that TS cannot resolve
       this.instance = pipeline(
         "automatic-speech-recognition",
-        this.model_id,
+        modelId,
         {
           ...PER_DEVICE_CONFIG[device],
           ...(progress_callback && { progress_callback }),
@@ -51,6 +68,7 @@ class PipelineSingleton {
 }
 
 let activeDevice: DeviceType | null = null;
+let activeModelSize: ModelSize | null = null;
 let loadPromise: Promise<void> | null = null;
 type TranscriptionResult = Awaited<ReturnType<AutomaticSpeechRecognitionPipeline>>;
 
@@ -75,8 +93,8 @@ self.addEventListener("message", async (e: MessageEvent) => {
 });
 
 // Handle model loading - simplified like sample app
-async function handleLoad({ device = "wasm" }: { device?: DeviceType }) {
-  if (!loadPromise || device !== activeDevice) {
+async function handleLoad({ device = "wasm", modelSize = "base" as ModelSize }: { device?: DeviceType; modelSize?: ModelSize }) {
+  if (!loadPromise || device !== activeDevice || modelSize !== activeModelSize) {
     if (transcriptionPromise) {
       try {
         await transcriptionPromise;
@@ -86,19 +104,20 @@ async function handleLoad({ device = "wasm" }: { device?: DeviceType }) {
       transcriptionPromise = null;
     }
 
-    if (device !== activeDevice) {
+    if (device !== activeDevice || modelSize !== activeModelSize) {
       PipelineSingleton.resetInstance();
       loadPromise = null;
     }
 
     self.postMessage({
       status: "loading",
-      data: `Loading model (${device})...`,
+      data: `Loading ${modelSize} model (${device})...`,
     });
 
     loadPromise = (async () => {
       try {
         const transcriber = await PipelineSingleton.getInstance(
+          modelSize,
           (progressInfo) => {
             self.postMessage(progressInfo);
           },
@@ -106,6 +125,7 @@ async function handleLoad({ device = "wasm" }: { device?: DeviceType }) {
         );
 
         activeDevice = device;
+        activeModelSize = modelSize;
 
         if (device === "webgpu") {
           self.postMessage({
@@ -120,6 +140,7 @@ async function handleLoad({ device = "wasm" }: { device?: DeviceType }) {
       } catch (error) {
         PipelineSingleton.resetInstance();
         activeDevice = null;
+        activeModelSize = null;
         throw error;
       }
     })();
@@ -144,10 +165,12 @@ async function handleRun({
   audio,
   language = "en",
   device,
+  modelSize,
 }: {
   audio: Float32Array;
   language?: string;
   device?: DeviceType;
+  modelSize?: ModelSize;
 }) {
   try {
     if (loadPromise) {
@@ -155,7 +178,8 @@ async function handleRun({
     }
 
     const targetDevice = device ?? activeDevice ?? "wasm";
-    const transcriber = await PipelineSingleton.getInstance(undefined, targetDevice);
+    const targetModelSize = modelSize ?? activeModelSize ?? "base";
+    const transcriber = await PipelineSingleton.getInstance(targetModelSize, undefined, targetDevice);
 
     if (transcriptionPromise) {
       await transcriptionPromise;

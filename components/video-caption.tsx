@@ -24,7 +24,7 @@ interface VideoCaptionProps {
   };
   currentTime: number;
   style: SubtitleStyle;
-  mode: "word" | "phrase";
+  mode: "word" | "phrase" | "dynamic";
   ratio: "16:9" | "9:16";
 }
 
@@ -54,12 +54,13 @@ export function VideoCaption({
   const [isAnimating, setIsAnimating] = useState(false);
   const [currentText, setCurrentText] = useState("");
 
-  const processedChunks: ProcessedChunk[] = processTranscriptChunks(transcript, mode);
-  
+  // processTranscriptChunks handles dynamic mode internally now
+  const processedChunks: ProcessedChunk[] = processTranscriptChunks(transcript, mode, style.maxWordsPerLine);
+
   // Filter out disabled chunks for playback preview
   const enabledChunks = processedChunks.filter((chunk) => {
-    if (mode === "phrase" && chunk.words) {
-      // For phrase mode, check if any word in the phrase is disabled
+    if ((mode === "phrase" || mode === "dynamic") && chunk.words) {
+      // For phrase/dynamic mode, check if any word in the phrase is disabled
       return !chunk.words.some(word => 
         transcript.chunks.find(originalChunk => 
           originalChunk.timestamp[0] === word.timestamp[0] && 

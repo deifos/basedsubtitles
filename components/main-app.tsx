@@ -20,8 +20,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ProcessingOverlay } from "@/components/processing-overlay";
-import { useTranscription, STATUS_MESSAGES, type TranscriptionResult } from "@/hooks/useTranscription";
+import { useTranscription, STATUS_MESSAGES, type TranscriptionResult, type ModelSize } from "@/hooks/useTranscription";
 import { useVideoDownloadMediaBunny } from "@/hooks/useVideoDownloadMediaBunny";
+import { useBackgroundRemoval } from "@/hooks/useBackgroundRemoval";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { type LanguageCode } from "@/components/language-selector";
 import { LanguageSelectionModal } from "@/components/language-selection-modal";
@@ -31,7 +32,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Settings, FileText } from "lucide-react";
+import { Settings, FileText, Eraser } from "lucide-react";
 
 interface MainAppProps {
   initialFile?: File | null;
@@ -40,7 +41,7 @@ interface MainAppProps {
 
 // Default subtitle style - Gold preset
 const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
-  fontFamily: "var(--font-open-sans), 'Open Sans', sans-serif",
+  fontFamily: "var(--font-poppins), 'Poppins', sans-serif",
   fontSize: 22,
   fontWeight: "600",
   color: "#F4D35E",
@@ -51,6 +52,14 @@ const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
   wordEmphasisEnabled: true,
   position: "bottom",
   maxWordsPerLine: 6,
+  backgroundRemovalEnabled: false,
+  backgroundType: "solid",
+  solidBackgroundColor: "#000000",
+  subtitleBehindPerson: false,
+  dynamicFontSize: 80,
+  dynamicYPosition: 35,
+  dynamicFrontFontSize: 40,
+  dynamicFrontYPosition: 75,
 };
 
 export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps): JSX.Element {
@@ -59,10 +68,11 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
     DEFAULT_SUBTITLE_STYLE
   );
   const [uploadKey, setUploadKey] = useState(0);
-  const [mode, setMode] = useState<"word" | "phrase">("phrase");
+  const [mode, setMode] = useState<"word" | "phrase" | "dynamic">("phrase");
   const [ratio, setRatio] = useState<"16:9" | "9:16">("16:9");
   const [zoomPortrait, setZoomPortrait] = useState(false);
   const [language, setLanguage] = useState<LanguageCode>("en");
+  const [modelSize, setModelSize] = useState<ModelSize>("base");
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [showStylingDrawer, setShowStylingDrawer] = useState(false);
@@ -83,6 +93,17 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
     cancelTranscription,
   } = useTranscription();
 
+  const {
+    isModelLoading: isBgModelLoading,
+    isProcessing: isBgProcessing,
+    progress: bgProgress,
+    isReady: bgRemovalReady,
+    processVideo: processBgRemoval,
+    getMaskAtTime,
+    reset: resetBgRemoval,
+    processFrame: bgProcessFrame,
+  } = useBackgroundRemoval();
+
   const handleVideoSelect = useCallback(
     (file: File) => {
       setUploadedFile(file);
@@ -101,10 +122,11 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
     }
   }, []);
 
-  const handleLanguageConfirm = useCallback((selectedLanguage: LanguageCode) => {
+  const handleLanguageConfirm = useCallback((selectedLanguage: LanguageCode, selectedModelSize: ModelSize) => {
     setLanguage(selectedLanguage);
+    setModelSize(selectedModelSize);
     if (uploadedFile) {
-      startTranscription(uploadedFile, selectedLanguage);
+      startTranscription(uploadedFile, selectedLanguage, selectedModelSize);
     }
     // Don't close modal here - let useEffect handle it when status changes
   }, [uploadedFile, startTranscription]);
@@ -147,12 +169,28 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
     format: 'mp4',
     quality: 'high',
     fps: 30,
+    bgRemovalReady,
+    processFrame: bgProcessFrame,
   });
+
+  const handleRemoveBackground = useCallback(async () => {
+    if (!videoRef.current) return;
+    setSubtitleStyle((prev) => ({ ...prev, backgroundRemovalEnabled: true }));
+    await processBgRemoval(videoRef.current);
+  }, [processBgRemoval]);
 
   // Memoized handlers for better performance
   const handleResetVideo = useCallback(() => {
     // Reset transcription state
     resetTranscription();
+
+    // Reset background removal
+    resetBgRemoval();
+    setSubtitleStyle((prev) => ({
+      ...prev,
+      backgroundRemovalEnabled: false,
+      subtitleBehindPerson: false,
+    }));
 
     // Clear uploaded file
     setUploadedFile(null);
@@ -174,13 +212,13 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
     }
 
     onReturnToLanding?.();
-  }, [resetTranscription, onReturnToLanding]);
+  }, [resetTranscription, resetBgRemoval, onReturnToLanding]);
 
   const handleTimeUpdate = useCallback((time: number) => {
     setCurrentTime(time);
   }, []);
 
-  const handleModeChange = useCallback((value: "word" | "phrase") => {
+  const handleModeChange = useCallback((value: "word" | "phrase" | "dynamic") => {
     setMode(value);
   }, []);
 
@@ -278,6 +316,7 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
               onClose={handleModalClose}
               onConfirm={handleLanguageConfirm}
               defaultLanguage={language}
+              defaultModelSize={modelSize}
             />
 
             {/* Mobile Drawers */}
@@ -295,6 +334,7 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
                           onChange={setSubtitleStyle}
                           mode={mode}
                           onModeChange={handleModeChange}
+                          bgRemovalReady={bgRemovalReady}
                         />
                       </div>
                     </ScrollArea>
@@ -321,6 +361,7 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
                             setResult(updatedTranscript);
                           }}
                           mode={mode}
+                          maxWordsPerLine={subtitleStyle.maxWordsPerLine}
                         />
                       </div>
                     </ScrollArea>
@@ -340,6 +381,7 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
                         onChange={setSubtitleStyle}
                         mode={mode}
                         onModeChange={handleModeChange}
+                        bgRemovalReady={bgRemovalReady}
                       />
                     </div>
                   </ScrollArea>
@@ -363,6 +405,8 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
                   ratio={ratio}
                   zoomPortrait={zoomPortrait}
                   initialFile={initialFile}
+                  bgRemovalReady={bgRemovalReady}
+                  getMaskAtTime={getMaskAtTime}
                 />
 
                 {result && (
@@ -390,6 +434,71 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
                         </Button>
                       )}
                     </div>
+
+                    {/* Background Removal */}
+                    {!bgRemovalReady && (
+                      <Button
+                        onClick={handleRemoveBackground}
+                        variant="outline"
+                        size="sm"
+                        disabled={isBgModelLoading || isBgProcessing}
+                        className="flex items-center gap-2"
+                      >
+                        <Eraser className="h-4 w-4" />
+                        {isBgModelLoading
+                          ? "Loading model..."
+                          : isBgProcessing
+                            ? "Processing..."
+                            : "Remove Background"}
+                      </Button>
+                    )}
+                    {bgRemovalReady && subtitleStyle.backgroundRemovalEnabled && (
+                      <Button
+                        onClick={() => {
+                          setSubtitleStyle((prev) => ({
+                            ...prev,
+                            backgroundRemovalEnabled: false,
+                            subtitleBehindPerson: false,
+                          }));
+                        }}
+                        variant="outline"
+                        size="sm"
+                        className="flex items-center gap-2"
+                      >
+                        <Eraser className="h-4 w-4" />
+                        Disable Background Removal
+                      </Button>
+                    )}
+                    {bgRemovalReady && !subtitleStyle.backgroundRemovalEnabled && (
+                      <Button
+                        onClick={() => {
+                          setSubtitleStyle((prev) => ({
+                            ...prev,
+                            backgroundRemovalEnabled: true,
+                          }));
+                        }}
+                        variant="outline"
+                        size="sm"
+                        className="flex items-center gap-2"
+                      >
+                        <Eraser className="h-4 w-4" />
+                        Enable Background Removal
+                      </Button>
+                    )}
+                    {(isBgModelLoading || isBgProcessing) && (
+                      <div className="w-full max-w-md space-y-1">
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>{isBgModelLoading ? "Loading model..." : "Processing frames..."}</span>
+                          <span>{Math.round(bgProgress)}%</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className="bg-purple-600 h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${Math.max(0, Math.min(100, bgProgress))}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
 
                     {result.generationTime && (
                       <div className="text-xs text-muted-foreground">

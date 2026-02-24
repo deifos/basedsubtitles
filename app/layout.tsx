@@ -14,6 +14,15 @@ import {
   Roboto,
   Open_Sans,
   Inter,
+  Permanent_Marker,
+  Pacifico,
+  Lobster,
+  Alfa_Slab_One,
+  Staatliches,
+  Fugaz_One,
+  Chewy,
+  Playfair_Display,
+  Lora,
 } from "next/font/google";
 import "./globals.css";
 
@@ -111,6 +120,69 @@ const inter = Inter({
   display: "swap",
 });
 
+const permanentMarker = Permanent_Marker({
+  variable: "--font-permanent-marker",
+  subsets: ["latin"],
+  weight: "400",
+  display: "swap",
+});
+
+const pacifico = Pacifico({
+  variable: "--font-pacifico",
+  subsets: ["latin"],
+  weight: "400",
+  display: "swap",
+});
+
+const lobster = Lobster({
+  variable: "--font-lobster",
+  subsets: ["latin"],
+  weight: "400",
+  display: "swap",
+});
+
+const alfaSlabOne = Alfa_Slab_One({
+  variable: "--font-alfa-slab-one",
+  subsets: ["latin"],
+  weight: "400",
+  display: "swap",
+});
+
+const staatliches = Staatliches({
+  variable: "--font-staatliches",
+  subsets: ["latin"],
+  weight: "400",
+  display: "swap",
+});
+
+const fugazOne = Fugaz_One({
+  variable: "--font-fugaz-one",
+  subsets: ["latin"],
+  weight: "400",
+  display: "swap",
+});
+
+const chewy = Chewy({
+  variable: "--font-chewy",
+  subsets: ["latin"],
+  weight: "400",
+  display: "swap",
+});
+
+const playfairDisplay = Playfair_Display({
+  variable: "--font-playfair-display",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+});
+
+const lora = Lora({
+  variable: "--font-lora",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   title: {
     default: "Based Subtitles - AI Video Subtitle Generator",
@@ -158,7 +230,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${montserrat.variable} ${bebasNeue.variable} ${poppins.variable} ${oswald.variable} ${anton.variable} ${bangers.variable} ${fredoka.variable} ${righteous.variable} ${nunito.variable} ${roboto.variable} ${openSans.variable} ${inter.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${montserrat.variable} ${bebasNeue.variable} ${poppins.variable} ${oswald.variable} ${anton.variable} ${bangers.variable} ${fredoka.variable} ${righteous.variable} ${nunito.variable} ${roboto.variable} ${openSans.variable} ${inter.variable} ${permanentMarker.variable} ${pacifico.variable} ${lobster.variable} ${alfaSlabOne.variable} ${staatliches.variable} ${fugazOne.variable} ${chewy.variable} ${playfairDisplay.variable} ${lora.variable} antialiased`}
       >
         {children}
       </body>

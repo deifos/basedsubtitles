@@ -50,6 +50,7 @@ export interface ProcessedWord {
   text: string;
   timestamp: [number, number];
   disabled?: boolean;
+  dynamicPosition?: "behind" | "front";
 }
 
 export interface ProcessedChunk {
@@ -64,6 +65,7 @@ interface SourceTranscript {
     text: string;
     timestamp: [number, number];
     disabled?: boolean;
+    dynamicPosition?: "behind" | "front";
   }>;
 }
 
@@ -72,7 +74,8 @@ interface SourceTranscript {
  */
 export function processTranscriptChunks(
   transcript: SourceTranscript,
-  mode: "word" | "phrase" = "word"
+  mode: "word" | "phrase" | "dynamic" = "word",
+  maxWordsPerLine?: number
 ): ProcessedChunk[] {
   if (mode === "word") {
     return transcript.chunks.map((chunk) => ({
@@ -81,6 +84,9 @@ export function processTranscriptChunks(
       disabled: chunk.disabled,
     }));
   }
+
+  // Dynamic mode uses phrase grouping internally
+  const isDynamic = mode === "dynamic";
 
   const processedChunks: ProcessedChunk[] = [];
 
@@ -94,13 +100,21 @@ export function processTranscriptChunks(
 
   let currentGroup: PhraseAccumulator = null;
 
-  const MAX_PHRASE_WORDS = 6;
+  const MAX_PHRASE_WORDS = maxWordsPerLine ?? 6;
   const MAX_PHRASE_DURATION = 3.0;
   const MAX_GAP = 0.5;
 
   const flushGroup = () => {
     if (!currentGroup) {
       return;
+    }
+
+    // For dynamic mode, auto-assign dynamicPosition if not already set
+    if (isDynamic) {
+      currentGroup.words = currentGroup.words.map((word, i) => {
+        if (word.dynamicPosition) return word; // preserve user toggle
+        return { ...word, dynamicPosition: i === 0 ? "behind" as const : "front" as const };
+      });
     }
 
     processedChunks.push({
@@ -126,6 +140,7 @@ export function processTranscriptChunks(
       text: trimmedText,
       timestamp: [start, end],
       disabled: chunk.disabled,
+      dynamicPosition: chunk.dynamicPosition,
     };
 
     if (!currentGroup) {
@@ -193,7 +208,7 @@ export function transcriptToSrt(
       timestamp: [number, number];
     }>;
   },
-  mode: "word" | "phrase" = "word"
+  mode: "word" | "phrase" | "dynamic" = "word"
 ): string {
   const processedChunks = processTranscriptChunks(transcript, mode);
   return processedChunks
@@ -216,7 +231,7 @@ export function transcriptToVtt(
       timestamp: [number, number];
     }>;
   },
-  mode: "word" | "phrase" = "word"
+  mode: "word" | "phrase" | "dynamic" = "word"
 ): string {
   const header = "WEBVTT\n\n";
   const processedChunks = processTranscriptChunks(transcript, mode);

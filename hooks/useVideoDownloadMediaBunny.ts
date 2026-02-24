@@ -19,12 +19,15 @@ import {
 } from 'mediabunny';
 import { SubtitleStyle } from '@/components/subtitle-styling';
 import { processTranscriptChunks } from '@/lib/utils';
+import { estimateFaceFromMask, type FaceBounds } from '@/lib/render-subtitle';
+import type { MaskData } from '@/hooks/useBackgroundRemoval';
 
 // Types
 interface TranscriptChunk {
   text: string;
   timestamp: [number, number];
   disabled?: boolean;
+  dynamicPosition?: "behind" | "front";
   words?: WordTiming[];
 }
 
@@ -32,10 +35,17 @@ interface UseVideoDownloadMediaBunnyProps {
   video: HTMLVideoElement | null;
   transcriptChunks: TranscriptChunk[];
   subtitleStyle: SubtitleStyle;
-  mode: 'word' | 'phrase';
+  mode: 'word' | 'phrase' | 'dynamic';
   format?: 'mp4' | 'webm';
   quality?: 'low' | 'medium' | 'high' | 'very_high';
   fps?: number;
+  bgRemovalReady?: boolean;
+  processFrame?: (
+    imageData: Uint8ClampedArray,
+    width: number,
+    height: number,
+    frameIndex: number
+  ) => Promise<MaskData>;
 }
 
 // Quality mapping
@@ -49,6 +59,7 @@ const qualityMap = {
 interface WordTiming {
   text: string;
   timestamp: [number, number];
+  dynamicPosition?: "behind" | "front";
 }
 
 type ProcessedChunk = ReturnType<typeof processTranscriptChunks>[number];
@@ -72,7 +83,9 @@ export function useVideoDownloadMediaBunny({
   mode,
   format = 'mp4',
   quality = 'high',
-  fps = 30
+  fps = 30,
+  bgRemovalReady = false,
+  processFrame: bgProcessFrame,
 }: UseVideoDownloadMediaBunnyProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -171,11 +184,11 @@ export function useVideoDownloadMediaBunny({
         videoSampleSink = new VideoSampleSink(originalVideoTrack);
       }
 
-      // Process chunks according to mode (word/phrase) and filter enabled ones 
-      // this is done to remove disabled chunks eventually to remove silence sections
-      const processedChunks = processTranscriptChunks({ chunks: transcriptChunks }, mode);
+      // Process chunks according to mode (word/phrase/dynamic) and filter enabled ones
+      // processTranscriptChunks handles dynamic mode internally now
+      const processedChunks = processTranscriptChunks({ chunks: transcriptChunks }, mode, subtitleStyle.maxWordsPerLine);
       const enabledChunks = processedChunks.filter((chunk) => {
-        if (mode === 'phrase' && isPhraseChunk(chunk)) {
+        if ((mode === 'phrase' || mode === 'dynamic') && isPhraseChunk(chunk)) {
           return !chunk.words.some((word) => {
             const originalChunk = transcriptChunks.find(
               (candidate) =>
@@ -236,14 +249,100 @@ export function useVideoDownloadMediaBunny({
           }
         }
 
-        // Find and render current subtitle
+        // Find current subtitle chunk
         const currentChunk = enabledChunks.find((chunk) => {
           const [start, end] = chunk.timestamp;
           return time >= start && time <= end;
         });
 
-        if (currentChunk) {
-          renderSubtitle(ctx, currentChunk, subtitleStyle, canvas, mode, time);
+        const isDynamicMode = mode === 'dynamic' && bgRemovalReady && bgProcessFrame;
+        const bgActive = bgRemovalReady && subtitleStyle.backgroundRemovalEnabled && bgProcessFrame;
+        const needsCompositing = isDynamicMode || bgActive;
+
+        if (needsCompositing) {
+          // Compositing at full resolution (bg removal or dynamic mode)
+          const frameImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+          // Process frame through bg removal worker at full resolution
+          const mask = await bgProcessFrame(
+            frameImageData.data,
+            canvas.width,
+            canvas.height,
+            frameIndex
+          );
+
+          // Step 1: Draw background
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          if (isDynamicMode) {
+            // Dynamic mode: keep original video as background
+            ctx.putImageData(frameImageData, 0, 0);
+          } else if (subtitleStyle.backgroundType === 'blur') {
+            const blurCanvas = document.createElement('canvas');
+            blurCanvas.width = canvas.width;
+            blurCanvas.height = canvas.height;
+            const blurCtx = blurCanvas.getContext('2d');
+            if (blurCtx) {
+              blurCtx.putImageData(frameImageData, 0, 0);
+              ctx.filter = 'blur(20px)';
+              ctx.drawImage(blurCanvas, 0, 0);
+              ctx.filter = 'none';
+            }
+          } else {
+            ctx.fillStyle = subtitleStyle.solidBackgroundColor;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+          }
+
+          // Step 2: Render subtitle behind person
+          if (isDynamicMode && currentChunk) {
+            // Dynamic mode: render only "behind" words as big text
+            renderDynamicBehindInExport(ctx, currentChunk, subtitleStyle, canvas);
+          } else if (subtitleStyle.subtitleBehindPerson && currentChunk) {
+            renderSubtitle(ctx, currentChunk, subtitleStyle, canvas, mode, time);
+          }
+
+          // Step 3: Draw masked foreground
+          const fgCanvas = document.createElement('canvas');
+          fgCanvas.width = canvas.width;
+          fgCanvas.height = canvas.height;
+          const fgCtx = fgCanvas.getContext('2d');
+          if (fgCtx) {
+            fgCtx.putImageData(frameImageData, 0, 0);
+
+            const maskCanvas = document.createElement('canvas');
+            maskCanvas.width = mask.width;
+            maskCanvas.height = mask.height;
+            const maskCtx = maskCanvas.getContext('2d');
+            if (maskCtx) {
+              const maskImgData = maskCtx.createImageData(mask.width, mask.height);
+              for (let i = 0; i < mask.data.length; i++) {
+                const idx = i * 4;
+                maskImgData.data[idx] = 255;
+                maskImgData.data[idx + 1] = 255;
+                maskImgData.data[idx + 2] = 255;
+                maskImgData.data[idx + 3] = mask.data[i];
+              }
+              maskCtx.putImageData(maskImgData, 0, 0);
+
+              fgCtx.globalCompositeOperation = 'destination-in';
+              fgCtx.drawImage(maskCanvas, 0, 0, canvas.width, canvas.height);
+              fgCtx.globalCompositeOperation = 'source-over';
+            }
+
+            ctx.drawImage(fgCanvas, 0, 0);
+          }
+
+          // Step 4: Render front text (dynamic) or on-top text (non-dynamic)
+          if (isDynamicMode && currentChunk) {
+            const faceBounds = estimateFaceFromMask(mask.data, mask.width, mask.height, canvas.width, canvas.height);
+            renderDynamicFrontInExport(ctx, currentChunk, subtitleStyle, canvas, faceBounds);
+          } else if (!subtitleStyle.subtitleBehindPerson && currentChunk) {
+            renderSubtitle(ctx, currentChunk, subtitleStyle, canvas, mode, time);
+          }
+        } else {
+          // Normal rendering (no compositing)
+          if (currentChunk) {
+            renderSubtitle(ctx, currentChunk, subtitleStyle, canvas, mode, time);
+          }
         }
 
         if (cancelContextRef.current.cancelRequested) {
@@ -327,7 +426,7 @@ export function useVideoDownloadMediaBunny({
       }
       cancelContextRef.current.cancelRequested = false;
     }
-  }, [video, transcriptChunks, subtitleStyle, mode, format, quality, fps]);
+  }, [video, transcriptChunks, subtitleStyle, mode, format, quality, fps, bgRemovalReady, bgProcessFrame]);
 
   const cancelDownload = useCallback(() => {
     if (!isProcessing) {
@@ -362,9 +461,14 @@ function renderSubtitle(
   chunk: TranscriptChunk,
   style: SubtitleStyle,
   canvas: HTMLCanvasElement,
-  mode: 'word' | 'phrase',
+  mode: 'word' | 'phrase' | 'dynamic',
   currentTime: number
 ) {
+  if (mode === 'dynamic') {
+    renderDynamicWord(ctx, chunk.text, style, canvas);
+    return;
+  }
+
   const displayText = chunk.text;
   const isVerticalVideo = canvas.height > canvas.width;
 
@@ -372,7 +476,7 @@ function renderSubtitle(
   // The preview shows at max 500px height, so we scale relative to that
   const previewHeight = 500;
   const videoScale = canvas.height / previewHeight;
-  
+
   // Calculate font size to match preview proportions exactly
   // Use the video scale to maintain the same visual proportion
   const finalFontSize = Math.round(style.fontSize * videoScale);
@@ -394,6 +498,15 @@ function renderSubtitle(
       'var(--font-righteous)': 'Righteous',
       'var(--font-nunito)': 'Nunito',
       'var(--font-roboto)': 'Roboto',
+      'var(--font-permanent-marker)': 'Permanent Marker',
+      'var(--font-pacifico)': 'Pacifico',
+      'var(--font-lobster)': 'Lobster',
+      'var(--font-alfa-slab-one)': 'Alfa Slab One',
+      'var(--font-staatliches)': 'Staatliches',
+      'var(--font-fugaz-one)': 'Fugaz One',
+      'var(--font-chewy)': 'Chewy',
+      'var(--font-playfair-display)': 'Playfair Display',
+      'var(--font-lora)': 'Lora',
     };
     
     // Find the CSS variable in the font family string
@@ -638,7 +751,7 @@ function renderPhraseLineWithEmphasis(
   const emphasisBgColor = textIsLight ? 'rgba(0, 0, 0, 0.65)' : 'rgba(255, 255, 255, 0.85)';
   const emphasisTextColor = textIsLight ? '#FFFFFF' : '#000000';
 
-  words.forEach((word, index) => {
+  words.forEach((_word, index) => {
     const displayText = uppercaseWords[index];
     const scale = scales[index];
     const scaledWidth = scaledWidths[index];
@@ -744,4 +857,281 @@ function drawWordText(
   ctx.scale(scale, scale);
   ctx.fillText(uppercase, 0, 0);
   ctx.restore();
+}
+
+// Dynamic mode: large text with configurable size and position, word-wrapped
+function renderDynamicWord(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  style: SubtitleStyle,
+  canvas: HTMLCanvasElement
+) {
+  const upperText = text.toUpperCase();
+  const videoScale = canvas.height / 500;
+  const fontSize = Math.round((style.dynamicFontSize ?? 80) * videoScale);
+  const maxWidth = canvas.width * 0.85;
+
+  let fontFamily = style.fontFamily;
+  if (fontFamily.includes('var(')) {
+    const fontMappings: { [key: string]: string } = {
+      'var(--font-bangers)': 'Bangers',
+      'var(--font-montserrat)': 'Montserrat',
+      'var(--font-inter)': 'Inter',
+      'var(--font-bebas-neue)': 'Bebas Neue',
+      'var(--font-poppins)': 'Poppins',
+      'var(--font-open-sans)': 'Open Sans',
+      'var(--font-oswald)': 'Oswald',
+      'var(--font-anton)': 'Anton',
+      'var(--font-fredoka)': 'Fredoka',
+      'var(--font-righteous)': 'Righteous',
+      'var(--font-nunito)': 'Nunito',
+      'var(--font-roboto)': 'Roboto',
+      'var(--font-permanent-marker)': 'Permanent Marker',
+      'var(--font-pacifico)': 'Pacifico',
+      'var(--font-lobster)': 'Lobster',
+      'var(--font-alfa-slab-one)': 'Alfa Slab One',
+      'var(--font-staatliches)': 'Staatliches',
+      'var(--font-fugaz-one)': 'Fugaz One',
+      'var(--font-chewy)': 'Chewy',
+      'var(--font-playfair-display)': 'Playfair Display',
+      'var(--font-lora)': 'Lora',
+    };
+    for (const [cssVar, actualFont] of Object.entries(fontMappings)) {
+      if (fontFamily.includes(cssVar)) {
+        fontFamily = fontFamily.replace(cssVar, actualFont);
+        break;
+      }
+    }
+    if (fontFamily.includes('var(')) {
+      const fallbackMatch = fontFamily.match(/,\s*(.+)$/);
+      fontFamily = fallbackMatch ? fallbackMatch[1] : 'Arial, sans-serif';
+    }
+  }
+
+  ctx.font = `${style.fontWeight} ${fontSize}px ${fontFamily}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  // Word-wrap the text
+  const words = upperText.split(' ');
+  const lines: string[] = [];
+  let currentLine = '';
+  for (const word of words) {
+    const testLine = currentLine ? `${currentLine} ${word}` : word;
+    if (ctx.measureText(testLine).width > maxWidth && currentLine) {
+      lines.push(currentLine);
+      currentLine = word;
+    } else {
+      currentLine = testLine;
+    }
+  }
+  if (currentLine) lines.push(currentLine);
+
+  const lineHeight = fontSize * 1.1;
+  const totalHeight = lines.length * lineHeight;
+  const x = canvas.width / 2;
+  const yPercent = style.dynamicYPosition ?? 35;
+  const yCenter = canvas.height * (yPercent / 100);
+  const startY = yCenter - totalHeight / 2 + lineHeight / 2;
+
+  for (let i = 0; i < lines.length; i++) {
+    const lineY = startY + i * lineHeight;
+    const lineText = lines[i];
+
+    // Stroke
+    const strokeWidth = Math.max(2, fontSize * 0.03);
+    ctx.save();
+    ctx.strokeStyle = style.borderColor || '#000000';
+    ctx.lineWidth = strokeWidth;
+    ctx.lineJoin = 'round';
+    ctx.miterLimit = 2;
+    ctx.strokeText(lineText, x, lineY);
+    ctx.restore();
+
+    // Fill
+    let fillStyle: string | CanvasGradient = style.color;
+    if (style.color === '#CCCCCC' || style.color === '#C0C0C0') {
+      const textWidth = ctx.measureText(lineText).width;
+      const gradient = ctx.createLinearGradient(
+        x - textWidth / 2, lineY - fontSize / 2,
+        x + textWidth / 2, lineY + fontSize / 2
+      );
+      gradient.addColorStop(0, '#FFFFFF');
+      gradient.addColorStop(0.5, '#CCCCCC');
+      gradient.addColorStop(1, '#999999');
+      fillStyle = gradient;
+    }
+
+    ctx.save();
+    const shadowIntensity = Math.max(0.5, style.dropShadowIntensity);
+    ctx.shadowColor = `rgba(0,0,0,${shadowIntensity})`;
+    ctx.shadowBlur = Math.max(3, shadowIntensity * 6 * videoScale);
+    ctx.shadowOffsetX = 2 * videoScale;
+    ctx.shadowOffsetY = 2 * videoScale;
+    ctx.fillStyle = fillStyle;
+    ctx.fillText(lineText, x, lineY);
+    ctx.restore();
+  }
+}
+
+// Render only "behind" words from a dynamic chunk
+function renderDynamicBehindInExport(
+  ctx: CanvasRenderingContext2D,
+  chunk: TranscriptChunk,
+  style: SubtitleStyle,
+  canvas: HTMLCanvasElement
+) {
+  if (!chunk.words) {
+    // Fallback: render entire text as behind
+    renderDynamicWord(ctx, chunk.text, style, canvas);
+    return;
+  }
+
+  const behindWords = chunk.words.filter((w) => w.dynamicPosition === 'behind');
+  if (behindWords.length === 0) return;
+
+  const behindText = behindWords.map((w) => w.text).join(' ');
+  renderDynamicWordWithOptions(ctx, behindText, style, canvas, {
+    fontSize: style.dynamicFontSize ?? 80,
+    yPosition: style.dynamicYPosition ?? 35,
+  });
+}
+
+// Render only "front" words from a dynamic chunk
+function renderDynamicFrontInExport(
+  ctx: CanvasRenderingContext2D,
+  chunk: TranscriptChunk,
+  style: SubtitleStyle,
+  canvas: HTMLCanvasElement,
+  faceBounds: FaceBounds | null
+) {
+  if (!chunk.words) return;
+
+  const frontWords = chunk.words.filter((w) => w.dynamicPosition === 'front');
+  if (frontWords.length === 0) return;
+
+  const frontText = frontWords.map((w) => w.text).join(' ');
+
+  let yPosition = style.dynamicFrontYPosition ?? 75;
+  if (faceBounds) {
+    const chinPercent = (faceBounds.chinY / canvas.height) * 100;
+    yPosition = Math.min(95, chinPercent + 5);
+  }
+
+  renderDynamicWordWithOptions(ctx, frontText, style, canvas, {
+    fontSize: style.dynamicFrontFontSize ?? 40,
+    yPosition,
+  });
+}
+
+// Shared dynamic text renderer with configurable size and position
+function renderDynamicWordWithOptions(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  style: SubtitleStyle,
+  canvas: HTMLCanvasElement,
+  options: { fontSize: number; yPosition: number }
+) {
+  const upperText = text.toUpperCase();
+  const videoScale = canvas.height / 500;
+  const fontSize = Math.round(options.fontSize * videoScale);
+  const maxWidth = canvas.width * 0.85;
+
+  let fontFamily = style.fontFamily;
+  if (fontFamily.includes('var(')) {
+    const fontMappings: { [key: string]: string } = {
+      'var(--font-bangers)': 'Bangers',
+      'var(--font-montserrat)': 'Montserrat',
+      'var(--font-inter)': 'Inter',
+      'var(--font-bebas-neue)': 'Bebas Neue',
+      'var(--font-poppins)': 'Poppins',
+      'var(--font-open-sans)': 'Open Sans',
+      'var(--font-oswald)': 'Oswald',
+      'var(--font-anton)': 'Anton',
+      'var(--font-fredoka)': 'Fredoka',
+      'var(--font-righteous)': 'Righteous',
+      'var(--font-nunito)': 'Nunito',
+      'var(--font-roboto)': 'Roboto',
+      'var(--font-permanent-marker)': 'Permanent Marker',
+      'var(--font-pacifico)': 'Pacifico',
+      'var(--font-lobster)': 'Lobster',
+      'var(--font-alfa-slab-one)': 'Alfa Slab One',
+      'var(--font-staatliches)': 'Staatliches',
+      'var(--font-fugaz-one)': 'Fugaz One',
+      'var(--font-chewy)': 'Chewy',
+      'var(--font-playfair-display)': 'Playfair Display',
+      'var(--font-lora)': 'Lora',
+    };
+    for (const [cssVar, actualFont] of Object.entries(fontMappings)) {
+      if (fontFamily.includes(cssVar)) {
+        fontFamily = fontFamily.replace(cssVar, actualFont);
+        break;
+      }
+    }
+    if (fontFamily.includes('var(')) {
+      const fallbackMatch = fontFamily.match(/,\s*(.+)$/);
+      fontFamily = fallbackMatch ? fallbackMatch[1] : 'Arial, sans-serif';
+    }
+  }
+
+  ctx.font = `${style.fontWeight} ${fontSize}px ${fontFamily}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  const words = upperText.split(' ');
+  const lines: string[] = [];
+  let currentLine = '';
+  for (const word of words) {
+    const testLine = currentLine ? `${currentLine} ${word}` : word;
+    if (ctx.measureText(testLine).width > maxWidth && currentLine) {
+      lines.push(currentLine);
+      currentLine = word;
+    } else {
+      currentLine = testLine;
+    }
+  }
+  if (currentLine) lines.push(currentLine);
+
+  const lineHeight = fontSize * 1.1;
+  const totalHeight = lines.length * lineHeight;
+  const x = canvas.width / 2;
+  const yCenter = canvas.height * (options.yPosition / 100);
+  const startY = yCenter - totalHeight / 2 + lineHeight / 2;
+
+  for (let i = 0; i < lines.length; i++) {
+    const lineY = startY + i * lineHeight;
+    const lineText = lines[i];
+
+    const strokeWidth = Math.max(2, fontSize * 0.03);
+    ctx.save();
+    ctx.strokeStyle = style.borderColor || '#000000';
+    ctx.lineWidth = strokeWidth;
+    ctx.lineJoin = 'round';
+    ctx.miterLimit = 2;
+    ctx.strokeText(lineText, x, lineY);
+    ctx.restore();
+
+    let fillStyle: string | CanvasGradient = style.color;
+    if (style.color === '#CCCCCC' || style.color === '#C0C0C0') {
+      const textWidth = ctx.measureText(lineText).width;
+      const gradient = ctx.createLinearGradient(
+        x - textWidth / 2, lineY - fontSize / 2,
+        x + textWidth / 2, lineY + fontSize / 2
+      );
+      gradient.addColorStop(0, '#FFFFFF');
+      gradient.addColorStop(0.5, '#CCCCCC');
+      gradient.addColorStop(1, '#999999');
+      fillStyle = gradient;
+    }
+
+    ctx.save();
+    const shadowIntensity = Math.max(0.5, style.dropShadowIntensity);
+    ctx.shadowColor = `rgba(0,0,0,${shadowIntensity})`;
+    ctx.shadowBlur = Math.max(3, shadowIntensity * 6 * videoScale);
+    ctx.shadowOffsetX = 2 * videoScale;
+    ctx.shadowOffsetY = 2 * videoScale;
+    ctx.fillStyle = fillStyle;
+    ctx.fillText(lineText, x, lineY);
+    ctx.restore();
+  }
 }

@@ -5,6 +5,8 @@ import { cn } from "@/lib/utils";
 import { VideoCaption } from "./video-caption";
 import { SubtitleStyle } from "./subtitle-styling";
 import { UploadIcon } from "lucide-react";
+import type { MaskData } from "@/hooks/useBackgroundRemoval";
+import { renderSubtitleToCanvas, renderDynamicBehindText, renderDynamicFrontText, estimateFaceFromMask } from "@/lib/render-subtitle";
 
 interface VideoUploadProps {
   onVideoSelect: (file: File) => void;
@@ -21,10 +23,12 @@ interface VideoUploadProps {
   } | null;
   currentTime?: number;
   subtitleStyle: SubtitleStyle;
-  mode: "word" | "phrase";
+  mode: "word" | "phrase" | "dynamic";
   ratio: "16:9" | "9:16";
   zoomPortrait: boolean;
   initialFile?: File | null;
+  bgRemovalReady?: boolean;
+  getMaskAtTime?: (time: number, fps?: number) => MaskData | null;
 }
 
 const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
@@ -41,6 +45,8 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
       ratio,
       zoomPortrait,
       initialFile,
+      bgRemovalReady = false,
+      getMaskAtTime,
     },
     ref
   ) => {
@@ -48,6 +54,14 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
     const [error, setError] = useState<string | null>(null);
     const [isSkipping, setIsSkipping] = useState(false);
     const processedFileRef = useRef<File | null>(null);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const animFrameRef = useRef<number>(0);
+    const blurCanvasRef = useRef<HTMLCanvasElement | null>(null);
+
+    // Whether compositing mode is active
+    const isDynamicMode = mode === "dynamic" && bgRemovalReady && getMaskAtTime;
+    const isBgRemovalMode = bgRemovalReady && subtitleStyle.backgroundRemovalEnabled && getMaskAtTime;
+    const compositingActive = isDynamicMode || isBgRemovalMode;
 
     // Reset video source when ref.current.src is empty
     useEffect(() => {
@@ -89,11 +103,11 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
 
           // Detect aspect ratio from video dimensions
           const detectedRatio: "16:9" | "9:16" = video.videoHeight > video.videoWidth ? "9:16" : "16:9";
-          
+
           setVideoSrc(video.src);
           setError(null);
           onVideoSelect(file);
-          
+
           // Notify parent of detected aspect ratio
           if (onAspectRatioDetected) {
             onAspectRatioDetected(detectedRatio);
@@ -143,19 +157,19 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
     // Function to get disabled time ranges
     const getDisabledRanges = useCallback(() => {
       if (!transcript) return [];
-      
+
       const disabledRanges: Array<[number, number]> = [];
-      
+
       transcript.chunks.forEach(chunk => {
         if (chunk.disabled) {
           disabledRanges.push(chunk.timestamp);
         }
       });
-      
+
       // Sort ranges by start time and merge overlapping ranges
       disabledRanges.sort((a, b) => a[0] - b[0]);
       const mergedRanges: Array<[number, number]> = [];
-      
+
       for (const range of disabledRanges) {
         if (mergedRanges.length === 0 || mergedRanges[mergedRanges.length - 1][1] < range[0]) {
           mergedRanges.push(range);
@@ -167,7 +181,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
           );
         }
       }
-      
+
       return mergedRanges;
     }, [transcript]);
 
@@ -176,20 +190,20 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
       (e: React.SyntheticEvent<HTMLVideoElement>) => {
         const video = e.currentTarget;
         const currentTime = video.currentTime;
-        
+
         // Call the original onTimeUpdate
         onTimeUpdate?.(currentTime);
-        
+
         // Skip disabled segments
         if (!isSkipping && transcript) {
           const disabledRanges = getDisabledRanges();
-          
+
           for (const [start, end] of disabledRanges) {
             // If current time is within a disabled range, skip to the end
             if (currentTime >= start && currentTime < end) {
               setIsSkipping(true);
               video.currentTime = end + 0.1; // Add small buffer to avoid edge cases
-              
+
               // Reset skipping flag after a short delay
               setTimeout(() => {
                 setIsSkipping(false);
@@ -201,6 +215,143 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
       },
       [onTimeUpdate, transcript, isSkipping, getDisabledRanges]
     );
+
+    // Canvas compositing loop for background removal preview
+    useEffect(() => {
+      if (!compositingActive || !canvasRef.current) {
+        if (animFrameRef.current) {
+          cancelAnimationFrame(animFrameRef.current);
+          animFrameRef.current = 0;
+        }
+        return;
+      }
+
+      const videoEl =
+        ref && typeof ref !== "function" ? ref.current : null;
+      if (!videoEl) return;
+
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      // Create reusable temp canvases
+      if (!blurCanvasRef.current) {
+        blurCanvasRef.current = document.createElement("canvas");
+      }
+      const fgCanvas = document.createElement("canvas");
+      const maskCanvas = document.createElement("canvas");
+
+      const render = () => {
+        if (!videoEl || (videoEl.paused && videoEl.currentTime === 0)) {
+          animFrameRef.current = requestAnimationFrame(render);
+          return;
+        }
+
+        // Match canvas to displayed size
+        const displayWidth = canvas.clientWidth;
+        const displayHeight = canvas.clientHeight;
+        if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
+          canvas.width = displayWidth;
+          canvas.height = displayHeight;
+        }
+
+        const time = videoEl.currentTime;
+        const mask = getMaskAtTime!(time);
+
+        if (!mask) {
+          ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+          animFrameRef.current = requestAnimationFrame(render);
+          return;
+        }
+
+        const w = canvas.width;
+        const h = canvas.height;
+        const isDynamic = mode === "dynamic";
+
+        // Step 1: Draw background layer
+        if (isDynamic) {
+          // Dynamic mode: keep original video as background
+          ctx.drawImage(videoEl, 0, 0, w, h);
+        } else if (subtitleStyle.backgroundType === "blur") {
+          const blurCanvas = blurCanvasRef.current!;
+          blurCanvas.width = w;
+          blurCanvas.height = h;
+          const blurCtx = blurCanvas.getContext("2d");
+          if (blurCtx) {
+            blurCtx.filter = "blur(20px)";
+            blurCtx.drawImage(videoEl, 0, 0, w, h);
+            blurCtx.filter = "none";
+            ctx.drawImage(blurCanvas, 0, 0);
+          }
+        } else {
+          ctx.fillStyle = subtitleStyle.solidBackgroundColor;
+          ctx.fillRect(0, 0, w, h);
+        }
+
+        // Step 2: Render subtitle behind person
+        if (isDynamic && transcript) {
+          // Dynamic mode: render only "behind" words as big text
+          renderDynamicBehindText(ctx, transcript, time, subtitleStyle, w, h);
+        } else if (subtitleStyle.subtitleBehindPerson && transcript) {
+          // Non-dynamic behind mode: render all text behind
+          renderSubtitleToCanvas(ctx, transcript, time, subtitleStyle, mode, w, h);
+        }
+
+        // Step 3: Draw masked foreground using canvas compositing
+        fgCanvas.width = w;
+        fgCanvas.height = h;
+        const fgCtx = fgCanvas.getContext("2d");
+        if (fgCtx) {
+          // Draw video frame onto foreground canvas
+          fgCtx.clearRect(0, 0, w, h);
+          fgCtx.drawImage(videoEl, 0, 0, w, h);
+
+          // Create mask canvas at mask resolution, then scale
+          maskCanvas.width = mask.width;
+          maskCanvas.height = mask.height;
+          const maskCtx = maskCanvas.getContext("2d");
+          if (maskCtx) {
+            const maskImageData = maskCtx.createImageData(mask.width, mask.height);
+            for (let i = 0; i < mask.data.length; i++) {
+              const idx = i * 4;
+              maskImageData.data[idx] = 255;     // R
+              maskImageData.data[idx + 1] = 255; // G
+              maskImageData.data[idx + 2] = 255; // B
+              maskImageData.data[idx + 3] = mask.data[i]; // A = mask alpha
+            }
+            maskCtx.putImageData(maskImageData, 0, 0);
+
+            // Use destination-in to clip the video frame to the mask shape
+            fgCtx.globalCompositeOperation = "destination-in";
+            fgCtx.drawImage(maskCanvas, 0, 0, w, h);
+            fgCtx.globalCompositeOperation = "source-over";
+          }
+
+          // Draw masked foreground onto main canvas
+          ctx.drawImage(fgCanvas, 0, 0);
+        }
+
+        // Step 4: Render front text (dynamic) or on-top text (non-dynamic)
+        if (isDynamic && transcript) {
+          // Estimate face from mask for positioning front text below chin
+          const faceBounds = estimateFaceFromMask(mask.data, mask.width, mask.height, w, h);
+          renderDynamicFrontText(ctx, transcript, time, subtitleStyle, w, h, faceBounds);
+        } else if (!subtitleStyle.subtitleBehindPerson && transcript) {
+          renderSubtitleToCanvas(ctx, transcript, time, subtitleStyle, mode, w, h);
+        }
+
+        animFrameRef.current = requestAnimationFrame(render);
+      };
+
+      animFrameRef.current = requestAnimationFrame(render);
+
+      return () => {
+        if (animFrameRef.current) {
+          cancelAnimationFrame(animFrameRef.current);
+          animFrameRef.current = 0;
+        }
+      };
+    }, [compositingActive, ref, subtitleStyle, transcript, mode, getMaskAtTime]);
 
     return (
       <div
@@ -216,7 +367,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
       >
         {videoSrc ? (
           <div className="relative flex items-center justify-center w-full">
-            <div 
+            <div
               className={cn(
                 "relative mx-auto flex justify-center",
                 ratio === "16:9" ? "w-full" : "w-auto"
@@ -241,12 +392,30 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
                 }}
                 onTimeUpdate={handleTimeUpdate}
               />
+              {/* Canvas overlay for background removal compositing - pointer-events-none so video controls remain clickable */}
+              {compositingActive && (
+                <canvas
+                  ref={canvasRef}
+                  className={cn(
+                    "absolute inset-0 pointer-events-none",
+                    ratio === "16:9"
+                      ? "w-full max-w-4xl max-h-[500px]"
+                      : ratio === "9:16" && zoomPortrait
+                        ? "h-[500px] max-h-[500px]"
+                        : "h-[500px] max-h-[500px]"
+                  )}
+                  style={{
+                    aspectRatio: ratio === "16:9" ? "16/9" : "9/16"
+                  }}
+                />
+              )}
               {isSkipping && (
                 <div className="absolute top-4 right-4 bg-black bg-opacity-75 text-white px-3 py-1 rounded-md text-sm font-medium">
-                  ⏭️ Skipping disabled segment
+                  Skipping disabled segment
                 </div>
               )}
-              {transcript && (
+              {/* Only show DOM-based captions when NOT compositing (compositing draws its own) */}
+              {transcript && !compositingActive && (
                 <VideoCaption
                   transcript={transcript}
                   currentTime={currentTime}

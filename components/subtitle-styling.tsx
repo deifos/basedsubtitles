@@ -52,14 +52,24 @@ export interface SubtitleStyle {
   wordEmphasisEnabled: boolean;
   position: "top" | "middle" | "bottom";
   maxWordsPerLine: number;
+  backgroundRemovalEnabled: boolean;
+  backgroundType: "solid" | "blur";
+  solidBackgroundColor: string;
+  subtitleBehindPerson: boolean;
+  // Dynamic subtitle controls
+  dynamicFontSize: number; // font size in px at 500px preview height (default 80)
+  dynamicYPosition: number; // vertical position 0-100 (0=top, 100=bottom, default 35)
+  dynamicFrontFontSize: number; // front text font size at 500px preview height (default 40)
+  dynamicFrontYPosition: number; // front text fallback Y position 0-100 (default 75)
 }
 
 interface SubtitleStylingProps {
   style: SubtitleStyle;
   onChange: (style: SubtitleStyle) => void;
-  mode?: "word" | "phrase";
-  onModeChange?: (mode: "word" | "phrase") => void;
+  mode?: "word" | "phrase" | "dynamic";
+  onModeChange?: (mode: "word" | "phrase" | "dynamic") => void;
   className?: string;
+  bgRemovalReady?: boolean;
 }
 
 const FONT_FAMILIES = {
@@ -122,6 +132,51 @@ const FONT_FAMILIES = {
     label: "Bebas Neue",
     value: "var(--font-bebas-neue), 'Bebas Neue', sans-serif",
     cssFont: "var(--font-bebas-neue), 'Bebas Neue', sans-serif",
+  },
+  permanentMarker: {
+    label: "Permanent Marker",
+    value: "var(--font-permanent-marker), 'Permanent Marker', cursive",
+    cssFont: "var(--font-permanent-marker), 'Permanent Marker', cursive",
+  },
+  pacifico: {
+    label: "Pacifico",
+    value: "var(--font-pacifico), 'Pacifico', cursive",
+    cssFont: "var(--font-pacifico), Pacifico, cursive",
+  },
+  lobster: {
+    label: "Lobster",
+    value: "var(--font-lobster), 'Lobster', cursive",
+    cssFont: "var(--font-lobster), Lobster, cursive",
+  },
+  alfaSlabOne: {
+    label: "Alfa Slab One",
+    value: "var(--font-alfa-slab-one), 'Alfa Slab One', serif",
+    cssFont: "var(--font-alfa-slab-one), 'Alfa Slab One', serif",
+  },
+  staatliches: {
+    label: "Staatliches",
+    value: "var(--font-staatliches), 'Staatliches', sans-serif",
+    cssFont: "var(--font-staatliches), Staatliches, sans-serif",
+  },
+  fugazOne: {
+    label: "Fugaz One",
+    value: "var(--font-fugaz-one), 'Fugaz One', cursive",
+    cssFont: "var(--font-fugaz-one), 'Fugaz One', cursive",
+  },
+  chewy: {
+    label: "Chewy",
+    value: "var(--font-chewy), 'Chewy', cursive",
+    cssFont: "var(--font-chewy), Chewy, cursive",
+  },
+  playfairDisplay: {
+    label: "Playfair Display",
+    value: "var(--font-playfair-display), 'Playfair Display', serif",
+    cssFont: "var(--font-playfair-display), 'Playfair Display', serif",
+  },
+  lora: {
+    label: "Lora",
+    value: "var(--font-lora), 'Lora', serif",
+    cssFont: "var(--font-lora), Lora, serif",
   },
   arial: {
     label: "Arial",
@@ -225,7 +280,7 @@ const PRESETS: SubtitlePreset[] = [
     label: "Gold",
     previewText: "GOLD",
     style: {
-      fontFamily: FONT_FAMILIES.openSans.value,
+      fontFamily: FONT_FAMILIES.poppins.value,
       fontSize: 22,
       fontWeight: "600",
       color: "#F4D35E",
@@ -357,6 +412,7 @@ export function SubtitleStyling({
   mode = "phrase",
   onModeChange,
   className = "",
+  bgRemovalReady = false,
 }: SubtitleStylingProps) {
   const activePresetName = useMemo<SubtitlePresetName | null>(() => {
     const match = PRESETS.find((preset) => isPresetActive(style, preset));
@@ -440,34 +496,52 @@ export function SubtitleStyling({
         <div className="px-4 mb-3">
           <Tabs
             value={mode}
-            onValueChange={(value) => onModeChange(value as "word" | "phrase")}
+            onValueChange={(value) => onModeChange(value as "word" | "phrase" | "dynamic")}
           >
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="word">Word by Word</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="word">Word</TabsTrigger>
               <TabsTrigger value="phrase">Phrases</TabsTrigger>
+              <TabsTrigger value="dynamic" disabled={!bgRemovalReady}>
+                Dynamic
+              </TabsTrigger>
             </TabsList>
           </Tabs>
+          {mode === "dynamic" && !bgRemovalReady && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Remove background first to use Dynamic subtitles
+            </p>
+          )}
         </div>
       )}
 
       <div className="px-4 mb-2">
-        <h3 className="font-medium text-lg">Subtitle Styling</h3>
+        <h3 className="font-medium text-lg">
+          {mode === "dynamic" ? "Dynamic Subtitles" : "Subtitle Styling"}
+        </h3>
+        {mode === "dynamic" && (
+          <p className="text-xs text-muted-foreground mt-1">
+            Large text behind the person for a 3D depth effect
+          </p>
+        )}
       </div>
 
       <div className="p-2 space-y-3 flex-1 overflow-y-auto">
-        <div className="space-y-2 mb-2">
-          <label className="text-sm font-medium block">Style Presets</label>
-          <div className="grid grid-cols-2 gap-2">
-            {PRESETS.map((preset) => (
-              <PresetButton
-                key={preset.name}
-                preset={preset}
-                isActive={activePresetName === preset.name}
-                onApply={() => applyPreset(preset)}
-              />
-            ))}
+        {/* Style presets - only for non-dynamic modes */}
+        {mode !== "dynamic" && (
+          <div className="space-y-2 mb-2">
+            <label className="text-sm font-medium block">Style Presets</label>
+            <div className="grid grid-cols-2 gap-2">
+              {PRESETS.map((preset) => (
+                <PresetButton
+                  key={preset.name}
+                  preset={preset}
+                  isActive={activePresetName === preset.name}
+                  onApply={() => applyPreset(preset)}
+                />
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Font Family with preview */}
         <div className="space-y-2 rounded-lg border border-border/40 bg-muted/40 p-3">
@@ -495,34 +569,36 @@ export function SubtitleStyling({
           </Select>
         </div>
 
-        {/* Font Size - 3-step slider */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium block">Font Size</label>
-          <Slider
-            value={[fontSizeSliderIndex]}
-            onValueChange={(values) => {
-              onChange({ ...style, fontSize: sliderIndexToFontSize(values[0]) });
-            }}
-            min={0}
-            max={2}
-            step={1}
-            className="w-full"
-          />
-          <div className="flex justify-between text-xs mt-1">
-            {FONT_SIZE_STOPS.map((stop, i) => (
-              <span
-                key={stop.value}
-                className={
-                  fontSizeSliderIndex === i
-                    ? "text-foreground font-semibold"
-                    : "text-muted-foreground"
-                }
-              >
-                {stop.label}
-              </span>
-            ))}
+        {/* Font Size - only for non-dynamic modes (dynamic auto-sizes) */}
+        {mode !== "dynamic" && (
+          <div className="space-y-2">
+            <label className="text-sm font-medium block">Font Size</label>
+            <Slider
+              value={[fontSizeSliderIndex]}
+              onValueChange={(values) => {
+                onChange({ ...style, fontSize: sliderIndexToFontSize(values[0]) });
+              }}
+              min={0}
+              max={2}
+              step={1}
+              className="w-full"
+            />
+            <div className="flex justify-between text-xs mt-1">
+              {FONT_SIZE_STOPS.map((stop, i) => (
+                <span
+                  key={stop.value}
+                  className={
+                    fontSizeSliderIndex === i
+                      ? "text-foreground font-semibold"
+                      : "text-muted-foreground"
+                  }
+                >
+                  {stop.label}
+                </span>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="space-y-2">
           <label className="text-sm font-medium block">Font Weight</label>
@@ -542,29 +618,127 @@ export function SubtitleStyling({
           </Select>
         </div>
 
-        {/* Position selector */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium block">Position</label>
-          <div className="grid grid-cols-3 gap-2">
-            {(["top", "middle", "bottom"] as const).map((pos) => {
-              const isActive = style.position === pos;
-              return (
-                <button
-                  key={pos}
-                  onClick={() => onChange({ ...style, position: pos })}
-                  className={`flex flex-col items-center gap-1 rounded-md border px-2 py-2 text-xs font-medium transition-all ${
-                    isActive
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-border/50 bg-background text-muted-foreground hover:border-border hover:text-foreground"
-                  }`}
-                >
-                  <PositionIcon position={pos} isActive={isActive} />
-                  <span className="capitalize">{pos}</span>
-                </button>
-              );
-            })}
+        {/* Dynamic mode controls: font size + vertical position sliders */}
+        {mode === "dynamic" && (
+          <>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">Text Size</label>
+                <span className="text-sm text-muted-foreground tabular-nums">{style.dynamicFontSize}px</span>
+              </div>
+              <Slider
+                value={[style.dynamicFontSize]}
+                onValueChange={(values) => {
+                  onChange({ ...style, dynamicFontSize: values[0] });
+                }}
+                min={30}
+                max={160}
+                step={2}
+                className="w-full"
+              />
+              <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                <span>Small</span>
+                <span>Large</span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">Vertical Position</label>
+                <span className="text-sm text-muted-foreground tabular-nums">{style.dynamicYPosition}%</span>
+              </div>
+              <Slider
+                value={[style.dynamicYPosition]}
+                onValueChange={(values) => {
+                  onChange({ ...style, dynamicYPosition: values[0] });
+                }}
+                min={5}
+                max={95}
+                step={1}
+                className="w-full"
+              />
+              <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                <span>Top</span>
+                <span>Bottom</span>
+              </div>
+            </div>
+
+            <div className="space-y-2 rounded-lg border border-border/40 bg-muted/40 p-3">
+              <h4 className="text-sm font-medium">Front Text</h4>
+              <p className="text-xs text-muted-foreground">
+                Smaller text rendered in front of the person
+              </p>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium">Front Text Size</label>
+                  <span className="text-sm text-muted-foreground tabular-nums">{style.dynamicFrontFontSize}px</span>
+                </div>
+                <Slider
+                  value={[style.dynamicFrontFontSize]}
+                  onValueChange={(values) => {
+                    onChange({ ...style, dynamicFrontFontSize: values[0] });
+                  }}
+                  min={16}
+                  max={80}
+                  step={2}
+                  className="w-full"
+                />
+                <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                  <span>Small</span>
+                  <span>Large</span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium">Front Text Position</label>
+                  <span className="text-sm text-muted-foreground tabular-nums">{style.dynamicFrontYPosition}%</span>
+                </div>
+                <Slider
+                  value={[style.dynamicFrontYPosition]}
+                  onValueChange={(values) => {
+                    onChange({ ...style, dynamicFrontYPosition: values[0] });
+                  }}
+                  min={30}
+                  max={95}
+                  step={1}
+                  className="w-full"
+                />
+                <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                  <span>Top</span>
+                  <span>Bottom</span>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Position selector - not for dynamic mode */}
+        {mode !== "dynamic" && (
+          <div className="space-y-2">
+            <label className="text-sm font-medium block">Position</label>
+            <div className="grid grid-cols-3 gap-2">
+              {(["top", "middle", "bottom"] as const).map((pos) => {
+                const isActive = style.position === pos;
+                return (
+                  <button
+                    key={pos}
+                    onClick={() => onChange({ ...style, position: pos })}
+                    className={`flex flex-col items-center gap-1 rounded-md border px-2 py-2 text-xs font-medium transition-all ${
+                      isActive
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border/50 bg-background text-muted-foreground hover:border-border hover:text-foreground"
+                    }`}
+                  >
+                    <PositionIcon position={pos} isActive={isActive} />
+                    <span className="capitalize">{pos}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Max Words Per Line slider - phrase mode only */}
         {mode === "phrase" && (
@@ -603,33 +777,36 @@ export function SubtitleStyling({
           </div>
         </div>
 
-        <div className="space-y-2">
-          <label className="text-sm font-medium block">Background Color</label>
-          <div className="flex items-center justify-between">
-            <span className="text-sm">No background</span>
-            <Switch
-              checked={isTransparentColor(style.backgroundColor)}
-              onCheckedChange={(checked) => {
-                if (checked) {
-                  onChange({ ...style, backgroundColor: "transparent" });
-                } else {
-                  onChange({ ...style, backgroundColor: "#000000" });
-                }
-              }}
-            />
-          </div>
-          {!isTransparentColor(style.backgroundColor) && (
-            <div className="flex items-center gap-2">
-              <input
-                type="color"
-                value={rgbaToHex(style.backgroundColor)}
-                onChange={handleBackgroundColorChange}
-                className="w-10 h-10 rounded cursor-pointer"
+        {/* Background color - not for dynamic mode */}
+        {mode !== "dynamic" && (
+          <div className="space-y-2">
+            <label className="text-sm font-medium block">Background Color</label>
+            <div className="flex items-center justify-between">
+              <span className="text-sm">No background</span>
+              <Switch
+                checked={isTransparentColor(style.backgroundColor)}
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    onChange({ ...style, backgroundColor: "transparent" });
+                  } else {
+                    onChange({ ...style, backgroundColor: "#000000" });
+                  }
+                }}
               />
-              <span className="text-sm uppercase">{rgbaToHex(style.backgroundColor)}</span>
             </div>
-          )}
-        </div>
+            {!isTransparentColor(style.backgroundColor) && (
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={rgbaToHex(style.backgroundColor)}
+                  onChange={handleBackgroundColorChange}
+                  className="w-10 h-10 rounded cursor-pointer"
+                />
+                <span className="text-sm uppercase">{rgbaToHex(style.backgroundColor)}</span>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="space-y-2">
           <label className="text-sm font-medium block">Border Width</label>
@@ -680,23 +857,88 @@ export function SubtitleStyling({
           </div>
         </div>
 
-        <div className="flex items-center justify-between rounded-md border border-border/50 px-3 py-2">
-          <div>
-            <p className="text-sm font-medium">Active word emphasis</p>
-            <p className="text-xs text-muted-foreground">
-              {mode === "word"
-                ? "Only available in phrase mode"
-                : "Scale the spoken word and add a subtle dark backdrop."
-              }
-            </p>
+        {/* Word emphasis - not for dynamic mode */}
+        {mode !== "dynamic" && (
+          <div className="flex items-center justify-between rounded-md border border-border/50 px-3 py-2">
+            <div>
+              <p className="text-sm font-medium">Active word emphasis</p>
+              <p className="text-xs text-muted-foreground">
+                {mode === "word"
+                  ? "Only available in phrase mode"
+                  : "Scale the spoken word and add a subtle dark backdrop."
+                }
+              </p>
+            </div>
+            <Switch
+              checked={wordEmphasisEnabled}
+              onCheckedChange={handleWordEmphasisToggle}
+              disabled={mode === "word"}
+              aria-label="Toggle active word emphasis"
+            />
           </div>
-          <Switch
-            checked={wordEmphasisEnabled}
-            onCheckedChange={handleWordEmphasisToggle}
-            disabled={mode === "word"}
-            aria-label="Toggle active word emphasis"
-          />
-        </div>
+        )}
+
+        {/* Background Removal Section - only when masks are ready and not in dynamic mode */}
+        {bgRemovalReady && mode !== "dynamic" && (
+          <div className="space-y-3 rounded-lg border border-border/40 bg-muted/40 p-3">
+            <h4 className="text-sm font-medium">Background</h4>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium block">Background Type</label>
+              <div className="grid grid-cols-2 gap-2">
+                {(["solid", "blur"] as const).map((bgType) => {
+                  const isActive = style.backgroundType === bgType;
+                  return (
+                    <button
+                      key={bgType}
+                      onClick={() => onChange({ ...style, backgroundType: bgType })}
+                      className={`rounded-md border px-3 py-2 text-xs font-medium transition-all ${
+                        isActive
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border/50 bg-background text-muted-foreground hover:border-border hover:text-foreground"
+                      }`}
+                    >
+                      {bgType === "solid" ? "Solid Color" : "Blurred"}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {style.backgroundType === "solid" && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium block">Background Color</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={style.solidBackgroundColor}
+                    onChange={(e) =>
+                      onChange({ ...style, solidBackgroundColor: e.target.value })
+                    }
+                    className="w-10 h-10 rounded cursor-pointer"
+                  />
+                  <span className="text-sm uppercase">{style.solidBackgroundColor}</span>
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between rounded-md border border-border/50 px-3 py-2">
+              <div>
+                <p className="text-sm font-medium">Subtitles behind person</p>
+                <p className="text-xs text-muted-foreground">
+                  Place subtitles behind the person for a 3D effect
+                </p>
+              </div>
+              <Switch
+                checked={style.subtitleBehindPerson}
+                onCheckedChange={(checked) =>
+                  onChange({ ...style, subtitleBehindPerson: checked })
+                }
+                aria-label="Toggle subtitles behind person"
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="mt-4">
