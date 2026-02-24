@@ -10,7 +10,6 @@ interface UseBackgroundRemovalReturn {
   isModelLoading: boolean;
   isProcessing: boolean;
   progress: number;
-  masks: Map<number, MaskData>;
   isReady: boolean;
   processVideo: (videoElement: HTMLVideoElement) => Promise<void>;
   getMaskAtTime: (time: number, fps?: number) => MaskData | null;
@@ -29,7 +28,6 @@ export function useBackgroundRemoval(): UseBackgroundRemovalReturn {
   const [isModelLoading, setIsModelLoading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [masks, setMasks] = useState<Map<number, MaskData>>(new Map());
   const [isReady, setIsReady] = useState(false);
 
   const workerRef = useRef<Worker | null>(null);
@@ -157,7 +155,6 @@ export function useBackgroundRemoval(): UseBackgroundRemovalReturn {
       setProgress(0);
       setIsReady(false);
       masksRef.current = new Map();
-      setMasks(new Map());
 
       try {
         // Load model first
@@ -220,8 +217,6 @@ export function useBackgroundRemoval(): UseBackgroundRemovalReturn {
         processingVideo.src = "";
         processingVideo.load();
 
-        // Update state with all masks
-        setMasks(new Map(masksRef.current));
         setIsReady(true);
       } catch (error) {
         console.error("[useBackgroundRemoval] Processing failed:", error);
@@ -268,7 +263,6 @@ export function useBackgroundRemoval(): UseBackgroundRemovalReturn {
   const reset = useCallback(() => {
     masksRef.current = new Map();
     pendingFramesRef.current = new Map();
-    setMasks(new Map());
     setIsReady(false);
     setIsProcessing(false);
     setProgress(0);
@@ -288,7 +282,6 @@ export function useBackgroundRemoval(): UseBackgroundRemovalReturn {
     isModelLoading,
     isProcessing,
     progress,
-    masks,
     isReady,
     processVideo,
     getMaskAtTime,

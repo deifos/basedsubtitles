@@ -222,6 +222,12 @@ export function useVideoDownloadMediaBunny({
         : null;
       let iteratorResult: IteratorResult<VideoSample | null> | undefined;
 
+      // Reusable canvases and ImageData to avoid per-frame allocations
+      let reusableBlurCanvas: HTMLCanvasElement | null = null;
+      let reusableFgCanvas: HTMLCanvasElement | null = null;
+      let reusableMaskCanvas: HTMLCanvasElement | null = null;
+      let reusableMaskImageData: ImageData | null = null;
+
       // Render each frame
       for (let frameIndex = 0; frameIndex < totalFrames; frameIndex++) {
         if (cancelContextRef.current.cancelRequested) {
@@ -284,14 +290,17 @@ export function useVideoDownloadMediaBunny({
             // Dynamic mode: keep original video as background
             ctx.putImageData(frameImageData, 0, 0);
           } else if (subtitleStyle.backgroundType === 'blur') {
-            const blurCanvas = document.createElement('canvas');
-            blurCanvas.width = canvas.width;
-            blurCanvas.height = canvas.height;
-            const blurCtx = blurCanvas.getContext('2d');
+            // Reuse blurCanvas across frames
+            if (!reusableBlurCanvas) {
+              reusableBlurCanvas = document.createElement('canvas');
+            }
+            reusableBlurCanvas.width = canvas.width;
+            reusableBlurCanvas.height = canvas.height;
+            const blurCtx = reusableBlurCanvas.getContext('2d');
             if (blurCtx) {
               blurCtx.putImageData(frameImageData, 0, 0);
               ctx.filter = 'blur(20px)';
-              ctx.drawImage(blurCanvas, 0, 0);
+              ctx.drawImage(reusableBlurCanvas, 0, 0);
               ctx.filter = 'none';
             }
           } else {
@@ -307,35 +316,43 @@ export function useVideoDownloadMediaBunny({
             renderSubtitle(ctx, currentChunk, subtitleStyle, canvas, mode, time);
           }
 
-          // Step 3: Draw masked foreground
-          const fgCanvas = document.createElement('canvas');
-          fgCanvas.width = canvas.width;
-          fgCanvas.height = canvas.height;
-          const fgCtx = fgCanvas.getContext('2d');
+          // Step 3: Draw masked foreground (reuse canvases across frames)
+          if (!reusableFgCanvas) {
+            reusableFgCanvas = document.createElement('canvas');
+          }
+          if (!reusableMaskCanvas) {
+            reusableMaskCanvas = document.createElement('canvas');
+          }
+          reusableFgCanvas.width = canvas.width;
+          reusableFgCanvas.height = canvas.height;
+          const fgCtx = reusableFgCanvas.getContext('2d');
           if (fgCtx) {
             fgCtx.putImageData(frameImageData, 0, 0);
 
-            const maskCanvas = document.createElement('canvas');
-            maskCanvas.width = mask.width;
-            maskCanvas.height = mask.height;
-            const maskCtx = maskCanvas.getContext('2d');
+            reusableMaskCanvas.width = mask.width;
+            reusableMaskCanvas.height = mask.height;
+            const maskCtx = reusableMaskCanvas.getContext('2d');
             if (maskCtx) {
-              const maskImgData = maskCtx.createImageData(mask.width, mask.height);
+              // Reuse ImageData if mask dimensions haven't changed
+              if (!reusableMaskImageData || reusableMaskImageData.width !== mask.width || reusableMaskImageData.height !== mask.height) {
+                reusableMaskImageData = maskCtx.createImageData(mask.width, mask.height);
+              }
+              const pixels = reusableMaskImageData.data;
               for (let i = 0; i < mask.data.length; i++) {
                 const idx = i * 4;
-                maskImgData.data[idx] = 255;
-                maskImgData.data[idx + 1] = 255;
-                maskImgData.data[idx + 2] = 255;
-                maskImgData.data[idx + 3] = mask.data[i];
+                pixels[idx] = 255;
+                pixels[idx + 1] = 255;
+                pixels[idx + 2] = 255;
+                pixels[idx + 3] = mask.data[i];
               }
-              maskCtx.putImageData(maskImgData, 0, 0);
+              maskCtx.putImageData(reusableMaskImageData, 0, 0);
 
               fgCtx.globalCompositeOperation = 'destination-in';
-              fgCtx.drawImage(maskCanvas, 0, 0, canvas.width, canvas.height);
+              fgCtx.drawImage(reusableMaskCanvas, 0, 0, canvas.width, canvas.height);
               fgCtx.globalCompositeOperation = 'source-over';
             }
 
-            ctx.drawImage(fgCanvas, 0, 0);
+            ctx.drawImage(reusableFgCanvas, 0, 0);
           }
 
           // Step 4: Render front text (dynamic) or on-top text (non-dynamic)

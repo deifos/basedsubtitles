@@ -244,13 +244,32 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
         blurCanvasRef.current = document.createElement("canvas");
       }
       const fgCanvas = document.createElement("canvas");
+      const fgCtx = fgCanvas.getContext("2d");
       const maskCanvas = document.createElement("canvas");
+      const maskCtx = maskCanvas.getContext("2d");
+
+      // Reusable ImageData for mask — avoids allocating ~8MB per frame
+      let cachedMaskImageData: ImageData | null = null;
+      let lastMaskW = 0;
+      let lastMaskH = 0;
+
+      // Track last rendered time to skip redundant draws when paused
+      let lastRenderedTime = -1;
 
       const render = () => {
-        if (!videoEl || (videoEl.paused && videoEl.currentTime === 0)) {
+        if (!videoEl) {
           animFrameRef.current = requestAnimationFrame(render);
           return;
         }
+
+        const time = videoEl.currentTime;
+
+        // Skip rendering when paused and we already drew this frame
+        if (videoEl.paused && time === lastRenderedTime) {
+          animFrameRef.current = requestAnimationFrame(render);
+          return;
+        }
+        lastRenderedTime = time;
 
         // Match canvas to displayed size
         const displayWidth = canvas.clientWidth;
@@ -260,7 +279,6 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
           canvas.height = displayHeight;
         }
 
-        const time = videoEl.currentTime;
         const mask = getMaskAtTime!(time);
 
         if (!mask) {
@@ -279,8 +297,10 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
           ctx.drawImage(videoEl, 0, 0, w, h);
         } else if (subtitleStyle.backgroundType === "blur") {
           const blurCanvas = blurCanvasRef.current!;
-          blurCanvas.width = w;
-          blurCanvas.height = h;
+          if (blurCanvas.width !== w || blurCanvas.height !== h) {
+            blurCanvas.width = w;
+            blurCanvas.height = h;
+          }
           const blurCtx = blurCanvas.getContext("2d");
           if (blurCtx) {
             blurCtx.filter = "blur(20px)";
@@ -303,34 +323,44 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
         }
 
         // Step 3: Draw masked foreground using canvas compositing
-        fgCanvas.width = w;
-        fgCanvas.height = h;
-        const fgCtx = fgCanvas.getContext("2d");
-        if (fgCtx) {
+        if (fgCtx && maskCtx) {
+          if (fgCanvas.width !== w || fgCanvas.height !== h) {
+            fgCanvas.width = w;
+            fgCanvas.height = h;
+          }
+
           // Draw video frame onto foreground canvas
           fgCtx.clearRect(0, 0, w, h);
           fgCtx.drawImage(videoEl, 0, 0, w, h);
 
-          // Create mask canvas at mask resolution, then scale
-          maskCanvas.width = mask.width;
-          maskCanvas.height = mask.height;
-          const maskCtx = maskCanvas.getContext("2d");
-          if (maskCtx) {
-            const maskImageData = maskCtx.createImageData(mask.width, mask.height);
-            for (let i = 0; i < mask.data.length; i++) {
-              const idx = i * 4;
-              maskImageData.data[idx] = 255;     // R
-              maskImageData.data[idx + 1] = 255; // G
-              maskImageData.data[idx + 2] = 255; // B
-              maskImageData.data[idx + 3] = mask.data[i]; // A = mask alpha
-            }
-            maskCtx.putImageData(maskImageData, 0, 0);
-
-            // Use destination-in to clip the video frame to the mask shape
-            fgCtx.globalCompositeOperation = "destination-in";
-            fgCtx.drawImage(maskCanvas, 0, 0, w, h);
-            fgCtx.globalCompositeOperation = "source-over";
+          // Resize mask canvas only when mask dimensions change
+          if (maskCanvas.width !== mask.width || maskCanvas.height !== mask.height) {
+            maskCanvas.width = mask.width;
+            maskCanvas.height = mask.height;
           }
+
+          // Reuse ImageData if dimensions match, otherwise create new one
+          if (lastMaskW !== mask.width || lastMaskH !== mask.height) {
+            cachedMaskImageData = maskCtx.createImageData(mask.width, mask.height);
+            lastMaskW = mask.width;
+            lastMaskH = mask.height;
+          }
+
+          const maskImageData = cachedMaskImageData!;
+          const pixels = maskImageData.data;
+          for (let i = 0; i < mask.data.length; i++) {
+            const idx = i * 4;
+            pixels[idx] = 255;     // R
+            pixels[idx + 1] = 255; // G
+            pixels[idx + 2] = 255; // B
+            pixels[idx + 3] = mask.data[i]; // A = mask alpha
+          }
+          maskCtx.putImageData(maskImageData, 0, 0);
+
+          // Use destination-in to clip the video frame to the mask shape
+          fgCtx.globalCompositeOperation = "destination-in";
+          fgCtx.drawImage(maskCanvas, 0, 0, w, h);
+          fgCtx.globalCompositeOperation = "source-over";
 
           // Draw masked foreground onto main canvas
           ctx.drawImage(fgCanvas, 0, 0);
