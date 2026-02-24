@@ -8,7 +8,7 @@
  * - PATCH: Bug fixes and small improvements
  */
 
-export const APP_VERSION = "1.0.0";
+export const APP_VERSION = "1.1.0";
 
 export interface ChangelogEntry {
   version: string;
@@ -21,6 +21,33 @@ export interface ChangelogEntry {
 }
 
 export const changelog: ChangelogEntry[] = [
+  {
+    version: "1.1.0",
+    date: "2026-02-24",
+    title: "Landing Page Redesign & Performance",
+    changes: [
+      { type: "added", description: "New landing page with hero section, feature highlights, how-it-works flow, local processing showcase, and call-to-action" },
+      { type: "added", description: "Full-page drag-and-drop — drop a video anywhere on the landing page to get started" },
+      { type: "added", description: "Drag-over visual feedback on the dropzone with amber highlight" },
+      { type: "added", description: "Changelog page at /changelog with version history" },
+      { type: "added", description: "\"Buy me a coffee\" floating button" },
+      { type: "added", description: "Site footer matching getbasedapps design with version link" },
+      { type: "changed", description: "Redesigned feature cards with playful visual representations — waveform bars, layered text, font samples, language globe" },
+      { type: "changed", description: "Subtitle style presets now use dynamic fonts (Bangers, Permanent Marker, Bebas Neue, Outfit) instead of generic system fonts" },
+      { type: "changed", description: "Default subtitle font size changed to Small for a cleaner look" },
+      { type: "changed", description: "Subtitle styling panel now uses Outfit font with consistent rounded-lg buttons and amber accent colors" },
+      { type: "changed", description: "Style presets now visible in dynamic (3D) mode for consistent styling" },
+      { type: "changed", description: "Subtitle preview pinned above the scroll area so it's always visible while adjusting settings" },
+      { type: "changed", description: "Editor buttons and panels updated to match the new landing page design" },
+      { type: "fixed", description: "Major memory leak — Whisper model (~1GB) now freed after transcription completes instead of staying in memory" },
+      { type: "fixed", description: "Major memory leak — background removal model (~500MB-1GB) now freed after processing completes" },
+      { type: "fixed", description: "Mask data was duplicated in both a ref and React state (~2x memory usage) — removed unused state copy" },
+      { type: "fixed", description: "Canvas render loop now skips redundant draws when video is paused, saving significant CPU" },
+      { type: "fixed", description: "ImageData allocation (~8MB) was created every frame at 60fps — now reused across frames" },
+      { type: "fixed", description: "Temporary canvases in video export now reused across frames instead of recreated per-frame" },
+      { type: "removed", description: "Removed purple color accents — replaced with amber tones throughout" },
+    ],
+  },
   {
     version: "1.0.0",
     date: "2026-02-24",

@@ -105,13 +105,26 @@ export function useTranscription() {
         modelLoadRejectRef.current = null;
         break;
 
-      case "complete":
+      case "complete": {
         // Add generation time from worker
         const resultWithTime = { ...e.data.result, generationTime: e.data.time };
         setResult(resultWithTime);
         updateStatus("ready");
         setProgress(100);
+
+        // Terminate worker to free model memory (~800MB-1.2GB for Whisper)
+        // Worker will be re-created if user transcribes again
+        if (worker.current) {
+          worker.current.removeEventListener("message", workerMessageHandler);
+          worker.current.terminate();
+          worker.current = null;
+        }
+        modelReadyRef.current = false;
+        modelLoadingPromiseRef.current = null;
+        modelLoadResolveRef.current = null;
+        modelLoadRejectRef.current = null;
         break;
+      }
 
       case "error":
         setError(e.data.data);

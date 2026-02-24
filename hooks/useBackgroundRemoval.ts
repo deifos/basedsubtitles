@@ -217,6 +217,14 @@ export function useBackgroundRemoval(): UseBackgroundRemovalReturn {
         processingVideo.src = "";
         processingVideo.load();
 
+        // Terminate worker to free segmentation model memory (~500MB-1GB)
+        // Worker will be re-created on demand if needed for export
+        if (workerRef.current) {
+          workerRef.current.terminate();
+          workerRef.current = null;
+        }
+        modelReadyRef.current = false;
+
         setIsReady(true);
       } catch (error) {
         console.error("[useBackgroundRemoval] Processing failed:", error);

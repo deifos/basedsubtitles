@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { JSX, DragEvent, ChangeEvent } from "react";
 import { Film, FolderOpen, Plus } from "lucide-react";
 
@@ -12,6 +12,8 @@ export function LandingDropzone({
   onVideoSelect,
 }: LandingDropzoneProps): JSX.Element {
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const dragCounterRef = useRef(0);
 
   const handleFile = useCallback(
     (file: File | null) => {
@@ -38,6 +40,9 @@ export function LandingDropzone({
   const handleDrop = useCallback(
     (event: DragEvent<HTMLDivElement>) => {
       event.preventDefault();
+      event.stopPropagation();
+      dragCounterRef.current = 0;
+      setIsDragOver(false);
       const file = event.dataTransfer.files?.[0] ?? null;
       handleFile(file);
     },
@@ -46,6 +51,23 @@ export function LandingDropzone({
 
   const handleDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
+    event.stopPropagation();
+  }, []);
+
+  const handleDragEnter = useCallback((event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    dragCounterRef.current++;
+    setIsDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    dragCounterRef.current--;
+    if (dragCounterRef.current === 0) {
+      setIsDragOver(false);
+    }
   }, []);
 
   const openFilePicker = useCallback(() => {
@@ -54,11 +76,17 @@ export function LandingDropzone({
 
   return (
     <div
-      className="group relative rounded-xl border border-dashed border-slate-300 bg-white p-6 shadow-sm transition-colors hover:border-slate-400 focus-within:outline-none sm:p-8"
+      className={`group relative rounded-xl border-2 border-dashed p-6 shadow-sm transition-all focus-within:outline-none sm:p-8 ${
+        isDragOver
+          ? "border-amber-400 bg-amber-50/60 scale-[1.02]"
+          : "border-slate-300 bg-white hover:border-slate-400"
+      }`}
       onDrop={handleDrop}
       onDragOver={handleDragOver}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
     >
-      <div className="absolute inset-0 -z-10 rounded-xl bg-slate-50" />
+      <div className={`absolute inset-0 -z-10 rounded-xl transition-colors ${isDragOver ? "bg-amber-50/40" : "bg-slate-50"}`} />
 
       <div className="flex flex-col items-center justify-center py-10 text-center sm:py-14">
         <div className="relative flex h-16 w-16 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700">
