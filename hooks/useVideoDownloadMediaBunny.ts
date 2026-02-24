@@ -1012,10 +1012,13 @@ function renderDynamicFrontInExport(
 
   const frontText = frontWords.map((w) => w.text).join(' ');
 
-  let yPosition = style.dynamicFrontYPosition ?? 75;
+  const fallbackY = style.dynamicFrontYPosition ?? 75;
+  let yPosition = fallbackY;
   if (faceBounds) {
     const chinPercent = (faceBounds.chinY / canvas.height) * 100;
-    yPosition = Math.min(95, chinPercent + 5);
+    const faceBasedY = Math.min(90, chinPercent + 10);
+    // Use whichever is lower (further down) — never place above the fallback
+    yPosition = Math.max(fallbackY, faceBasedY);
   }
 
   renderDynamicWordWithOptions(ctx, frontText, style, canvas, {

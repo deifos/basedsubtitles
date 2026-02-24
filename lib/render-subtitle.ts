@@ -164,8 +164,9 @@ export function estimateFaceFromMask(
   if (!found) return null;
 
   const personHeight = maxY - minY;
-  // Face is approximately the top 20% of the person mask
-  const chinMaskY = minY + personHeight * 0.2;
+  // Face/head is approximately the top 30% of the visible person
+  // The chin sits at roughly 30% down from the top of the person bounding box
+  const chinMaskY = minY + personHeight * 0.30;
   // Scale from mask coordinates to canvas coordinates
   const chinY = (chinMaskY / maskHeight) * canvasHeight;
 
@@ -263,11 +264,14 @@ export function renderDynamicFrontText(
   const frontText = frontWords.map((w) => w.text).join(" ");
 
   // Calculate Y position: below face if detected, otherwise fallback
-  let yPosition = style.dynamicFrontYPosition ?? 75;
+  const fallbackY = style.dynamicFrontYPosition ?? 75;
+  let yPosition = fallbackY;
   if (faceBounds) {
-    // Convert chin Y to percentage of canvas height, then add 5% margin
+    // Place text below the chin with a 10% margin
     const chinPercent = (faceBounds.chinY / canvasHeight) * 100;
-    yPosition = Math.min(95, chinPercent + 5);
+    const faceBasedY = Math.min(90, chinPercent + 10);
+    // Use whichever is lower (further down) — never place above the fallback
+    yPosition = Math.max(fallbackY, faceBasedY);
   }
 
   renderDynamicTextBlock(ctx, frontText, style, canvasWidth, canvasHeight, {
