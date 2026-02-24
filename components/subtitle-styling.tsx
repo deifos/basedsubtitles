@@ -57,22 +57,34 @@ export interface SubtitleStyle {
   solidBackgroundColor: string;
   subtitleBehindPerson: boolean;
   // Dynamic subtitle controls
-  dynamicFontSize: number; // font size in px at 500px preview height (default 80)
-  dynamicYPosition: number; // vertical position 0-100 (0=top, 100=bottom, default 35)
+  dynamicEnabled: boolean; // toggle for behind/front 3D depth effect
+  dynamicFontSize: number; // behind text font size in px at 500px preview height (default 80)
+  dynamicYPosition: number; // behind text vertical position 0-100 (0=top, 100=bottom, default 35)
   dynamicFrontFontSize: number; // front text font size at 500px preview height (default 40)
   dynamicFrontYPosition: number; // front text fallback Y position 0-100 (default 75)
+  dynamicFollowWord: boolean; // highlight spoken word in front text (phrase mode only)
 }
 
 interface SubtitleStylingProps {
   style: SubtitleStyle;
   onChange: (style: SubtitleStyle) => void;
-  mode?: "word" | "phrase" | "dynamic";
-  onModeChange?: (mode: "word" | "phrase" | "dynamic") => void;
+  mode?: "word" | "phrase";
+  onModeChange?: (mode: "word" | "phrase") => void;
   className?: string;
   bgRemovalReady?: boolean;
 }
 
 const FONT_FAMILIES = {
+  plusJakartaSans: {
+    label: "Plus Jakarta Sans",
+    value: "var(--font-plus-jakarta-sans), 'Plus Jakarta Sans', sans-serif",
+    cssFont: "var(--font-plus-jakarta-sans), 'Plus Jakarta Sans', sans-serif",
+  },
+  outfit: {
+    label: "Outfit",
+    value: "var(--font-outfit), 'Outfit', sans-serif",
+    cssFont: "var(--font-outfit), Outfit, sans-serif",
+  },
   inter: {
     label: "Inter",
     value: "var(--font-inter), 'Inter', sans-serif",
@@ -496,38 +508,23 @@ export function SubtitleStyling({
         <div className="px-4 mb-3">
           <Tabs
             value={mode}
-            onValueChange={(value) => onModeChange(value as "word" | "phrase" | "dynamic")}
+            onValueChange={(value) => onModeChange(value as "word" | "phrase")}
           >
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="word">Word</TabsTrigger>
               <TabsTrigger value="phrase">Phrases</TabsTrigger>
-              <TabsTrigger value="dynamic" disabled={!bgRemovalReady}>
-                Dynamic
-              </TabsTrigger>
             </TabsList>
           </Tabs>
-          {mode === "dynamic" && !bgRemovalReady && (
-            <p className="text-xs text-muted-foreground mt-1">
-              Remove background first to use Dynamic subtitles
-            </p>
-          )}
         </div>
       )}
 
       <div className="px-4 mb-2">
-        <h3 className="font-medium text-lg">
-          {mode === "dynamic" ? "Dynamic Subtitles" : "Subtitle Styling"}
-        </h3>
-        {mode === "dynamic" && (
-          <p className="text-xs text-muted-foreground mt-1">
-            Large text behind the person for a 3D depth effect
-          </p>
-        )}
+        <h3 className="font-medium text-lg">Subtitle Styling</h3>
       </div>
 
       <div className="p-2 space-y-3 flex-1 overflow-y-auto">
-        {/* Style presets - only for non-dynamic modes */}
-        {mode !== "dynamic" && (
+        {/* Style presets */}
+        {!style.dynamicEnabled && (
           <div className="space-y-2 mb-2">
             <label className="text-sm font-medium block">Style Presets</label>
             <div className="grid grid-cols-2 gap-2">
@@ -569,8 +566,8 @@ export function SubtitleStyling({
           </Select>
         </div>
 
-        {/* Font Size - only for non-dynamic modes (dynamic auto-sizes) */}
-        {mode !== "dynamic" && (
+        {/* Font Size - only when dynamic is off (dynamic has its own size controls) */}
+        {!style.dynamicEnabled && (
           <div className="space-y-2">
             <label className="text-sm font-medium block">Font Size</label>
             <Slider
@@ -618,12 +615,12 @@ export function SubtitleStyling({
           </Select>
         </div>
 
-        {/* Dynamic mode controls: font size + vertical position sliders */}
-        {mode === "dynamic" && (
+        {/* Dynamic controls: behind text size + position, front text, follow-word */}
+        {style.dynamicEnabled && (
           <>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="text-sm font-medium">Text Size</label>
+                <label className="text-sm font-medium">Behind Text Size</label>
                 <span className="text-sm text-muted-foreground tabular-nums">{style.dynamicFontSize}px</span>
               </div>
               <Slider
@@ -711,11 +708,30 @@ export function SubtitleStyling({
                 </div>
               </div>
             </div>
+
+            {/* Follow-up word display - phrase mode only */}
+            {mode === "phrase" && (
+              <div className="flex items-center justify-between rounded-md border border-border/50 px-3 py-2">
+                <div>
+                  <p className="text-sm font-medium">Follow-up word display</p>
+                  <p className="text-xs text-muted-foreground">
+                    Reveal words one by one as they are spoken
+                  </p>
+                </div>
+                <Switch
+                  checked={style.dynamicFollowWord}
+                  onCheckedChange={(checked) =>
+                    onChange({ ...style, dynamicFollowWord: checked })
+                  }
+                  aria-label="Toggle follow-up word display"
+                />
+              </div>
+            )}
           </>
         )}
 
-        {/* Position selector - not for dynamic mode */}
-        {mode !== "dynamic" && (
+        {/* Position selector - hidden when dynamic is active */}
+        {!style.dynamicEnabled && (
           <div className="space-y-2">
             <label className="text-sm font-medium block">Position</label>
             <div className="grid grid-cols-3 gap-2">
@@ -777,8 +793,8 @@ export function SubtitleStyling({
           </div>
         </div>
 
-        {/* Background color - not for dynamic mode */}
-        {mode !== "dynamic" && (
+        {/* Background color - hidden when dynamic is active */}
+        {!style.dynamicEnabled && (
           <div className="space-y-2">
             <label className="text-sm font-medium block">Background Color</label>
             <div className="flex items-center justify-between">
@@ -857,8 +873,8 @@ export function SubtitleStyling({
           </div>
         </div>
 
-        {/* Word emphasis - not for dynamic mode */}
-        {mode !== "dynamic" && (
+        {/* Word emphasis - hidden when dynamic is active */}
+        {!style.dynamicEnabled && (
           <div className="flex items-center justify-between rounded-md border border-border/50 px-3 py-2">
             <div>
               <p className="text-sm font-medium">Active word emphasis</p>
@@ -878,65 +894,86 @@ export function SubtitleStyling({
           </div>
         )}
 
-        {/* Background Removal Section - only when masks are ready and not in dynamic mode */}
-        {bgRemovalReady && mode !== "dynamic" && (
+        {/* Background Removal Section - only when masks are ready */}
+        {bgRemovalReady && (
           <div className="space-y-3 rounded-lg border border-border/40 bg-muted/40 p-3">
             <h4 className="text-sm font-medium">Background</h4>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium block">Background Type</label>
-              <div className="grid grid-cols-2 gap-2">
-                {(["solid", "blur"] as const).map((bgType) => {
-                  const isActive = style.backgroundType === bgType;
-                  return (
-                    <button
-                      key={bgType}
-                      onClick={() => onChange({ ...style, backgroundType: bgType })}
-                      className={`rounded-md border px-3 py-2 text-xs font-medium transition-all ${
-                        isActive
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-border/50 bg-background text-muted-foreground hover:border-border hover:text-foreground"
-                      }`}
-                    >
-                      {bgType === "solid" ? "Solid Color" : "Blurred"}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {style.backgroundType === "solid" && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium block">Background Color</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="color"
-                    value={style.solidBackgroundColor}
-                    onChange={(e) =>
-                      onChange({ ...style, solidBackgroundColor: e.target.value })
-                    }
-                    className="w-10 h-10 rounded cursor-pointer"
-                  />
-                  <span className="text-sm uppercase">{style.solidBackgroundColor}</span>
-                </div>
-              </div>
-            )}
-
-            <div className="flex items-center justify-between rounded-md border border-border/50 px-3 py-2">
+            {/* Dynamic (3D depth) toggle */}
+            <div className="flex items-center justify-between rounded-md border border-purple-300/50 bg-purple-50/50 px-3 py-2">
               <div>
-                <p className="text-sm font-medium">Subtitles behind person</p>
+                <p className="text-sm font-medium">Dynamic (3D depth)</p>
                 <p className="text-xs text-muted-foreground">
-                  Place subtitles behind the person for a 3D effect
+                  Split text behind &amp; in front of the person
                 </p>
               </div>
               <Switch
-                checked={style.subtitleBehindPerson}
+                checked={style.dynamicEnabled}
                 onCheckedChange={(checked) =>
-                  onChange({ ...style, subtitleBehindPerson: checked })
+                  onChange({ ...style, dynamicEnabled: checked })
                 }
-                aria-label="Toggle subtitles behind person"
+                aria-label="Toggle dynamic 3D depth subtitles"
               />
             </div>
+
+            {!style.dynamicEnabled && (
+              <>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium block">Background Type</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(["solid", "blur"] as const).map((bgType) => {
+                      const isActive = style.backgroundType === bgType;
+                      return (
+                        <button
+                          key={bgType}
+                          onClick={() => onChange({ ...style, backgroundType: bgType })}
+                          className={`rounded-md border px-3 py-2 text-xs font-medium transition-all ${
+                            isActive
+                              ? "border-primary bg-primary/10 text-primary"
+                              : "border-border/50 bg-background text-muted-foreground hover:border-border hover:text-foreground"
+                          }`}
+                        >
+                          {bgType === "solid" ? "Solid Color" : "Blurred"}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {style.backgroundType === "solid" && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium block">Background Color</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={style.solidBackgroundColor}
+                        onChange={(e) =>
+                          onChange({ ...style, solidBackgroundColor: e.target.value })
+                        }
+                        className="w-10 h-10 rounded cursor-pointer"
+                      />
+                      <span className="text-sm uppercase">{style.solidBackgroundColor}</span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between rounded-md border border-border/50 px-3 py-2">
+                  <div>
+                    <p className="text-sm font-medium">Subtitles behind person</p>
+                    <p className="text-xs text-muted-foreground">
+                      Place subtitles behind the person for a 3D effect
+                    </p>
+                  </div>
+                  <Switch
+                    checked={style.subtitleBehindPerson}
+                    onCheckedChange={(checked) =>
+                      onChange({ ...style, subtitleBehindPerson: checked })
+                    }
+                    aria-label="Toggle subtitles behind person"
+                  />
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>

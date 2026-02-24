@@ -10,12 +10,13 @@ import {
   type ProcessedWord,
 } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Edit, Ban, Undo2, Plus } from "lucide-react";
+import { Edit, Ban, Undo2, Plus, EyeOff, SkipForward } from "lucide-react";
 
 interface TranscriptChunk {
   text: string;
   timestamp: [number, number];
   disabled?: boolean;
+  subtitleHidden?: boolean;
   dynamicPosition?: "behind" | "front";
 }
 
@@ -31,8 +32,9 @@ interface TranscriptSidebarProps {
     chunks: TranscriptChunk[];
   }) => void;
   className?: string;
-  mode: "word" | "phrase" | "dynamic";
+  mode: "word" | "phrase";
   maxWordsPerLine?: number;
+  dynamicEnabled?: boolean;
 }
 
 export function TranscriptSidebar({
@@ -43,6 +45,7 @@ export function TranscriptSidebar({
   className = "",
   mode,
   maxWordsPerLine,
+  dynamicEnabled = false,
 }: TranscriptSidebarProps) {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editText, setEditText] = useState("");
@@ -58,10 +61,10 @@ export function TranscriptSidebar({
 
   // Process transcript chunks based on the current mode
   const displayChunks: ProcessedChunk[] = useMemo(() => {
-    const processed = processTranscriptChunks(transcript, mode, maxWordsPerLine);
+    const processed = processTranscriptChunks(transcript, mode, maxWordsPerLine, dynamicEnabled);
 
     return processed.map((chunk, index) => {
-      if ((mode === "phrase" || mode === "dynamic") && chunk.words) {
+      if ((mode === "phrase") && chunk.words) {
         const everyWordDisabled = chunk.words.every((word) =>
           transcript.chunks.some(
             (originalChunk) =>
@@ -70,19 +73,29 @@ export function TranscriptSidebar({
               originalChunk.disabled
           )
         );
+        const everyWordHidden = chunk.words.every((word) =>
+          transcript.chunks.some(
+            (originalChunk) =>
+              originalChunk.timestamp[0] === word.timestamp[0] &&
+              originalChunk.timestamp[1] === word.timestamp[1] &&
+              originalChunk.subtitleHidden
+          )
+        );
 
         return {
           ...chunk,
           disabled: everyWordDisabled,
+          subtitleHidden: everyWordHidden,
         };
       }
 
       return {
         ...chunk,
         disabled: transcript.chunks[index]?.disabled ?? false,
+        subtitleHidden: transcript.chunks[index]?.subtitleHidden ?? false,
       };
     });
-  }, [transcript, mode]);
+  }, [transcript, mode, maxWordsPerLine, dynamicEnabled]);
 
   // Add effect to scroll to active chunk when currentTime changes
   useEffect(() => {
@@ -178,7 +191,7 @@ export function TranscriptSidebar({
         ...updatedChunks[editingIndex],
         text: editText,
       };
-    } else if (mode === "phrase" || mode === "dynamic") {
+    } else if (mode === "phrase") {
       // For phrase/dynamic mode, we need to update the original word chunks that make up this phrase
       const phraseToEdit = displayChunks[editingIndex];
       if (phraseToEdit.words && phraseToEdit.words.length > 0) {
@@ -188,7 +201,7 @@ export function TranscriptSidebar({
 
         // Update each original chunk with the corresponding new word
         // If there are more new words than original, concatenate extras to the last original word
-        // If there are fewer new words, the remaining original words keep their text
+        // If there are fewer new words, extra original words are cleared (empty text is skipped by processTranscriptChunks)
         originalWords.forEach((originalWord, wordIndex) => {
           const originalChunkIndex = transcript.chunks.findIndex(
             (chunk) =>
@@ -197,19 +210,22 @@ export function TranscriptSidebar({
           );
 
           if (originalChunkIndex !== -1) {
-            let newText = "";
+            let newText: string;
 
             if (wordIndex === originalWords.length - 1) {
               // This is the last original word - concatenate all remaining new words
               newText = newWords.slice(wordIndex).join(" ");
             } else if (wordIndex < newWords.length) {
-              // Not the last original word, take the corresponding new word if it exists
+              // Not the last original word, take the corresponding new word
               newText = newWords[wordIndex];
+            } else {
+              // Fewer new words than original - clear this word
+              newText = "";
             }
 
             updatedChunks[originalChunkIndex] = {
               ...updatedChunks[originalChunkIndex],
-              text: newText || updatedChunks[originalChunkIndex].text,
+              text: newText,
             };
           }
         });
@@ -236,34 +252,41 @@ export function TranscriptSidebar({
     setEditText("");
   };
 
-  const toggleChunkDisabled = (index: number) => {
-    if (mode === "phrase" || mode === "dynamic") {
-      // For phrase/dynamic mode, we need to toggle the disabled state of all word chunks
-      // that make up this phrase
+  // Cycle through 3 states: normal → hidden subs → skip segment → normal
+  const cycleChunkState = (index: number) => {
+    const chunk = displayChunks[index];
+    const isHidden = chunk.subtitleHidden ?? false;
+    const isDisabled = chunk.disabled ?? false;
+
+    // Determine next state
+    let nextHidden = false;
+    let nextDisabled = false;
+    if (!isHidden && !isDisabled) {
+      // Normal → Hide subs
+      nextHidden = true;
+    } else if (isHidden && !isDisabled) {
+      // Hide subs → Skip segment
+      nextDisabled = true;
+    }
+    // Skip → Normal (both false)
+
+    if (mode === "phrase") {
       const phraseToToggle = displayChunks[index];
       if (phraseToToggle.words) {
-        const isCurrentlyDisabled = phraseToToggle.words.some((word: ProcessedWord) =>
-          transcript.chunks.find(
-            (chunk) =>
-              chunk.timestamp[0] === word.timestamp[0] &&
-              chunk.timestamp[1] === word.timestamp[1]
-          )?.disabled
-        );
-
         const updatedChunks = transcript.chunks.map((originalChunk) => {
           const isPartOfPhrase = phraseToToggle.words!.some((phraseWord) =>
             phraseWord.timestamp[0] === originalChunk.timestamp[0] &&
             phraseWord.timestamp[1] === originalChunk.timestamp[1]
           );
-          
+
           if (isPartOfPhrase) {
-            return { ...originalChunk, disabled: !isCurrentlyDisabled };
+            return { ...originalChunk, disabled: nextDisabled, subtitleHidden: nextHidden };
           }
           return originalChunk;
         });
 
         const updatedTranscript = {
-          text: updatedChunks.filter(chunk => !chunk.disabled).map((chunk) => chunk.text).join(" "),
+          text: updatedChunks.filter(c => !c.disabled).map((c) => c.text).join(" "),
           chunks: updatedChunks,
         };
 
@@ -272,13 +295,12 @@ export function TranscriptSidebar({
         }
       }
     } else {
-      // For word mode, direct toggle
-      const updatedChunks = transcript.chunks.map((chunk, i) =>
-        i === index ? { ...chunk, disabled: !chunk.disabled } : chunk
+      const updatedChunks = transcript.chunks.map((c, i) =>
+        i === index ? { ...c, disabled: nextDisabled, subtitleHidden: nextHidden } : c
       );
-      
+
       const updatedTranscript = {
-        text: updatedChunks.filter(chunk => !chunk.disabled).map((chunk) => chunk.text).join(" "),
+        text: updatedChunks.filter(c => !c.disabled).map((c) => c.text).join(" "),
         chunks: updatedChunks,
       };
 
@@ -476,12 +498,12 @@ export function TranscriptSidebar({
             const isActive = start <= currentTime && currentTime <= end;
             const isEditing = editingIndex === i;
 
-            // Check if this chunk is disabled
             const isDisabled = chunk.disabled ?? false;
+            const isHidden = chunk.subtitleHidden ?? false;
 
             return (
               <div
-                key={`${mode}-${i}-${start}`} // Include mode in key to force re-render when mode changes
+                key={`${mode}-${i}-${start}`}
                 ref={isActive && !isDisabled ? (el) => {
                   if (el) {
                     setCurrentActiveElement(el);
@@ -495,7 +517,9 @@ export function TranscriptSidebar({
                     ? "bg-muted border-l-4 border-black"
                     : ""
                 } ${
-                  isDisabled ? "opacity-50 bg-gray-100 border-l-4 border-gray-400" : ""
+                  isDisabled ? "opacity-50 bg-gray-100 border-l-4 border-red-400" : ""
+                } ${
+                  isHidden && !isDisabled ? "opacity-70 bg-yellow-50 border-l-4 border-yellow-400" : ""
                 }`}
                 onClick={() => {
                   if (!isEditing) {
@@ -542,10 +566,10 @@ export function TranscriptSidebar({
                 ) : (
                   <div>
                     <div className="flex justify-between items-start">
-                      <p className={`${isActive ? "font-medium" : ""} ${isDisabled ? "line-through text-gray-500" : ""}`}>
+                      <p className={`${isActive ? "font-medium" : ""} ${isDisabled ? "line-through text-gray-500" : ""} ${isHidden && !isDisabled ? "italic text-yellow-700" : ""}`}>
                         {chunk.text}
                       </p>
-                      <div className="flex gap-1">
+                      <div className="flex gap-1 shrink-0 ml-1">
                         <Button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -561,27 +585,25 @@ export function TranscriptSidebar({
                         <Button
                           onClick={(e) => {
                             e.stopPropagation();
-                            toggleChunkDisabled(i);
+                            cycleChunkState(i);
                           }}
-                          className={`p-1 ${
-                            isDisabled
-                              ? "text-emerald-600 hover:text-emerald-800"
-                              : "text-gray-500 hover:text-gray-700"
-                          }`}
-                          title={isDisabled ? "Enable section" : "Disable section"}
+                          className="p-1"
+                          title={isDisabled ? "Skipped (click to enable)" : isHidden ? "Subs hidden (click to skip)" : "Click to hide subs"}
                           size="icon"
                           variant="default"
                         >
                           {isDisabled ? (
-                            <Undo2 className="h-3 w-3" />
+                            <SkipForward className="h-3 w-3 text-red-500" />
+                          ) : isHidden ? (
+                            <EyeOff className="h-3 w-3 text-yellow-600" />
                           ) : (
-                            <Ban className="h-3 w-3" />
+                            <Ban className="h-3 w-3 text-gray-500" />
                           )}
                         </Button>
                       </div>
                     </div>
-                    {/* Word pills for dynamic mode behind/front toggling */}
-                    {mode === "dynamic" && chunk.words && chunk.words.length > 0 && !isDisabled && (
+                    {/* Word pills for dynamic behind/front toggling */}
+                    {dynamicEnabled && chunk.words && chunk.words.length > 0 && !isDisabled && (
                       <div className="flex flex-wrap gap-1 mt-1.5">
                         {chunk.words.map((word: ProcessedWord, wordIdx: number) => {
                           const pos = word.dynamicPosition || "front";

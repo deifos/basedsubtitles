@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useState, forwardRef, useEffect, memo, useRef } from "react";
-import { cn } from "@/lib/utils";
+import { cn, formatTime } from "@/lib/utils";
 import { VideoCaption } from "./video-caption";
 import { SubtitleStyle } from "./subtitle-styling";
-import { UploadIcon } from "lucide-react";
+import { UploadIcon, Play, Pause, Volume2, VolumeX } from "lucide-react";
 import type { MaskData } from "@/hooks/useBackgroundRemoval";
 import { renderSubtitleToCanvas, renderDynamicBehindText, renderDynamicFrontText, estimateFaceFromMask } from "@/lib/render-subtitle";
 
@@ -19,11 +19,12 @@ interface VideoUploadProps {
       text: string;
       timestamp: [number, number];
       disabled?: boolean;
+      subtitleHidden?: boolean;
     }>;
   } | null;
   currentTime?: number;
   subtitleStyle: SubtitleStyle;
-  mode: "word" | "phrase" | "dynamic";
+  mode: "word" | "phrase";
   ratio: "16:9" | "9:16";
   zoomPortrait: boolean;
   initialFile?: File | null;
@@ -53,13 +54,17 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
     const [videoSrc, setVideoSrc] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [isSkipping, setIsSkipping] = useState(false);
+    const [isPlaying, setIsPlaying] = useState(false);
+    const [duration, setDuration] = useState(0);
+    const [isMuted, setIsMuted] = useState(false);
     const processedFileRef = useRef<File | null>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const animFrameRef = useRef<number>(0);
     const blurCanvasRef = useRef<HTMLCanvasElement | null>(null);
+    const seekBarRef = useRef<HTMLInputElement>(null);
 
     // Whether compositing mode is active
-    const isDynamicMode = mode === "dynamic" && bgRemovalReady && getMaskAtTime;
+    const isDynamicMode = subtitleStyle.dynamicEnabled && bgRemovalReady && getMaskAtTime;
     const isBgRemovalMode = bgRemovalReady && subtitleStyle.backgroundRemovalEnabled && getMaskAtTime;
     const compositingActive = isDynamicMode || isBgRemovalMode;
 
@@ -266,7 +271,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
 
         const w = canvas.width;
         const h = canvas.height;
-        const isDynamic = mode === "dynamic";
+        const isDynamic = subtitleStyle.dynamicEnabled;
 
         // Step 1: Draw background layer
         if (isDynamic) {
@@ -366,12 +371,15 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
         onDrop={handleDrop}
       >
         {videoSrc ? (
-          <div className="relative flex items-center justify-center w-full">
+          <div className="relative flex flex-col items-center justify-center w-full">
             <div
               className={cn(
-                "relative mx-auto flex justify-center",
+                "relative mx-auto flex flex-col",
                 ratio === "16:9" ? "w-full" : "w-auto"
               )}
+            >
+            <div
+              className="relative flex justify-center"
               style={{
                 aspectRatio: ratio === "16:9" ? "16/9" : "9/16"
               }}
@@ -379,7 +387,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
               <video
                 ref={ref}
                 src={videoSrc}
-                controls
+                controls={!compositingActive}
                 className={cn(
                   ratio === "16:9"
                     ? "object-cover w-full max-w-4xl max-h-[500px]"
@@ -388,16 +396,19 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
                       : "object-contain h-[500px] max-h-[500px]"
                 )}
                 style={{
-                  aspectRatio: ratio === "16:9" ? "16/9" : "9/16"
+                  aspectRatio: ratio === "16:9" ? "16/9" : "9/16",
                 }}
                 onTimeUpdate={handleTimeUpdate}
+                onPlay={() => setIsPlaying(true)}
+                onPause={() => setIsPlaying(false)}
+                onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
               />
-              {/* Canvas overlay for background removal compositing - pointer-events-none so video controls remain clickable */}
+              {/* Canvas overlay for background removal compositing */}
               {compositingActive && (
                 <canvas
                   ref={canvasRef}
                   className={cn(
-                    "absolute inset-0 pointer-events-none",
+                    "absolute inset-0 cursor-pointer",
                     ratio === "16:9"
                       ? "w-full max-w-4xl max-h-[500px]"
                       : ratio === "9:16" && zoomPortrait
@@ -405,12 +416,19 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
                         : "h-[500px] max-h-[500px]"
                   )}
                   style={{
-                    aspectRatio: ratio === "16:9" ? "16/9" : "9/16"
+                    aspectRatio: ratio === "16:9" ? "16/9" : "9/16",
+                  }}
+                  onClick={() => {
+                    const videoEl = ref && typeof ref !== "function" ? ref.current : null;
+                    if (videoEl) {
+                      if (videoEl.paused) videoEl.play();
+                      else videoEl.pause();
+                    }
                   }}
                 />
               )}
               {isSkipping && (
-                <div className="absolute top-4 right-4 bg-black bg-opacity-75 text-white px-3 py-1 rounded-md text-sm font-medium">
+                <div className="absolute top-4 right-4 bg-black bg-opacity-75 text-white px-3 py-1 rounded-md text-sm font-medium z-10">
                   Skipping disabled segment
                 </div>
               )}
@@ -424,6 +442,66 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
                   ratio={ratio}
                 />
               )}
+            </div>
+            {/* Custom controls below video when compositing is active */}
+            {compositingActive && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-black/90 rounded-b-lg w-full">
+                {/* Play/Pause */}
+                <button
+                  onClick={() => {
+                    const videoEl = ref && typeof ref !== "function" ? ref.current : null;
+                    if (videoEl) {
+                      if (videoEl.paused) videoEl.play();
+                      else videoEl.pause();
+                    }
+                  }}
+                  className="text-white hover:text-white/80 transition-colors shrink-0"
+                >
+                  {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                </button>
+
+                {/* Time */}
+                <span className="text-white text-xs tabular-nums shrink-0">
+                  {formatTime(currentTime)}
+                </span>
+
+                {/* Seek bar */}
+                <input
+                  ref={seekBarRef}
+                  type="range"
+                  min={0}
+                  max={duration || 1}
+                  step={0.1}
+                  value={currentTime}
+                  onChange={(e) => {
+                    const videoEl = ref && typeof ref !== "function" ? ref.current : null;
+                    if (videoEl) {
+                      videoEl.currentTime = parseFloat(e.target.value);
+                    }
+                  }}
+                  className="flex-1 h-1 appearance-none bg-white/30 rounded-full cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-0"
+                />
+
+                {/* Duration */}
+                <span className="text-white text-xs tabular-nums shrink-0">
+                  {formatTime(duration)}
+                </span>
+
+                {/* Mute toggle */}
+                <button
+                  onClick={() => {
+                    const videoEl = ref && typeof ref !== "function" ? ref.current : null;
+                    if (videoEl) {
+                      videoEl.muted = !videoEl.muted;
+                      setIsMuted(!isMuted);
+                    }
+                  }}
+                  className="text-white hover:text-white/80 transition-colors shrink-0"
+                >
+                  {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                </button>
+              </div>
+            )}
             </div>
           </div>
         ) : (

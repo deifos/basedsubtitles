@@ -50,6 +50,7 @@ export interface ProcessedWord {
   text: string;
   timestamp: [number, number];
   disabled?: boolean;
+  subtitleHidden?: boolean;
   dynamicPosition?: "behind" | "front";
 }
 
@@ -57,6 +58,7 @@ export interface ProcessedChunk {
   text: string;
   timestamp: [number, number];
   disabled?: boolean;
+  subtitleHidden?: boolean;
   words?: ProcessedWord[];
 }
 
@@ -65,17 +67,22 @@ interface SourceTranscript {
     text: string;
     timestamp: [number, number];
     disabled?: boolean;
+    subtitleHidden?: boolean;
     dynamicPosition?: "behind" | "front";
   }>;
 }
 
 /**
- * Process transcript chunks according to the mode (word/phrase)
+ * Process transcript chunks according to the mode (word/phrase).
+ * When dynamicEnabled is true and mode is "phrase", auto-assigns
+ * dynamicPosition (first word = "behind", rest = "front") to words
+ * that don't already have a position set.
  */
 export function processTranscriptChunks(
   transcript: SourceTranscript,
-  mode: "word" | "phrase" | "dynamic" = "word",
-  maxWordsPerLine?: number
+  mode: "word" | "phrase" = "word",
+  maxWordsPerLine?: number,
+  dynamicEnabled?: boolean
 ): ProcessedChunk[] {
   if (mode === "word") {
     return transcript.chunks.map((chunk) => ({
@@ -84,9 +91,6 @@ export function processTranscriptChunks(
       disabled: chunk.disabled,
     }));
   }
-
-  // Dynamic mode uses phrase grouping internally
-  const isDynamic = mode === "dynamic";
 
   const processedChunks: ProcessedChunk[] = [];
 
@@ -109,8 +113,8 @@ export function processTranscriptChunks(
       return;
     }
 
-    // For dynamic mode, auto-assign dynamicPosition if not already set
-    if (isDynamic) {
+    // When dynamic is enabled, auto-assign dynamicPosition if not already set
+    if (dynamicEnabled) {
       currentGroup.words = currentGroup.words.map((word, i) => {
         if (word.dynamicPosition) return word; // preserve user toggle
         return { ...word, dynamicPosition: i === 0 ? "behind" as const : "front" as const };
@@ -140,6 +144,7 @@ export function processTranscriptChunks(
       text: trimmedText,
       timestamp: [start, end],
       disabled: chunk.disabled,
+      subtitleHidden: chunk.subtitleHidden,
       dynamicPosition: chunk.dynamicPosition,
     };
 
@@ -208,7 +213,7 @@ export function transcriptToSrt(
       timestamp: [number, number];
     }>;
   },
-  mode: "word" | "phrase" | "dynamic" = "word"
+  mode: "word" | "phrase" = "word"
 ): string {
   const processedChunks = processTranscriptChunks(transcript, mode);
   return processedChunks
@@ -231,7 +236,7 @@ export function transcriptToVtt(
       timestamp: [number, number];
     }>;
   },
-  mode: "word" | "phrase" | "dynamic" = "word"
+  mode: "word" | "phrase" = "word"
 ): string {
   const header = "WEBVTT\n\n";
   const processedChunks = processTranscriptChunks(transcript, mode);

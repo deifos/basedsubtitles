@@ -41,7 +41,7 @@ interface MainAppProps {
 
 // Default subtitle style - Gold preset
 const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
-  fontFamily: "var(--font-poppins), 'Poppins', sans-serif",
+  fontFamily: "var(--font-bangers), 'Bangers', cursive",
   fontSize: 22,
   fontWeight: "600",
   color: "#F4D35E",
@@ -56,10 +56,12 @@ const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
   backgroundType: "solid",
   solidBackgroundColor: "#000000",
   subtitleBehindPerson: false,
+  dynamicEnabled: false,
   dynamicFontSize: 80,
   dynamicYPosition: 35,
   dynamicFrontFontSize: 40,
   dynamicFrontYPosition: 75,
+  dynamicFollowWord: false,
 };
 
 export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps): JSX.Element {
@@ -68,7 +70,7 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
     DEFAULT_SUBTITLE_STYLE
   );
   const [uploadKey, setUploadKey] = useState(0);
-  const [mode, setMode] = useState<"word" | "phrase" | "dynamic">("phrase");
+  const [mode, setMode] = useState<"word" | "phrase">("phrase");
   const [ratio, setRatio] = useState<"16:9" | "9:16">("16:9");
   const [zoomPortrait, setZoomPortrait] = useState(false);
   const [language, setLanguage] = useState<LanguageCode>("en");
@@ -218,7 +220,7 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
     setCurrentTime(time);
   }, []);
 
-  const handleModeChange = useCallback((value: "word" | "phrase" | "dynamic") => {
+  const handleModeChange = useCallback((value: "word" | "phrase") => {
     setMode(value);
   }, []);
 
@@ -358,10 +360,11 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
                             }
                           }}
                           onTranscriptUpdate={(updatedTranscript) => {
-                            setResult(updatedTranscript);
+                            setResult((prev) => prev ? { ...prev, ...updatedTranscript } : updatedTranscript);
                           }}
                           mode={mode}
                           maxWordsPerLine={subtitleStyle.maxWordsPerLine}
+                          dynamicEnabled={subtitleStyle.dynamicEnabled}
                         />
                       </div>
                     </ScrollArea>
@@ -557,9 +560,11 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
                         }
                       }}
                       onTranscriptUpdate={(updatedTranscript) => {
-                        setResult(updatedTranscript);
+                        setResult((prev) => prev ? { ...prev, ...updatedTranscript } : updatedTranscript);
                       }}
                       mode={mode}
+                      maxWordsPerLine={subtitleStyle.maxWordsPerLine}
+                      dynamicEnabled={subtitleStyle.dynamicEnabled}
                     />
                   </ScrollArea>
                 </div>

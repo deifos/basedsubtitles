@@ -7,6 +7,7 @@ interface TranscriptData {
     text: string;
     timestamp: [number, number];
     disabled?: boolean;
+    subtitleHidden?: boolean;
     dynamicPosition?: "behind" | "front";
   }>;
 }
@@ -43,6 +44,8 @@ const FONT_MAPPINGS: Record<string, string> = {
   "var(--font-chewy)": "Chewy",
   "var(--font-playfair-display)": "Playfair Display",
   "var(--font-lora)": "Lora",
+  "var(--font-plus-jakarta-sans)": "Plus Jakarta Sans",
+  "var(--font-outfit)": "Outfit",
 };
 
 function resolveFontFamily(fontFamily: string): string {
@@ -79,30 +82,30 @@ export function renderSubtitleToCanvas(
   transcript: TranscriptData,
   currentTime: number,
   style: SubtitleStyle,
-  mode: "word" | "phrase" | "dynamic",
+  mode: "word" | "phrase",
   canvasWidth: number,
   canvasHeight: number
 ) {
-  // processTranscriptChunks handles dynamic mode internally now
   const processedChunks = processTranscriptChunks(transcript, mode, style.maxWordsPerLine);
 
-  // Filter enabled chunks
+  // Filter enabled chunks (exclude disabled and subtitleHidden)
   const enabledChunks = processedChunks.filter((chunk) => {
-    if ((mode === "phrase" || mode === "dynamic") && chunk.words) {
-      return !chunk.words.some((word) =>
-        transcript.chunks.find(
+    if (mode === "phrase" && chunk.words) {
+      return !chunk.words.some((word) => {
+        const original = transcript.chunks.find(
           (c) =>
             c.timestamp[0] === word.timestamp[0] &&
             c.timestamp[1] === word.timestamp[1]
-        )?.disabled
-      );
+        );
+        return original?.disabled || original?.subtitleHidden;
+      });
     }
     const original = transcript.chunks.find(
       (c) =>
         c.timestamp[0] === chunk.timestamp[0] &&
         c.timestamp[1] === chunk.timestamp[1]
     );
-    return !original?.disabled;
+    return !original?.disabled && !original?.subtitleHidden;
   });
 
   const currentChunk = enabledChunks.find(
@@ -111,19 +114,6 @@ export function renderSubtitleToCanvas(
   );
 
   if (!currentChunk) return;
-
-  if (mode === "dynamic") {
-    // Legacy path: renders all dynamic text (behind+front) as one block
-    // Used only for non-compositing fallback
-    renderDynamicWordToCanvas(
-      ctx,
-      currentChunk.text,
-      style,
-      canvasWidth,
-      canvasHeight
-    );
-    return;
-  }
 
   renderChunkToCanvas(
     ctx,
@@ -185,17 +175,18 @@ export function renderDynamicBehindText(
   canvasWidth: number,
   canvasHeight: number
 ) {
-  const processedChunks = processTranscriptChunks(transcript, "dynamic", style.maxWordsPerLine);
+  const processedChunks = processTranscriptChunks(transcript, "phrase", style.maxWordsPerLine, true);
 
   const enabledChunks = processedChunks.filter((chunk) => {
     if (chunk.words) {
-      return !chunk.words.some((word) =>
-        transcript.chunks.find(
+      return !chunk.words.some((word) => {
+        const original = transcript.chunks.find(
           (c) =>
             c.timestamp[0] === word.timestamp[0] &&
             c.timestamp[1] === word.timestamp[1]
-        )?.disabled
-      );
+        );
+        return original?.disabled || original?.subtitleHidden;
+      });
     }
     return true;
   });
@@ -207,10 +198,13 @@ export function renderDynamicBehindText(
 
   if (!currentChunk || !currentChunk.words) return;
 
-  // Filter only "behind" words
-  const behindWords = currentChunk.words.filter(
+  // Filter only "behind" words, with progressive reveal if enabled
+  let behindWords = currentChunk.words.filter(
     (w) => w.dynamicPosition === "behind"
   );
+  if (style.dynamicFollowWord) {
+    behindWords = behindWords.filter(w => currentTime >= w.timestamp[0]);
+  }
   if (behindWords.length === 0) return;
 
   const behindText = behindWords.map((w) => w.text).join(" ");
@@ -233,17 +227,18 @@ export function renderDynamicFrontText(
   canvasHeight: number,
   faceBounds?: FaceBounds | null
 ) {
-  const processedChunks = processTranscriptChunks(transcript, "dynamic", style.maxWordsPerLine);
+  const processedChunks = processTranscriptChunks(transcript, "phrase", style.maxWordsPerLine, true);
 
   const enabledChunks = processedChunks.filter((chunk) => {
     if (chunk.words) {
-      return !chunk.words.some((word) =>
-        transcript.chunks.find(
+      return !chunk.words.some((word) => {
+        const original = transcript.chunks.find(
           (c) =>
             c.timestamp[0] === word.timestamp[0] &&
             c.timestamp[1] === word.timestamp[1]
-        )?.disabled
-      );
+        );
+        return original?.disabled || original?.subtitleHidden;
+      });
     }
     return true;
   });
@@ -255,10 +250,13 @@ export function renderDynamicFrontText(
 
   if (!currentChunk || !currentChunk.words) return;
 
-  // Filter only "front" words
-  const frontWords = currentChunk.words.filter(
+  // Filter only "front" words, with progressive reveal if enabled
+  let frontWords = currentChunk.words.filter(
     (w) => w.dynamicPosition === "front"
   );
+  if (style.dynamicFollowWord) {
+    frontWords = frontWords.filter(w => currentTime >= w.timestamp[0]);
+  }
   if (frontWords.length === 0) return;
 
   const frontText = frontWords.map((w) => w.text).join(" ");
@@ -467,10 +465,19 @@ function renderChunkToCanvas(
   style: SubtitleStyle,
   canvasWidth: number,
   canvasHeight: number,
-  mode: "word" | "phrase" | "dynamic",
+  mode: "word" | "phrase",
   currentTime: number
 ) {
-  const displayText = chunk.text;
+  // Progressive word reveal: only show words spoken so far
+  let displayText = chunk.text;
+  let chunkWords = chunk.words;
+  if (style.dynamicFollowWord && mode === "phrase" && chunk.words) {
+    const visibleWords = chunk.words.filter(w => currentTime >= w.timestamp[0]);
+    if (visibleWords.length === 0) return;
+    displayText = visibleWords.map(w => w.text).join(" ");
+    chunkWords = visibleWords;
+  }
+
   const isVerticalVideo = canvasHeight > canvasWidth;
 
   const previewHeight = 500;
@@ -562,7 +569,7 @@ function renderChunkToCanvas(
     ctx.fill();
   }
 
-  const phraseWords = Array.isArray(chunk.words) ? chunk.words : undefined;
+  const phraseWords = Array.isArray(chunkWords) ? chunkWords : undefined;
   const canEmphasize =
     style.wordEmphasisEnabled &&
     mode === "phrase" &&

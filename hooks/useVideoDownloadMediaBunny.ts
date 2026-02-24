@@ -27,6 +27,7 @@ interface TranscriptChunk {
   text: string;
   timestamp: [number, number];
   disabled?: boolean;
+  subtitleHidden?: boolean;
   dynamicPosition?: "behind" | "front";
   words?: WordTiming[];
 }
@@ -35,7 +36,7 @@ interface UseVideoDownloadMediaBunnyProps {
   video: HTMLVideoElement | null;
   transcriptChunks: TranscriptChunk[];
   subtitleStyle: SubtitleStyle;
-  mode: 'word' | 'phrase' | 'dynamic';
+  mode: 'word' | 'phrase';
   format?: 'mp4' | 'webm';
   quality?: 'low' | 'medium' | 'high' | 'very_high';
   fps?: number;
@@ -184,21 +185,27 @@ export function useVideoDownloadMediaBunny({
         videoSampleSink = new VideoSampleSink(originalVideoTrack);
       }
 
-      // Process chunks according to mode (word/phrase/dynamic) and filter enabled ones
-      // processTranscriptChunks handles dynamic mode internally now
-      const processedChunks = processTranscriptChunks({ chunks: transcriptChunks }, mode, subtitleStyle.maxWordsPerLine);
+      // Process chunks according to mode (word/phrase) and filter enabled ones
+      // When dynamic is enabled, use phrase mode with dynamicEnabled flag
+      const isDynamic = subtitleStyle.dynamicEnabled;
+      const processedChunks = processTranscriptChunks(
+        { chunks: transcriptChunks },
+        isDynamic ? 'phrase' : mode,
+        subtitleStyle.maxWordsPerLine,
+        isDynamic
+      );
       const enabledChunks = processedChunks.filter((chunk) => {
-        if ((mode === 'phrase' || mode === 'dynamic') && isPhraseChunk(chunk)) {
+        if ((mode === 'phrase' || isDynamic) && isPhraseChunk(chunk)) {
           return !chunk.words.some((word) => {
             const originalChunk = transcriptChunks.find(
               (candidate) =>
                 candidate.timestamp[0] === word.timestamp[0] &&
                 candidate.timestamp[1] === word.timestamp[1]
             );
-            return originalChunk?.disabled;
+            return originalChunk?.disabled || originalChunk?.subtitleHidden;
           });
         }
-        return !chunk.disabled;
+        return !chunk.disabled && !chunk.subtitleHidden;
       });
 
       const totalFrames = Math.ceil(duration * fps);
@@ -255,7 +262,7 @@ export function useVideoDownloadMediaBunny({
           return time >= start && time <= end;
         });
 
-        const isDynamicMode = mode === 'dynamic' && bgRemovalReady && bgProcessFrame;
+        const isDynamicMode = subtitleStyle.dynamicEnabled && bgRemovalReady && bgProcessFrame;
         const bgActive = bgRemovalReady && subtitleStyle.backgroundRemovalEnabled && bgProcessFrame;
         const needsCompositing = isDynamicMode || bgActive;
 
@@ -295,7 +302,7 @@ export function useVideoDownloadMediaBunny({
           // Step 2: Render subtitle behind person
           if (isDynamicMode && currentChunk) {
             // Dynamic mode: render only "behind" words as big text
-            renderDynamicBehindInExport(ctx, currentChunk, subtitleStyle, canvas);
+            renderDynamicBehindInExport(ctx, currentChunk, subtitleStyle, canvas, time);
           } else if (subtitleStyle.subtitleBehindPerson && currentChunk) {
             renderSubtitle(ctx, currentChunk, subtitleStyle, canvas, mode, time);
           }
@@ -334,7 +341,7 @@ export function useVideoDownloadMediaBunny({
           // Step 4: Render front text (dynamic) or on-top text (non-dynamic)
           if (isDynamicMode && currentChunk) {
             const faceBounds = estimateFaceFromMask(mask.data, mask.width, mask.height, canvas.width, canvas.height);
-            renderDynamicFrontInExport(ctx, currentChunk, subtitleStyle, canvas, faceBounds);
+            renderDynamicFrontInExport(ctx, currentChunk, subtitleStyle, canvas, faceBounds, time);
           } else if (!subtitleStyle.subtitleBehindPerson && currentChunk) {
             renderSubtitle(ctx, currentChunk, subtitleStyle, canvas, mode, time);
           }
@@ -461,15 +468,19 @@ function renderSubtitle(
   chunk: TranscriptChunk,
   style: SubtitleStyle,
   canvas: HTMLCanvasElement,
-  mode: 'word' | 'phrase' | 'dynamic',
+  mode: 'word' | 'phrase',
   currentTime: number
 ) {
-  if (mode === 'dynamic') {
-    renderDynamicWord(ctx, chunk.text, style, canvas);
-    return;
+  // Progressive word reveal: only show words spoken so far
+  let displayText = chunk.text;
+  let chunkWords = chunk.words;
+  if (style.dynamicFollowWord && mode === 'phrase' && chunk.words) {
+    const visibleWords = chunk.words.filter(w => currentTime >= w.timestamp[0]);
+    if (visibleWords.length === 0) return;
+    displayText = visibleWords.map(w => w.text).join(' ');
+    chunkWords = visibleWords;
   }
 
-  const displayText = chunk.text;
   const isVerticalVideo = canvas.height > canvas.width;
 
   // Calculate scale based on actual video dimensions
@@ -507,6 +518,8 @@ function renderSubtitle(
       'var(--font-chewy)': 'Chewy',
       'var(--font-playfair-display)': 'Playfair Display',
       'var(--font-lora)': 'Lora',
+      'var(--font-plus-jakarta-sans)': 'Plus Jakarta Sans',
+      'var(--font-outfit)': 'Outfit',
     };
     
     // Find the CSS variable in the font family string
@@ -606,7 +619,7 @@ function renderSubtitle(
     ctx.fill();
   }
 
-  const phraseWords = Array.isArray(chunk.words) ? chunk.words : undefined;
+  const phraseWords = Array.isArray(chunkWords) ? chunkWords : undefined;
   const canEmphasize =
     style.wordEmphasisEnabled &&
     mode === 'phrase' &&
@@ -895,6 +908,8 @@ function renderDynamicWord(
       'var(--font-chewy)': 'Chewy',
       'var(--font-playfair-display)': 'Playfair Display',
       'var(--font-lora)': 'Lora',
+      'var(--font-plus-jakarta-sans)': 'Plus Jakarta Sans',
+      'var(--font-outfit)': 'Outfit',
     };
     for (const [cssVar, actualFont] of Object.entries(fontMappings)) {
       if (fontFamily.includes(cssVar)) {
@@ -979,7 +994,8 @@ function renderDynamicBehindInExport(
   ctx: CanvasRenderingContext2D,
   chunk: TranscriptChunk,
   style: SubtitleStyle,
-  canvas: HTMLCanvasElement
+  canvas: HTMLCanvasElement,
+  currentTime: number
 ) {
   if (!chunk.words) {
     // Fallback: render entire text as behind
@@ -987,7 +1003,10 @@ function renderDynamicBehindInExport(
     return;
   }
 
-  const behindWords = chunk.words.filter((w) => w.dynamicPosition === 'behind');
+  let behindWords = chunk.words.filter((w) => w.dynamicPosition === 'behind');
+  if (style.dynamicFollowWord) {
+    behindWords = behindWords.filter(w => currentTime >= w.timestamp[0]);
+  }
   if (behindWords.length === 0) return;
 
   const behindText = behindWords.map((w) => w.text).join(' ');
@@ -1003,11 +1022,15 @@ function renderDynamicFrontInExport(
   chunk: TranscriptChunk,
   style: SubtitleStyle,
   canvas: HTMLCanvasElement,
-  faceBounds: FaceBounds | null
+  faceBounds: FaceBounds | null,
+  currentTime: number
 ) {
   if (!chunk.words) return;
 
-  const frontWords = chunk.words.filter((w) => w.dynamicPosition === 'front');
+  let frontWords = chunk.words.filter((w) => w.dynamicPosition === 'front');
+  if (style.dynamicFollowWord) {
+    frontWords = frontWords.filter(w => currentTime >= w.timestamp[0]);
+  }
   if (frontWords.length === 0) return;
 
   const frontText = frontWords.map((w) => w.text).join(' ');
@@ -1064,6 +1087,8 @@ function renderDynamicWordWithOptions(
       'var(--font-chewy)': 'Chewy',
       'var(--font-playfair-display)': 'Playfair Display',
       'var(--font-lora)': 'Lora',
+      'var(--font-plus-jakarta-sans)': 'Plus Jakarta Sans',
+      'var(--font-outfit)': 'Outfit',
     };
     for (const [cssVar, actualFont] of Object.entries(fontMappings)) {
       if (fontFamily.includes(cssVar)) {

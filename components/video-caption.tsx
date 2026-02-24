@@ -16,6 +16,7 @@ interface VideoCaptionProps {
       text: string;
       timestamp: [number, number];
       disabled?: boolean;
+      subtitleHidden?: boolean;
       words?: Array<{
         text: string;
         timestamp: [number, number];
@@ -24,7 +25,7 @@ interface VideoCaptionProps {
   };
   currentTime: number;
   style: SubtitleStyle;
-  mode: "word" | "phrase" | "dynamic";
+  mode: "word" | "phrase";
   ratio: "16:9" | "9:16";
 }
 
@@ -57,24 +58,25 @@ export function VideoCaption({
   // processTranscriptChunks handles dynamic mode internally now
   const processedChunks: ProcessedChunk[] = processTranscriptChunks(transcript, mode, style.maxWordsPerLine);
 
-  // Filter out disabled chunks for playback preview
+  // Filter out disabled and subtitleHidden chunks for playback preview
   const enabledChunks = processedChunks.filter((chunk) => {
-    if ((mode === "phrase" || mode === "dynamic") && chunk.words) {
-      // For phrase/dynamic mode, check if any word in the phrase is disabled
-      return !chunk.words.some(word => 
-        transcript.chunks.find(originalChunk => 
-          originalChunk.timestamp[0] === word.timestamp[0] && 
+    if (mode === "phrase" && chunk.words) {
+      // For phrase mode, check if any word in the phrase is disabled or hidden
+      return !chunk.words.some(word => {
+        const original = transcript.chunks.find(originalChunk =>
+          originalChunk.timestamp[0] === word.timestamp[0] &&
           originalChunk.timestamp[1] === word.timestamp[1]
-        )?.disabled
-      );
+        );
+        return original?.disabled || original?.subtitleHidden;
+      });
     } else {
-      // For word mode, check if the chunk itself is disabled
-      const originalChunkIndex = transcript.chunks.findIndex(
-        originalChunk => 
-          originalChunk.timestamp[0] === chunk.timestamp[0] && 
+      // For word mode, check if the chunk itself is disabled or hidden
+      const original = transcript.chunks.find(
+        originalChunk =>
+          originalChunk.timestamp[0] === chunk.timestamp[0] &&
           originalChunk.timestamp[1] === chunk.timestamp[1]
       );
-      return !transcript.chunks[originalChunkIndex]?.disabled;
+      return !original?.disabled && !original?.subtitleHidden;
     }
   });
   
@@ -124,7 +126,20 @@ export function VideoCaption({
 
   if (currentChunks.length === 0) return null;
 
-  const currentChunk = currentChunks[0]; // Take the first matching chunk
+  const rawChunk = currentChunks[0]; // Take the first matching chunk
+
+  // Progressive word reveal: show words one by one as they start being spoken
+  let currentChunk = rawChunk;
+  if (style.dynamicFollowWord && mode === "phrase" && rawChunk.words) {
+    const visibleWords = rawChunk.words.filter(w => currentTime >= w.timestamp[0]);
+    if (visibleWords.length === 0) return null;
+    currentChunk = {
+      ...rawChunk,
+      text: visibleWords.map(w => w.text).join(" "),
+      words: visibleWords,
+    };
+  }
+
   const text = currentChunk.text;
   const currentWordInPhrase = getCurrentWordInPhrase(currentChunk);
 
