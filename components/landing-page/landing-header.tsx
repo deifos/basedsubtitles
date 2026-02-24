@@ -2,56 +2,39 @@
 
 import type { JSX } from "react";
 import Link from "next/link";
-import type { LucideIcon } from "lucide-react";
-import { ShieldCheck } from "lucide-react";
 
-interface HeaderBadge {
-  icon: LucideIcon;
-  label: string;
-}
-
-interface LandingHeaderProps {
-  badges?: HeaderBadge[];
-}
-
-const DEFAULT_BADGES: HeaderBadge[] = [
-  { icon: ShieldCheck, label: "100% Local" },
-];
-
-export function LandingHeader({
-  badges = DEFAULT_BADGES,
-}: LandingHeaderProps = {}): JSX.Element {
+export function LandingHeader(): JSX.Element {
   return (
-    <header className="relative">
+    <header className="relative z-10">
       <div className="mx-auto max-w-7xl px-6">
-        <div className="flex items-center justify-between py-6">
-          <Link href="#" className="inline-flex items-center gap-2.5">
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-slate-900 text-sm font-medium tracking-tight text-white">
+        <div className="flex items-center justify-between py-5">
+          <Link href="#" className="inline-flex items-center gap-2.5 group">
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-sm font-bold tracking-tight text-white transition-transform group-hover:scale-105">
               BS
             </span>
-            <span className="text-sm font-medium tracking-tight text-slate-900">
+            <span
+              className="text-sm font-semibold tracking-tight text-slate-900"
+              style={{ fontFamily: "var(--font-outfit), sans-serif" }}
+            >
               basedsubtitles
             </span>
           </Link>
-          <div className="flex items-center gap-3">
-            {badges.map((badge) => (
-              <span
-                key={badge.label}
-                className="hidden items-center rounded-full border border-slate-200 px-2.5 py-1 text-xs text-slate-600 sm:inline-flex"
-              >
-                <badge.icon className="mr-1.5 h-3.5 w-3.5" strokeWidth={1.5} />
-                {badge.label}
+          <div className="flex items-center gap-2">
+            <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200/60">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
               </span>
-            ))}
+              100% Local
+            </span>
+            <a
+              href="#dropzone"
+              className="inline-flex items-center rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white transition-all hover:bg-slate-800 hover:shadow-lg"
+              style={{ fontFamily: "var(--font-outfit), sans-serif" }}
+            >
+              Get Started
+            </a>
           </div>
-        </div>
-      </div>
-      <div
-        aria-hidden={true}
-        className="pointer-events-none absolute inset-x-0 top-0 -z-10"
-      >
-        <div className="mx-auto max-w-7xl px-6">
-          <div className="h-px w-full bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
         </div>
       </div>
     </header>

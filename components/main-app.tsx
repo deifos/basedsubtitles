@@ -3,6 +3,7 @@
 import type { JSX } from "react";
 import { useRef, useState, useCallback, useEffect } from "react";
 import { SiteFooter } from "@/components/site-footer";
+import { BuyMeCoffee } from "@/components/buy-me-coffee";
 import { VideoUpload } from "@/components/video-upload";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -42,7 +43,7 @@ interface MainAppProps {
 // Default subtitle style - Gold preset
 const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
   fontFamily: "var(--font-bangers), 'Bangers', cursive",
-  fontSize: 22,
+  fontSize: 16,
   fontWeight: "600",
   color: "#F4D35E",
   backgroundColor: "#1F1300",
@@ -244,19 +245,35 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
   const statusMessage = STATUS_MESSAGES[status] ?? "Processing video...";
 
   return (
-    <main className="flex min-h-screen flex-col relative pb-16 lg:pb-0">
+    <main className="flex min-h-screen flex-col relative pb-16 lg:pb-0 bg-white">
       {/* Header */}
-      <header className="w-full py-4 border-b border-border/20">
-        <div className="container mx-auto px-4 md:px-6 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <div className="text-center sm:text-left">
-            <h1 className="text-3xl md:text-4xl font-bold mb-1">Based Subtitles</h1>
-            <p className="text-muted-foreground text-lg">100% local powered by transformers.js</p>
+      <header className="w-full border-b-2 border-black/10 bg-white">
+        <div className="container mx-auto px-4 md:px-6 py-3 flex flex-col sm:flex-row items-center justify-between gap-2">
+          <div className="flex items-center gap-3">
+            <div className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-sm font-bold tracking-tight text-white">
+              BS
+            </div>
+            <div className="text-left">
+              <h1
+                className="text-lg font-bold text-slate-900 leading-tight"
+                style={{ fontFamily: "var(--font-outfit), sans-serif" }}
+              >
+                Based Subtitles
+              </h1>
+              <p
+                className="text-xs text-slate-400"
+                style={{ fontFamily: "var(--font-outfit), sans-serif" }}
+              >
+                100% local &middot; powered by transformers.js
+              </p>
+            </div>
           </div>
           <div className="flex flex-col sm:flex-row gap-2">
             {uploadedFile && !result && (
               <Button
                 onClick={() => setShowLanguageModal(true)}
-                className="flex items-center gap-2 px-4 py-2"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 shadow-sm"
+                style={{ fontFamily: "var(--font-outfit), sans-serif" }}
               >
                 <Video className="w-4 h-4" />
                 Transcribe Video
@@ -267,17 +284,19 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
                 <Button
                   onClick={handleChangeLanguage}
                   variant="outline"
-                  className="flex items-center gap-2 px-4 py-2"
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg border-slate-200 text-slate-700 text-sm font-semibold hover:bg-slate-50"
+                  style={{ fontFamily: "var(--font-outfit), sans-serif" }}
                 >
                   <Video className="w-4 h-4" />
                   Change Language
                 </Button>
                 <Button
                   onClick={handleResetVideo}
-                  className="flex items-center gap-2 px-4 py-2"
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 shadow-sm"
+                  style={{ fontFamily: "var(--font-outfit), sans-serif" }}
                 >
                   <Upload className="w-4 h-4" />
-                  Upload Another Video
+                  Upload Another
                 </Button>
               </>
             )}
@@ -288,17 +307,22 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
       {/* App Section */}
       <section className="flex-1 flex items-center justify-center w-full py-4">
         <div className="mx-auto px-4 md:px-6 w-full">
-          <div className="w-full mx-auto space-y-4 p-4 md:p-6 rounded-xl border border-border/50">
+          <div className="w-full mx-auto space-y-4 p-4 md:p-6 rounded-2xl border border-slate-200/80 bg-white shadow-sm">
             {!result && (
               <>
                 <div className="text-center">
-                  <p className="text-muted-foreground">
+                  <p
+                    className="text-slate-500 text-sm"
+                    style={{ fontFamily: "var(--font-outfit), sans-serif" }}
+                  >
                     Upload a video (MP4 or WebM) to generate subtitles
                   </p>
                 </div>
                 <Alert>
-                  <Video className="h-4 w-4 text-primary" />
-                  <AlertDescription>
+                  <Video className="h-4 w-4 text-slate-600" />
+                  <AlertDescription
+                    style={{ fontFamily: "var(--font-outfit), sans-serif" }}
+                  >
                     Supported formats: MP4 and WebM. Maximum video length: 5
                     minutes.
                   </AlertDescription>
@@ -377,7 +401,7 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
               {/* Subtitle Styling Column - Hidden on mobile, shown on desktop */}
               {result && (
                 <div className="hidden lg:block w-full lg:w-96 h-[560px]">
-                  <ScrollArea className="rounded-base h-[560px] w-full text-mtext border-2 border-border bg-main p-2 shadow-shadow">
+                  <ScrollArea className="rounded-2xl h-[560px] w-full border border-slate-200/80 bg-white p-2 shadow-lg shadow-slate-200/40">
                     <div className="p-2 space-y-4">
                       <SubtitleStyling
                         style={subtitleStyle}
@@ -490,13 +514,13 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
                     )}
                     {(isBgModelLoading || isBgProcessing) && (
                       <div className="w-full max-w-md space-y-1">
-                        <div className="flex justify-between text-xs text-muted-foreground">
+                        <div className="flex justify-between text-xs text-slate-500" style={{ fontFamily: "var(--font-outfit), sans-serif" }}>
                           <span>{isBgModelLoading ? "Loading model..." : "Processing frames..."}</span>
                           <span>{Math.round(bgProgress)}%</span>
                         </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
                           <div
-                            className="bg-purple-600 h-2 rounded-full transition-all duration-300"
+                            className="bg-amber-500 h-1.5 rounded-full transition-all duration-300"
                             style={{ width: `${Math.max(0, Math.min(100, bgProgress))}%` }}
                           />
                         </div>
@@ -504,13 +528,17 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
                     )}
 
                     {result.generationTime && (
-                      <div className="text-xs text-muted-foreground">
+                      <div
+                        className="text-xs text-slate-400"
+                        style={{ fontFamily: "var(--font-outfit), sans-serif" }}
+                      >
                         Generation time: {(result.generationTime / 1000).toFixed(2)}s ({device === "webgpu" ? "WebGPU" : "WASM"})
                       </div>
                     )}
                     <Button
                       onClick={downloadVideo}
-                      className="flex items-center gap-2"
+                      className="flex items-center gap-2 rounded-lg bg-slate-900 text-white font-semibold hover:bg-slate-800 shadow-sm"
+                      style={{ fontFamily: "var(--font-outfit), sans-serif" }}
                       disabled={isDownloadProcessing}
                     >
                       <Download className="w-4 h-4" />
@@ -518,18 +546,24 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
                     </Button>
 
                     {isDownloadProcessing && (
-                      <div className="w-full max-w-md space-y-3">
-                        <div className="flex justify-between text-sm text-muted-foreground">
+                      <div className="w-full max-w-md space-y-2">
+                        <div className="flex justify-between text-xs text-slate-500" style={{ fontFamily: "var(--font-outfit), sans-serif" }}>
                           <span>{downloadStatus}</span>
                           <span>{Math.round(downloadProgress)}%</span>
                         </div>
-                        <div className="w-full bg-gray-200 rounded-full h-3">
+                        <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
                           <div
-                            className="bg-blue-600 h-3 rounded-full transition-all duration-300"
+                            className="bg-sky-500 h-2 rounded-full transition-all duration-300"
                             style={{ width: `${Math.max(0, Math.min(100, downloadProgress))}%` }}
-                          ></div>
+                          />
                         </div>
-                        <Button variant="default" size="sm" className="w-full" onClick={cancelDownload}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full rounded-lg border-slate-200 text-slate-700 font-semibold"
+                          style={{ fontFamily: "var(--font-outfit), sans-serif" }}
+                          onClick={cancelDownload}
+                        >
                           Stop download
                         </Button>
                       </div>
@@ -541,12 +575,18 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
               {/* Transcript Sidebar - Hidden on mobile, shown on desktop */}
               {result && (
                 <div className="hidden lg:block w-full lg:w-96 h-[560px]">
-                  <ScrollArea className="rounded-base h-[560px] w-full text-mtext border-2 border-border bg-main p-4 shadow-shadow">
-                    <div className="mb-4 pb-2 border-b border-border">
-                      <h4 className="text-lg font-semibold">
+                  <ScrollArea className="rounded-2xl h-[560px] w-full border border-slate-200/80 bg-white p-4 shadow-lg shadow-slate-200/40">
+                    <div className="mb-4 pb-2 border-b border-slate-100">
+                      <h4
+                        className="text-base font-semibold text-slate-900"
+                        style={{ fontFamily: "var(--font-outfit), sans-serif" }}
+                      >
                         Edit Transcript
                       </h4>
-                      <p className="text-sm text-muted-foreground">
+                      <p
+                        className="text-xs text-slate-400 mt-0.5"
+                        style={{ fontFamily: "var(--font-outfit), sans-serif" }}
+                      >
                         Click on any segment to edit the text
                       </p>
                     </div>
@@ -585,27 +625,30 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
 
       {/* Mobile Bottom Navigation - Only show when we have a result */}
       {result && (
-        <div className="lg:hidden fixed bottom-0 left-0 right-0 z-[100] bg-background border-t border-border shadow-lg">
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 z-[100] bg-white border-t-2 border-black/10 shadow-lg">
           <div className="grid grid-cols-2 gap-0">
             <button
               onClick={() => setShowStylingDrawer(true)}
-              className="flex flex-col items-center justify-center py-3 px-4 hover:bg-accent transition-colors active:bg-accent/80"
+              className="flex flex-col items-center justify-center py-3 px-4 hover:bg-slate-50 transition-colors active:bg-slate-100"
+              style={{ fontFamily: "var(--font-outfit), sans-serif" }}
             >
-              <Settings className="h-5 w-5 mb-1" />
-              <span className="text-xs font-medium">Styling</span>
+              <Settings className="h-5 w-5 mb-1 text-slate-600" />
+              <span className="text-xs font-semibold text-slate-700">Styling</span>
             </button>
             <button
               onClick={() => setShowEditingDrawer(true)}
-              className="flex flex-col items-center justify-center py-3 px-4 hover:bg-accent transition-colors border-l border-border active:bg-accent/80"
+              className="flex flex-col items-center justify-center py-3 px-4 hover:bg-slate-50 transition-colors border-l border-slate-200 active:bg-slate-100"
+              style={{ fontFamily: "var(--font-outfit), sans-serif" }}
             >
-              <FileText className="h-5 w-5 mb-1" />
-              <span className="text-xs font-medium">Edit</span>
+              <FileText className="h-5 w-5 mb-1 text-slate-600" />
+              <span className="text-xs font-semibold text-slate-700">Edit</span>
             </button>
           </div>
         </div>
       )}
 
       <SiteFooter />
+      <BuyMeCoffee />
     </main>
   );
 }

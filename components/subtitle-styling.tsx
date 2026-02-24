@@ -268,8 +268,8 @@ const PRESETS: SubtitlePreset[] = [
     label: "Green",
     previewText: "GREEN",
     style: {
-      fontFamily: FONT_FAMILIES.roboto.value,
-      fontSize: 22,
+      fontFamily: FONT_FAMILIES.bangers.value,
+      fontSize: 16,
       fontWeight: "600",
       color: "#00FF41",
       backgroundColor: "#0B0B0B",
@@ -282,7 +282,7 @@ const PRESETS: SubtitlePreset[] = [
     inactiveStyles: {
       color: "#00FF41",
       backgroundColor: "#0B0B0B",
-      borderRadius: "9999px",
+      borderRadius: "0.5rem",
       paddingInline: "0.75rem",
       paddingBlock: "0.35rem",
     },
@@ -292,8 +292,8 @@ const PRESETS: SubtitlePreset[] = [
     label: "Gold",
     previewText: "GOLD",
     style: {
-      fontFamily: FONT_FAMILIES.poppins.value,
-      fontSize: 22,
+      fontFamily: FONT_FAMILIES.permanentMarker.value,
+      fontSize: 16,
       fontWeight: "600",
       color: "#F4D35E",
       backgroundColor: "#1F1300",
@@ -306,7 +306,7 @@ const PRESETS: SubtitlePreset[] = [
     inactiveStyles: {
       color: "#F4D35E",
       backgroundColor: "#1F1300",
-      borderRadius: "0.75rem",
+      borderRadius: "0.5rem",
       paddingInline: "0.75rem",
       paddingBlock: "0.35rem",
     },
@@ -316,8 +316,8 @@ const PRESETS: SubtitlePreset[] = [
     label: "Subtitle",
     previewText: "SUBTITLE",
     style: {
-      fontFamily: FONT_FAMILIES.arial.value,
-      fontSize: 22,
+      fontFamily: FONT_FAMILIES.outfit.value,
+      fontSize: 16,
       fontWeight: "500",
       color: "#FFFFFF",
       backgroundColor: "rgba(0, 0, 0, 0.75)",
@@ -340,8 +340,8 @@ const PRESETS: SubtitlePreset[] = [
     label: "Gamer",
     previewText: "GAMER",
     style: {
-      fontFamily: FONT_FAMILIES.verdana.value,
-      fontSize: 28,
+      fontFamily: FONT_FAMILIES.bebasNeue.value,
+      fontSize: 16,
       fontWeight: "700",
       color: "#94FBAB",
       backgroundColor: "#141414",
@@ -354,7 +354,7 @@ const PRESETS: SubtitlePreset[] = [
     inactiveStyles: {
       color: "#94FBAB",
       backgroundColor: "#141414",
-      borderRadius: "9999px",
+      borderRadius: "0.5rem",
       paddingInline: "0.75rem",
       paddingBlock: "0.35rem",
       boxShadow: "0 0 0 2px #FF00FF",
@@ -373,7 +373,7 @@ function PresetButton({ preset, isActive, onApply }: PresetButtonProps) {
     <Button
       onClick={onApply}
       variant={isActive ? "default" : "ghost"}
-      className="group relative h-10 w-full rounded-full text-xs font-semibold transition-all"
+      className="group relative h-10 w-full rounded-lg text-xs font-semibold transition-all"
       style={
         isActive
           ? {
@@ -389,7 +389,7 @@ function PresetButton({ preset, isActive, onApply }: PresetButtonProps) {
     >
       {preset.label.toUpperCase()}
       <span
-        className={`pointer-events-none absolute inset-0 rounded-full border-2 transition-colors ${
+        className={`pointer-events-none absolute inset-0 rounded-lg border-2 transition-colors ${
           isActive
             ? "border-yellow-400"
             : "border-transparent group-hover:border-border/60"
@@ -502,7 +502,7 @@ export function SubtitleStyling({
   const fontSizeSliderIndex = fontSizeToSliderIndex(style.fontSize);
 
   return (
-    <div className={`flex flex-col h-full overflow-hidden ${className}`}>
+    <div className={`flex flex-col h-full overflow-hidden ${className}`} style={{ fontFamily: "var(--font-outfit), sans-serif" }}>
       {/* Mode Toggle at top */}
       {onModeChange && (
         <div className="px-4 mb-3">
@@ -519,26 +519,31 @@ export function SubtitleStyling({
       )}
 
       <div className="px-4 mb-2">
-        <h3 className="font-medium text-lg">Subtitle Styling</h3>
+        <h3 className="font-semibold text-base tracking-tight">Subtitle Styling</h3>
+      </div>
+
+      {/* Preview — pinned above scroll area */}
+      <div className="px-4 pb-3">
+        <div className="p-3 rounded-lg text-center border border-border/40 bg-muted/30" style={previewStyles}>
+          {previewText}
+        </div>
       </div>
 
       <div className="p-2 space-y-3 flex-1 overflow-y-auto">
         {/* Style presets */}
-        {!style.dynamicEnabled && (
-          <div className="space-y-2 mb-2">
-            <label className="text-sm font-medium block">Style Presets</label>
-            <div className="grid grid-cols-2 gap-2">
-              {PRESETS.map((preset) => (
-                <PresetButton
-                  key={preset.name}
-                  preset={preset}
-                  isActive={activePresetName === preset.name}
-                  onApply={() => applyPreset(preset)}
-                />
-              ))}
-            </div>
+        <div className="space-y-2 mb-2">
+          <label className="text-sm font-medium block">Style Presets</label>
+          <div className="grid grid-cols-2 gap-2">
+            {PRESETS.map((preset) => (
+              <PresetButton
+                key={preset.name}
+                preset={preset}
+                isActive={activePresetName === preset.name}
+                onApply={() => applyPreset(preset)}
+              />
+            ))}
           </div>
-        )}
+        </div>
 
         {/* Font Family with preview */}
         <div className="space-y-2 rounded-lg border border-border/40 bg-muted/40 p-3">
@@ -711,7 +716,7 @@ export function SubtitleStyling({
 
             {/* Follow-up word display - phrase mode only */}
             {mode === "phrase" && (
-              <div className="flex items-center justify-between rounded-md border border-border/50 px-3 py-2">
+              <div className="flex items-center justify-between rounded-lg border border-border/50 px-3 py-2">
                 <div>
                   <p className="text-sm font-medium">Follow-up word display</p>
                   <p className="text-xs text-muted-foreground">
@@ -741,9 +746,9 @@ export function SubtitleStyling({
                   <button
                     key={pos}
                     onClick={() => onChange({ ...style, position: pos })}
-                    className={`flex flex-col items-center gap-1 rounded-md border px-2 py-2 text-xs font-medium transition-all ${
+                    className={`flex flex-col items-center gap-1 rounded-lg border px-2 py-2 text-xs font-medium transition-all ${
                       isActive
-                        ? "border-primary bg-primary/10 text-primary"
+                        ? "border-amber-500/70 bg-amber-50 text-amber-700"
                         : "border-border/50 bg-background text-muted-foreground hover:border-border hover:text-foreground"
                     }`}
                   >
@@ -875,7 +880,7 @@ export function SubtitleStyling({
 
         {/* Word emphasis - hidden when dynamic is active */}
         {!style.dynamicEnabled && (
-          <div className="flex items-center justify-between rounded-md border border-border/50 px-3 py-2">
+          <div className="flex items-center justify-between rounded-lg border border-border/50 px-3 py-2">
             <div>
               <p className="text-sm font-medium">Active word emphasis</p>
               <p className="text-xs text-muted-foreground">
@@ -900,7 +905,7 @@ export function SubtitleStyling({
             <h4 className="text-sm font-medium">Background</h4>
 
             {/* Dynamic (3D depth) toggle */}
-            <div className="flex items-center justify-between rounded-md border border-purple-300/50 bg-purple-50/50 px-3 py-2">
+            <div className="flex items-center justify-between rounded-lg border border-amber-300/50 bg-amber-50/50 px-3 py-2">
               <div>
                 <p className="text-sm font-medium">Dynamic (3D depth)</p>
                 <p className="text-xs text-muted-foreground">
@@ -927,9 +932,9 @@ export function SubtitleStyling({
                         <button
                           key={bgType}
                           onClick={() => onChange({ ...style, backgroundType: bgType })}
-                          className={`rounded-md border px-3 py-2 text-xs font-medium transition-all ${
+                          className={`rounded-lg border px-3 py-2 text-xs font-medium transition-all ${
                             isActive
-                              ? "border-primary bg-primary/10 text-primary"
+                              ? "border-amber-500/70 bg-amber-50 text-amber-700"
                               : "border-border/50 bg-background text-muted-foreground hover:border-border hover:text-foreground"
                           }`}
                         >
@@ -957,7 +962,7 @@ export function SubtitleStyling({
                   </div>
                 )}
 
-                <div className="flex items-center justify-between rounded-md border border-border/50 px-3 py-2">
+                <div className="flex items-center justify-between rounded-lg border border-border/50 px-3 py-2">
                   <div>
                     <p className="text-sm font-medium">Subtitles behind person</p>
                     <p className="text-xs text-muted-foreground">
@@ -978,12 +983,6 @@ export function SubtitleStyling({
         )}
       </div>
 
-      <div className="mt-4">
-        <h4 className="text-sm font-medium mb-2">Preview</h4>
-        <div className="p-4 rounded-md text-center" style={previewStyles}>
-          {previewText}
-        </div>
-      </div>
     </div>
   );
 }

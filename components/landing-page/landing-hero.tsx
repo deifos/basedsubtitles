@@ -1,84 +1,92 @@
 "use client";
 
 import type { JSX } from "react";
-import { BadgeCheck, LucideIcon, ShieldCheck, Sparkles, WifiOff } from "lucide-react";
+import { ShieldCheck, WifiOff, Sparkles } from "lucide-react";
 
 import { LandingDropzone } from "./landing-dropzone";
 
-interface LandingHighlight {
-  icon: LucideIcon;
-  label: string;
-}
-
 interface LandingHeroProps {
-  highlights: LandingHighlight[];
   onVideoSelect?: (file: File) => void;
 }
 
-const DROPZONE_FACTS: LandingHighlight[] = [
-  { icon: ShieldCheck, label: "No data leaves your device" },
-  { icon: WifiOff, label: "Works offline" },
-  { icon: BadgeCheck, label: "Free to use" },
-];
-
-export function LandingHero({ highlights, onVideoSelect }: LandingHeroProps): JSX.Element {
+export function LandingHero({ onVideoSelect }: LandingHeroProps): JSX.Element {
   return (
-    <section className="relative">
-      <div className="mx-auto max-w-7xl px-6">
-        <div className="grid grid-cols-1 items-center gap-10 pb-20 pt-8 lg:grid-cols-12">
-          <div className="lg:col-span-6">
-            <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-600">
-              <Sparkles className="h-3.5 w-3.5" strokeWidth={1.5} />
-              Free to use • No sign-up
-            </div>
-            <h1 className="mt-5 text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl md:text-6xl">
-              Privacy-first subtitles,
-              <br className="hidden sm:block" />
-              generated 100% in your browser
-            </h1>
-            <p className="mt-5 text-base text-slate-600 sm:text-lg">
-              Drop a video and get accurate subtitles locally. Nothing is uploaded—ever. Fast, private, and works offline.
-            </p>
+    <section className="relative overflow-hidden pt-4 pb-12 sm:pt-6 sm:pb-16">
+      {/* Dot grid pattern background */}
+      <div
+        className="pointer-events-none absolute inset-0 -z-20"
+        style={{
+          backgroundImage: "radial-gradient(circle, #c7cbd1 1px, transparent 1px)",
+          backgroundSize: "24px 24px",
+        }}
+      />
 
-            <div className="mt-6 flex flex-wrap items-center gap-3">
-              {highlights.map((highlight) => (
-                <span
-                  key={highlight.label}
-                  className="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-600"
-                >
-                  <highlight.icon className="h-3.5 w-3.5" strokeWidth={1.5} />
-                  {highlight.label}
-                </span>
-              ))}
-            </div>
-
-            <p className="mt-8 text-sm text-slate-500">
-              Drop your video on the right to start generating subtitles instantly.
-            </p>
-          </div>
-
-          <div className="lg:col-span-6">
-            <LandingDropzone onVideoSelect={onVideoSelect} />
-            <div className="mt-6 border-t border-slate-200 pt-6">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                {DROPZONE_FACTS.map((fact) => (
-                  <span
-                    key={fact.label}
-                    className="flex items-center gap-2 text-xs text-slate-600"
-                  >
-                    <fact.icon className="h-4 w-4" strokeWidth={1.5} />
-                    {fact.label}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* Fade edges so pattern doesn't start/end abruptly */}
+      <div className="pointer-events-none absolute inset-0 -z-10">
+        <div className="absolute inset-0 bg-gradient-to-b from-white via-transparent to-white" />
+        <div className="absolute inset-0 bg-gradient-to-r from-white via-transparent to-white" />
       </div>
 
-      <div aria-hidden className="absolute inset-x-0 -z-10">
-        <div className="mx-auto max-w-7xl px-6">
-          <div className="h-px w-full bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
+      <div className="mx-auto max-w-7xl px-6">
+        {/* Pill badge */}
+        <div className="flex justify-center mb-5 animate-in fade-in slide-in-from-bottom-2 duration-500">
+          <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-4 py-1.5 text-xs font-medium text-slate-600 shadow-sm backdrop-blur-sm">
+            <Sparkles className="h-3.5 w-3.5 text-amber-500" strokeWidth={2} />
+            Free forever &middot; No sign-up &middot; No watermarks
+          </span>
+        </div>
+
+        {/* Headline */}
+        <div className="text-center max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100">
+          <h1
+            className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight text-slate-900 leading-[1.05]"
+            style={{ fontFamily: "var(--font-outfit), sans-serif" }}
+          >
+            Subtitles that run{" "}
+            <span className="relative inline-block">
+              <span className="relative z-10">in your browser</span>
+              <span
+                className="absolute -bottom-0.5 left-0 right-0 h-[0.2em] bg-amber-300/60 rounded-full -z-0"
+                aria-hidden
+              />
+            </span>
+          </h1>
+
+          <p
+            className="mt-4 text-base sm:text-lg text-slate-500 max-w-xl mx-auto leading-relaxed"
+            style={{ fontFamily: "var(--font-outfit), sans-serif" }}
+          >
+            Drop a video. Get AI-generated subtitles in seconds.
+            Everything happens on your device — nothing is ever uploaded.
+          </p>
+        </div>
+
+        {/* Trust indicators */}
+        <div className="flex flex-wrap justify-center gap-4 mt-5 animate-in fade-in slide-in-from-bottom-3 duration-500 delay-300">
+          {[
+            { icon: ShieldCheck, text: "No data leaves your device" },
+            { icon: WifiOff, text: "Works offline" },
+            { icon: Sparkles, text: "Powered by Whisper AI" },
+          ].map(({ icon: Icon, text }) => (
+            <span
+              key={text}
+              className="inline-flex items-center gap-1.5 text-xs text-slate-400"
+              style={{ fontFamily: "var(--font-outfit), sans-serif" }}
+            >
+              <Icon className="h-3 w-3" strokeWidth={1.5} />
+              {text}
+            </span>
+          ))}
+        </div>
+
+        {/* Dropzone */}
+        <div
+          id="dropzone"
+          className="mt-8 max-w-lg mx-auto animate-in fade-in zoom-in-95 duration-700 delay-200"
+        >
+          <div className="rounded-2xl bg-white shadow-xl shadow-slate-200/50 ring-1 ring-slate-100">
+            <LandingDropzone onVideoSelect={onVideoSelect} />
+          </div>
         </div>
       </div>
     </section>
