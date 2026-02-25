@@ -53,7 +53,7 @@ const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
   borderWidth: 0,
   borderColor: "#000000",
   dropShadowIntensity: 0.4,
-  wordEmphasisEnabled: true,
+  wordEmphasisEnabled: false,
   position: "bottom",
   maxWordsPerLine: 6,
   backgroundRemovalEnabled: false,
@@ -66,6 +66,7 @@ const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
   dynamicFrontFontSize: 40,
   dynamicFrontYPosition: 75,
   dynamicFollowWord: false,
+  textFadeIn: false,
 };
 
 export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps): JSX.Element {

@@ -203,6 +203,20 @@ export function VideoCaption({
     (w: ProcessedWord) => w.styleOverride?.effect === "knockout"
   );
 
+  // Fade calculations
+  const textFadeIn = style.textFadeIn ?? false;
+  const fadeOutDuration = 0.25; // 250ms chunk fade-out
+  const timeToChunkEnd = currentChunk.timestamp[1] - currentTime;
+  const chunkFadeOut = textFadeIn ? Math.min(1, Math.max(0, timeToChunkEnd / fadeOutDuration)) : 1;
+  // Word mode: also fade in at chunk level
+  const timeSinceChunkStart = currentTime - currentChunk.timestamp[0];
+  const fadeInDuration = 0.15; // 150ms per-word fade-in (word mode chunk-level)
+  const chunkFadeIn = (textFadeIn && mode === "word")
+    ? Math.min(1, Math.max(0, timeSinceChunkStart / fadeInDuration))
+    : 1;
+  // Container opacity (skip for knockout to avoid stacking context)
+  const containerFadeOpacity = hasKnockout ? 1 : chunkFadeIn * chunkFadeOut;
+
   const isMetallicColor = style.color === "#CCCCCC" || style.color === "#C0C0C0";
   const previewStrokeWidth = style.borderWidth > 0 ? Math.max(0.5, style.borderWidth) : 0;
   const previewStroke = previewStrokeWidth > 0 ? `${previewStrokeWidth}px ${style.borderColor}` : "none";
@@ -260,7 +274,7 @@ export function VideoCaption({
           const textIsLight = isLightColor(wordColor);
           const emphasisBgColor = textIsLight ? "rgba(0, 0, 0, 0.65)" : "rgba(255, 255, 255, 0.85)";
           const emphasisTextColor = textIsLight ? "#FFFFFF" : "#000000";
-          const isActive = isCurrentWord && (style.wordEmphasisEnabled ?? true);
+          const isActive = isCurrentWord && (style.wordEmphasisEnabled ?? false);
 
           const isSelected =
             selectedWordTimestamp &&
@@ -289,6 +303,10 @@ export function VideoCaption({
             overrideStyles.fontSize = `${word.styleOverride.fontSize}em`;
           }
 
+          // Per-word fade (when textFadeIn is on, per-letter opacity handles the reveal)
+          const timeSinceWordStart = currentTime - word.timestamp[0];
+          const wordOpacity = textFadeIn && !isKnockout ? chunkFadeOut : 1;
+
           const baseWordStyles: React.CSSProperties = {
             ...baseTypographyStyles,
             ...(isActive ? {} : metallicTypographyStyles),
@@ -299,6 +317,7 @@ export function VideoCaption({
             transform: isKnockout ? "none" : "scale(1)",
             backgroundColor: "transparent",
             cursor: onWordSelect ? "pointer" : undefined,
+            opacity: wordOpacity,
             ...overrideStyles,
           };
 
@@ -329,6 +348,23 @@ export function VideoCaption({
               }
             : {};
 
+          // Letter-by-letter fade: compute per-char alphas
+          const renderWordContent = () => {
+            if (!textFadeIn || isKnockout) return word.text;
+            const wordDuration = word.timestamp[1] - word.timestamp[0];
+            const revealDuration = Math.min(0.3, wordDuration * 0.6);
+            const charCount = word.text.length;
+            const letterStagger = charCount > 0 ? revealDuration / charCount : 0;
+            return word.text.split("").map((char, ci) => {
+              const charAlpha = Math.min(1, Math.max(0, (timeSinceWordStart - ci * letterStagger) / 0.06));
+              return (
+                <span key={ci} style={{ opacity: charAlpha }}>
+                  {char}
+                </span>
+              );
+            });
+          };
+
           return (
             <React.Fragment key={`${word.timestamp[0]}-${index}`}>
               <span
@@ -343,7 +379,7 @@ export function VideoCaption({
                 }
                 className={onWordSelect ? "pointer-events-auto" : undefined}
               >
-                {word.text}
+                {renderWordContent()}
               </span>
               {index < (currentChunk.words?.length || 0) - 1 && (
                 <span style={{ display: "inline-block", width: "0.35em" }}> </span>
@@ -430,8 +466,7 @@ export function VideoCaption({
           backgroundColor: style.backgroundColor,
           borderRadius: style.backgroundColor && style.backgroundColor !== "transparent" ? "0.5rem" : undefined,
           ...(hasKnockout ? {} : { transform: "scale(1) translateY(0)" }),
-          opacity: isAnimating ? 1 : 0,
-          transition: "opacity 0.15s ease-in",
+          opacity: isAnimating ? containerFadeOpacity : 0,
         }}
       >
         <div className="flex flex-col gap-1">

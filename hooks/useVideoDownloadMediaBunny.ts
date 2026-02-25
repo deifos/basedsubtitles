@@ -677,7 +677,7 @@ function renderSubtitle(
 
   const phraseWords = Array.isArray(chunkWords) ? chunkWords : undefined;
   const canEmphasize =
-    style.wordEmphasisEnabled &&
+    (style.wordEmphasisEnabled || style.textFadeIn) &&
     mode === 'phrase' &&
     phraseWords &&
     phraseWords.length > 0 &&
@@ -727,6 +727,7 @@ function renderSubtitle(
     const emphTotalHeight = lineWordGroups.length * lineHeight + Math.max(0, lineWordGroups.length - 1) * lineGap;
     const emphStartY = baseY - emphTotalHeight / 2 + lineHeight / 2;
 
+    const chunkEndTime = chunk.timestamp[1];
     lineWordGroups.forEach((wordGroup, index) => {
       const lineY = emphStartY + index * (lineHeight + lineGap);
       renderPhraseLineWithEmphasis(
@@ -737,16 +738,34 @@ function renderSubtitle(
         style,
         videoScale,
         currentTime,
-        finalFontSize
+        finalFontSize,
+        chunkEndTime
       );
     });
     return;
+  }
+
+  // Chunk-level fade for non-emphasis path (word mode or phrase without emphasis)
+  const useChunkFade = style.textFadeIn ?? false;
+  if (useChunkFade) {
+    const chunkFadeInDuration = 0.15;
+    const chunkFadeOutDuration = 0.25;
+    const timeSinceChunkStart = currentTime - chunk.timestamp[0];
+    const timeToChunkEnd = chunk.timestamp[1] - currentTime;
+    const chunkFadeIn = Math.min(1, Math.max(0, timeSinceChunkStart / chunkFadeInDuration));
+    const chunkFadeOut = Math.min(1, Math.max(0, timeToChunkEnd / chunkFadeOutDuration));
+    ctx.save();
+    ctx.globalAlpha = chunkFadeIn * chunkFadeOut;
   }
 
   lines.forEach((line, index) => {
     const lineY = startY + index * (lineHeight + lineGap);
     renderTextLine(ctx, line, x, lineY, style, videoScale);
   });
+
+  if (useChunkFade) {
+    ctx.restore();
+  }
 }
 
 // Text rendering helper
@@ -842,7 +861,8 @@ function renderPhraseLineWithEmphasis(
   style: SubtitleStyle,
   baseScale: number,
   currentTime: number,
-  finalFontSize: number
+  finalFontSize: number,
+  chunkEndTime?: number
 ) {
   if (words.length === 0) {
     return;
@@ -886,6 +906,10 @@ function renderPhraseLineWithEmphasis(
   const emphasisBgColor = textIsLight ? 'rgba(0, 0, 0, 0.65)' : 'rgba(255, 255, 255, 0.85)';
   const emphasisTextColor = textIsLight ? '#FFFFFF' : '#000000';
 
+  // Fade constants
+  const fadeOutDuration = 0.25; // 250ms chunk fade-out
+  const useTextFade = style.textFadeIn ?? false;
+
   words.forEach((word, index) => {
     const displayText = uppercaseWords[index];
     const scale = scales[index];
@@ -893,13 +917,23 @@ function renderPhraseLineWithEmphasis(
     const baseWidth = baseWidths[index];
     const isActive = scale > 1;
     const wordCenterX = cursor + scaledWidth / 2;
+    const isKnockout = word.styleOverride?.effect === "knockout";
+
+    // Per-word fade
+    const timeSinceWordStart = currentTime - word.timestamp[0];
+    const chunkFadeOut = (useTextFade && chunkEndTime != null)
+      ? Math.min(1, Math.max(0, (chunkEndTime - currentTime) / fadeOutDuration))
+      : 1;
+    const wordAlpha = chunkFadeOut;
+
+    ctx.save();
+    ctx.globalAlpha = wordAlpha;
 
     if (isActive) {
       const boxWidth = scaledWidth + highlightPaddingX * 2;
       const wordFontSize = word.styleOverride?.fontSize ? Math.round(finalFontSize * word.styleOverride.fontSize) : finalFontSize;
       const boxHeight = wordFontSize * scale + highlightPaddingY * 2;
 
-      ctx.save();
       ctx.fillStyle = emphasisBgColor;
       ctx.beginPath();
       ctx.roundRect(
@@ -910,7 +944,6 @@ function renderPhraseLineWithEmphasis(
         highlightRadius
       );
       ctx.fill();
-      ctx.restore();
     }
 
     const wordColor = word.styleOverride?.color;
@@ -919,6 +952,19 @@ function renderPhraseLineWithEmphasis(
     // Set per-word font if override exists
     if (word.styleOverride?.fontFamily || word.styleOverride?.fontSize) {
       ctx.font = buildWordFont(style, finalFontSize, globalFontFamily, word.styleOverride);
+    }
+
+    // Compute per-character alphas for letter-by-letter fade
+    let charAlphas: number[] | undefined;
+    if (useTextFade && !isKnockout) {
+      const wordDuration = word.timestamp[1] - word.timestamp[0];
+      const revealDuration = Math.min(0.3, wordDuration * 0.6);
+      const charCount = displayText.length;
+      const letterStagger = charCount > 0 ? revealDuration / charCount : 0;
+      charAlphas = [];
+      for (let ci = 0; ci < charCount; ci++) {
+        charAlphas.push(Math.min(1, Math.max(0, (timeSinceWordStart - ci * letterStagger) / 0.06)));
+      }
     }
 
     drawWordText(
@@ -931,13 +977,16 @@ function renderPhraseLineWithEmphasis(
       scale,
       baseWidth,
       fillColor,
-      word.styleOverride?.effect
+      word.styleOverride?.effect,
+      charAlphas
     );
 
     // Restore global font
     if (word.styleOverride?.fontFamily || word.styleOverride?.fontSize) {
       ctx.font = globalFont;
     }
+
+    ctx.restore();
 
     cursor += scaledWidth + spaceWidth;
   });
@@ -953,10 +1002,77 @@ function drawWordText(
   scale: number,
   baseWidth: number,
   fillColor: string,
-  effect?: "knockout"
+  effect?: "knockout",
+  charAlphas?: number[]
 ) {
   const uppercase = text.toUpperCase();
   const isKnockout = effect === "knockout";
+
+  // Per-character rendering when charAlphas provided
+  if (charAlphas && charAlphas.length > 0 && !isKnockout) {
+    const savedAlpha = ctx.globalAlpha;
+    const chars = uppercase.split("");
+    const charWidths = chars.map(c => ctx.measureText(c).width);
+    const totalCharWidth = charWidths.reduce((a, b) => a + b, 0);
+    let charX = -totalCharWidth / 2;
+
+    for (let ci = 0; ci < chars.length; ci++) {
+      const alpha = charAlphas[ci] ?? 1;
+      ctx.globalAlpha = savedAlpha * alpha;
+
+      const charCenterX = charX + charWidths[ci] / 2;
+
+      if (style.borderWidth > 0) {
+        ctx.save();
+        ctx.strokeStyle = style.borderColor;
+        const scaledBorderWidth = Math.max(0.5, (style.borderWidth * baseScale) / Math.max(scale, 0.001));
+        ctx.lineWidth = scaledBorderWidth;
+        ctx.translate(centerX, centerY);
+        ctx.scale(scale, scale);
+        ctx.lineJoin = 'round';
+        ctx.miterLimit = 2;
+        ctx.strokeText(chars[ci], charCenterX, 0);
+        ctx.restore();
+      }
+
+      let charFillStyle: string | CanvasGradient = fillColor;
+      if (fillColor === style.color && (style.color === '#CCCCCC' || style.color === '#C0C0C0')) {
+        const scaledWidth = baseWidth * scale;
+        const gradientHeight = 20 * baseScale;
+        const gradient = ctx.createLinearGradient(
+          centerX - scaledWidth / 2, centerY - gradientHeight,
+          centerX + scaledWidth / 2, centerY + gradientHeight
+        );
+        gradient.addColorStop(0, '#FFFFFF');
+        gradient.addColorStop(0.5, '#CCCCCC');
+        gradient.addColorStop(1, '#999999');
+        charFillStyle = gradient;
+      }
+
+      ctx.save();
+      if (style.dropShadowIntensity > 0) {
+        const shadowOpacity = Math.min(1, style.dropShadowIntensity);
+        ctx.shadowColor = `rgba(0,0,0,${shadowOpacity})`;
+        ctx.shadowBlur = Math.max(2, style.dropShadowIntensity * 5 * baseScale);
+        const shadowOffset = 2 * baseScale;
+        ctx.shadowOffsetX = shadowOffset;
+        ctx.shadowOffsetY = shadowOffset;
+      } else {
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+      }
+      ctx.fillStyle = charFillStyle;
+      ctx.translate(centerX, centerY);
+      ctx.scale(scale, scale);
+      ctx.fillText(chars[ci], charCenterX, 0);
+      ctx.restore();
+
+      charX += charWidths[ci];
+    }
+    ctx.globalAlpha = savedAlpha;
+    return;
+  }
 
   // Stroke closely matching WebKitTextStroke without over-thickening (skip for knockout)
   if (style.borderWidth > 0 && !isKnockout) {

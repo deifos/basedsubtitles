@@ -63,6 +63,7 @@ export interface SubtitleStyle {
   dynamicFrontFontSize: number; // front text font size at 500px preview height (default 40)
   dynamicFrontYPosition: number; // front text fallback Y position 0-100 (default 75)
   dynamicFollowWord: boolean; // highlight spoken word in front text (phrase mode only)
+  textFadeIn: boolean; // letter-by-letter fade-in effect
 }
 
 interface SubtitleStylingProps {
@@ -515,7 +516,7 @@ export function SubtitleStyling({
     };
   }, [style]);
 
-  const wordEmphasisEnabled = style.wordEmphasisEnabled ?? true;
+  const wordEmphasisEnabled = style.wordEmphasisEnabled ?? false;
   const fontSizeSliderIndex = fontSizeToSliderIndex(style.fontSize);
 
   return (
@@ -915,6 +916,21 @@ export function SubtitleStyling({
             />
           </div>
         )}
+
+        {/* Text fade in - letter-by-letter reveal */}
+        <div className="flex items-center justify-between rounded-lg border border-border/50 px-3 py-2">
+          <div>
+            <p className="text-sm font-medium">Text fade in</p>
+            <p className="text-xs text-muted-foreground">
+              Letters reveal left-to-right within each word
+            </p>
+          </div>
+          <Switch
+            checked={style.textFadeIn ?? false}
+            onCheckedChange={(value) => onChange({ ...style, textFadeIn: value })}
+            aria-label="Toggle text fade in"
+          />
+        </div>
 
         {/* Background Removal Section - only when masks are ready */}
         {bgRemovalReady && (

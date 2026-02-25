@@ -8,7 +8,7 @@
  * - PATCH: Bug fixes and small improvements
  */
 
-export const APP_VERSION = "1.5.0";
+export const APP_VERSION = "1.6.0";
 
 export interface ChangelogEntry {
   version: string;
@@ -21,6 +21,17 @@ export interface ChangelogEntry {
 }
 
 export const changelog: ChangelogEntry[] = [
+  {
+    version: "1.6.0",
+    date: "2026-02-25",
+    title: "Letter-by-Letter Text Fade In",
+    changes: [
+      { type: "added", description: "Letter-by-letter text fade in — characters reveal left-to-right within each word with staggered timing, similar to VEED-style animated captions" },
+      { type: "added", description: "\"Text fade in\" toggle in the styling panel — when off, text appears and disappears instantly with no fade effects" },
+      { type: "added", description: "Letter-by-letter reveal works in DOM preview, canvas compositing (3D depth), and video export" },
+      { type: "changed", description: "Word and chunk fade effects are now gated behind the text fade in toggle instead of always on" },
+    ],
+  },
   {
     version: "1.5.0",
     date: "2026-02-25",
