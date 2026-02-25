@@ -431,50 +431,54 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
             {/* Mobile Drawers */}
             {result && (
               <>
-                <Sheet open={showStylingDrawer} onOpenChange={setShowStylingDrawer}>
-                  <SheetContent side="left" className="w-full sm:w-96 p-0">
-                    <SheetHeader className="p-4 border-b">
+                <Sheet open={showStylingDrawer} onOpenChange={setShowStylingDrawer} modal={false}>
+                  <SheetContent side="left" className="w-full sm:w-96 p-0 gap-0" overlay={false}>
+                    <SheetHeader className="p-4 border-b shrink-0">
                       <SheetTitle>Subtitle Styling</SheetTitle>
                     </SheetHeader>
-                    <ScrollArea className="h-[calc(100vh-5rem)]">
-                      <div className="p-4">
-                        <SubtitleStyling
-                          style={subtitleStyle}
-                          onChange={setSubtitleStyle}
-                          mode={mode}
-                          onModeChange={handleModeChange}
-                          bgRemovalReady={bgRemovalReady}
-                        />
-                      </div>
-                    </ScrollArea>
+                    <div className="flex-1 min-h-0 overflow-hidden">
+                      <ScrollArea className="h-full">
+                        <div className="p-4 pb-20">
+                          <SubtitleStyling
+                            style={subtitleStyle}
+                            onChange={setSubtitleStyle}
+                            mode={mode}
+                            onModeChange={handleModeChange}
+                            bgRemovalReady={bgRemovalReady}
+                          />
+                        </div>
+                      </ScrollArea>
+                    </div>
                   </SheetContent>
                 </Sheet>
 
-                <Sheet open={showEditingDrawer} onOpenChange={setShowEditingDrawer}>
-                  <SheetContent side="right" className="w-full sm:w-96 p-0">
-                    <SheetHeader className="p-4 border-b">
+                <Sheet open={showEditingDrawer} onOpenChange={setShowEditingDrawer} modal={false}>
+                  <SheetContent side="right" className="w-full sm:w-96 p-0 gap-0" overlay={false}>
+                    <SheetHeader className="p-4 border-b shrink-0">
                       <SheetTitle>Edit Transcript</SheetTitle>
                     </SheetHeader>
-                    <ScrollArea className="h-[calc(100vh-5rem)]">
-                      <div className="p-4">
-                        <TranscriptSidebar
-                          transcript={result}
-                          currentTime={currentTime}
-                          setCurrentTime={(time) => {
-                            if (videoRef.current) {
-                              videoRef.current.currentTime = time;
-                              setCurrentTime(time);
-                            }
-                          }}
-                          onTranscriptUpdate={(updatedTranscript) => {
-                            setResult((prev) => prev ? { ...prev, ...updatedTranscript } : updatedTranscript);
-                          }}
-                          mode={mode}
-                          maxWordsPerLine={subtitleStyle.maxWordsPerLine}
-                          dynamicEnabled={subtitleStyle.dynamicEnabled}
-                        />
-                      </div>
-                    </ScrollArea>
+                    <div className="flex-1 min-h-0 overflow-hidden">
+                      <ScrollArea className="h-full">
+                        <div className="p-4 pb-20">
+                          <TranscriptSidebar
+                            transcript={result}
+                            currentTime={currentTime}
+                            setCurrentTime={(time) => {
+                              if (videoRef.current) {
+                                videoRef.current.currentTime = time;
+                                setCurrentTime(time);
+                              }
+                            }}
+                            onTranscriptUpdate={(updatedTranscript) => {
+                              setResult((prev) => prev ? { ...prev, ...updatedTranscript } : updatedTranscript);
+                            }}
+                            mode={mode}
+                            maxWordsPerLine={subtitleStyle.maxWordsPerLine}
+                            dynamicEnabled={subtitleStyle.dynamicEnabled}
+                          />
+                        </div>
+                      </ScrollArea>
+                    </div>
                   </SheetContent>
                 </Sheet>
               </>
@@ -759,20 +763,26 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
         <div className="lg:hidden fixed bottom-0 left-0 right-0 z-[100] bg-white border-t-2 border-black/10 shadow-lg">
           <div className="grid grid-cols-2 gap-0">
             <button
-              onClick={() => setShowStylingDrawer(true)}
-              className="flex flex-col items-center justify-center py-3 px-4 hover:bg-slate-50 transition-colors active:bg-slate-100"
+              onClick={() => {
+                setShowEditingDrawer(false);
+                setShowStylingDrawer((prev) => !prev);
+              }}
+              className={`flex flex-col items-center justify-center py-3 px-4 transition-colors active:bg-slate-100 ${showStylingDrawer ? "bg-slate-100" : "hover:bg-slate-50"}`}
               style={{ fontFamily: "var(--font-outfit), sans-serif" }}
             >
-              <Settings className="h-5 w-5 mb-1 text-slate-600" />
-              <span className="text-xs font-semibold text-slate-700">Styling</span>
+              <Settings className={`h-5 w-5 mb-1 ${showStylingDrawer ? "text-slate-900" : "text-slate-600"}`} />
+              <span className={`text-xs font-semibold ${showStylingDrawer ? "text-slate-900" : "text-slate-700"}`}>Styling</span>
             </button>
             <button
-              onClick={() => setShowEditingDrawer(true)}
-              className="flex flex-col items-center justify-center py-3 px-4 hover:bg-slate-50 transition-colors border-l border-slate-200 active:bg-slate-100"
+              onClick={() => {
+                setShowStylingDrawer(false);
+                setShowEditingDrawer((prev) => !prev);
+              }}
+              className={`flex flex-col items-center justify-center py-3 px-4 transition-colors border-l border-slate-200 active:bg-slate-100 ${showEditingDrawer ? "bg-slate-100" : "hover:bg-slate-50"}`}
               style={{ fontFamily: "var(--font-outfit), sans-serif" }}
             >
-              <FileText className="h-5 w-5 mb-1 text-slate-600" />
-              <span className="text-xs font-semibold text-slate-700">Edit</span>
+              <FileText className={`h-5 w-5 mb-1 ${showEditingDrawer ? "text-slate-900" : "text-slate-600"}`} />
+              <span className={`text-xs font-semibold ${showEditingDrawer ? "text-slate-900" : "text-slate-700"}`}>Edit</span>
             </button>
           </div>
         </div>

@@ -102,21 +102,24 @@ export function useCameraRecording(): UseCameraRecordingReturn {
     streamRef.current = stream;
     if (previewRef.current) {
       previewRef.current.srcObject = stream;
+      previewRef.current.play().catch(() => {});
     }
   }, []);
 
   const requestStream = useCallback(
     async (facing: "user" | "environment"): Promise<MediaStream> => {
       try {
+        // Use exact facingMode so the browser doesn't silently pick the wrong camera
         return await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: facing },
+          video: { facingMode: { exact: facing } },
           audio: true,
         });
       } catch (err) {
         if (
           err instanceof DOMException &&
-          err.name === "OverconstrainedError"
+          (err.name === "OverconstrainedError" || err.name === "NotFoundError")
         ) {
+          // Device doesn't have this camera — fall back to any available camera
           return await navigator.mediaDevices.getUserMedia({
             video: true,
             audio: true,

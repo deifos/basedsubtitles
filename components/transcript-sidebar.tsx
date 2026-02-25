@@ -491,7 +491,7 @@ export function TranscriptSidebar({
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto max-h-96" ref={transcriptContainerRef}>
+      <div className="flex-1 overflow-y-auto lg:max-h-96" ref={transcriptContainerRef}>
         <div className="space-y-2 p-2">
           {displayChunks.map((chunk, i) => {
             const [start, end] = chunk.timestamp;

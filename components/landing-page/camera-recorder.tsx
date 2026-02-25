@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import type { JSX } from "react";
 import {
   Circle,
@@ -40,8 +40,12 @@ export function CameraRecorder({
     closeCamera,
   } = useCameraRecording();
 
+  const hasOpenedRef = useRef(false);
   useEffect(() => {
-    openCamera();
+    if (!hasOpenedRef.current) {
+      hasOpenedRef.current = true;
+      openCamera();
+    }
   }, [openCamera]);
 
   const handleCancel = () => {

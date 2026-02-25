@@ -30,6 +30,13 @@ export const changelog: ChangelogEntry[] = [
       { type: "added", description: "\"Text fade in\" toggle in the styling panel — when off, text appears and disappears instantly with no fade effects" },
       { type: "added", description: "Letter-by-letter reveal works in DOM preview, canvas compositing (3D depth), and video export" },
       { type: "changed", description: "Word and chunk fade effects are now gated behind the text fade in toggle instead of always on" },
+      { type: "changed", description: "Active word emphasis is now off by default" },
+      { type: "fixed", description: "Mobile camera starting with black screen — autoPlay not reliable on mobile, now explicitly calls play() after attaching the stream" },
+      { type: "fixed", description: "Flipping camera showed \"camera in use by another app\" — the useEffect re-fired openCamera on facingMode change, causing two getUserMedia calls to race for the same device" },
+      { type: "fixed", description: "Camera defaulting to back camera on some Android devices — now uses exact facingMode constraint instead of a preference hint the browser can ignore" },
+      { type: "fixed", description: "Mobile styling and edit panels could not be switched directly — had to close one before opening the other. Bottom bar buttons are now toggles with mutual exclusion" },
+      { type: "fixed", description: "Mobile drawer panels cut off at the bottom — content now fills the full available height down to the navigation bar" },
+      { type: "fixed", description: "Mobile styling panel couldn't scroll to the last items — scroll area now accounts for the fixed bottom navigation bar" },
     ],
   },
   {
