@@ -40,7 +40,7 @@ export function SiteFooter(): JSX.Element {
             </Link>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center justify-center sm:justify-end gap-2 sm:gap-3">
             <span className="text-[10px] font-bold uppercase tracking-widest text-black/40">
               Powered by
             </span>
@@ -58,7 +58,7 @@ export function SiteFooter(): JSX.Element {
               />
               Transformers.js
             </a>
-            <span className="text-black/20">&bull;</span>
+            <span className="hidden sm:inline text-black/20">&bull;</span>
             <a
               href="https://github.com/Vanilagy/mediabunny"
               className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-black/60 hover:text-black transition-colors"

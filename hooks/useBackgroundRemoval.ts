@@ -229,6 +229,7 @@ export function useBackgroundRemoval(): UseBackgroundRemovalReturn {
       } catch (error) {
         console.error("[useBackgroundRemoval] Processing failed:", error);
         setIsReady(false);
+        throw error;
       } finally {
         setIsProcessing(false);
       }

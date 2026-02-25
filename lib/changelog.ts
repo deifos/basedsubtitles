@@ -8,7 +8,7 @@
  * - PATCH: Bug fixes and small improvements
  */
 
-export const APP_VERSION = "1.4.0";
+export const APP_VERSION = "1.4.1";
 
 export interface ChangelogEntry {
   version: string;
@@ -21,6 +21,16 @@ export interface ChangelogEntry {
 }
 
 export const changelog: ChangelogEntry[] = [
+  {
+    version: "1.4.1",
+    date: "2026-02-25",
+    title: "Mobile Bug Fixes",
+    changes: [
+      { type: "fixed", description: "Footer 'Powered by' row no longer overflows on small screens — items wrap and bullet separators hide on mobile" },
+      { type: "fixed", description: "Video freezing on mobile after transcription — unhandled play() promise rejections from autoplay policy now caught on all play/pause controls" },
+      { type: "added", description: "Toast notifications for background removal errors — shows a clear message when WebGPU/WASM is unavailable instead of silently failing" },
+    ],
+  },
   {
     version: "1.4.0",
     date: "2026-02-25",

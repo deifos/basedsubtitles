@@ -36,6 +36,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Settings, FileText, Eraser } from "lucide-react";
+import { toast } from "sonner";
 
 interface MainAppProps {
   initialFile?: File | null;
@@ -174,7 +175,11 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
   const handleRemoveBackground = useCallback(async () => {
     if (!videoRef.current) return;
     setSubtitleStyle((prev) => ({ ...prev, backgroundRemovalEnabled: true, dynamicEnabled: true }));
-    await processBgRemoval(videoRef.current);
+    try {
+      await processBgRemoval(videoRef.current);
+    } catch {
+      toast.error("Background removal failed. This feature requires WebGPU or WASM support, which may not be available on your device.");
+    }
   }, [processBgRemoval]);
 
   // Memoized handlers for better performance

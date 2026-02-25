@@ -438,7 +438,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
                   if (!compositingActive) {
                     const videoEl = ref && typeof ref !== "function" ? ref.current : null;
                     if (videoEl) {
-                      if (videoEl.paused) videoEl.play();
+                      if (videoEl.paused) videoEl.play().catch(() => {});
                       else videoEl.pause();
                     }
                   }
@@ -466,7 +466,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
                   onClick={() => {
                     const videoEl = ref && typeof ref !== "function" ? ref.current : null;
                     if (videoEl) {
-                      if (videoEl.paused) videoEl.play();
+                      if (videoEl.paused) videoEl.play().catch(() => {});
                       else videoEl.pause();
                     }
                   }}
@@ -497,7 +497,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
                   onClick={() => {
                     const videoEl = ref && typeof ref !== "function" ? ref.current : null;
                     if (videoEl) {
-                      if (videoEl.paused) videoEl.play();
+                      if (videoEl.paused) videoEl.play().catch(() => {});
                       else videoEl.pause();
                     }
                   }}
