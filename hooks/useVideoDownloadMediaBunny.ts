@@ -387,8 +387,6 @@ export function useVideoDownloadMediaBunny({
           if (isDynamicMode && currentChunk) {
             // Dynamic mode: render only "behind" words as big text
             renderDynamicBehindInExport(ctx, currentChunk, subtitleStyle, canvas, time);
-          } else if (subtitleStyle.subtitleBehindPerson && currentChunk) {
-            renderSubtitle(ctx, currentChunk, subtitleStyle, canvas, mode, time);
           }
 
           // Step 3: Draw masked foreground (reuse canvases across frames)
@@ -434,7 +432,7 @@ export function useVideoDownloadMediaBunny({
           if (isDynamicMode && currentChunk) {
             const faceBounds = estimateFaceFromMask(mask.data, mask.width, mask.height, canvas.width, canvas.height);
             renderDynamicFrontInExport(ctx, currentChunk, subtitleStyle, canvas, faceBounds, time);
-          } else if (!subtitleStyle.subtitleBehindPerson && currentChunk) {
+          } else if (currentChunk) {
             renderSubtitle(ctx, currentChunk, subtitleStyle, canvas, mode, time);
           }
         } else {
@@ -1240,7 +1238,7 @@ function renderDynamicBehindInExport(
   renderDynamicWordWithOptions(ctx, behindText, style, canvas, {
     fontSize: style.dynamicFontSize ?? 80,
     yPosition: style.dynamicYPosition ?? 35,
-  }, behindWords);
+  }, behindWords, currentTime, chunk.timestamp[1]);
 }
 
 // Render only "front" words from a dynamic chunk
@@ -1274,7 +1272,7 @@ function renderDynamicFrontInExport(
   renderDynamicWordWithOptions(ctx, frontText, style, canvas, {
     fontSize: style.dynamicFrontFontSize ?? 40,
     yPosition,
-  }, frontWords);
+  }, frontWords, currentTime, chunk.timestamp[1]);
 }
 
 // Shared dynamic text renderer with configurable size and position
@@ -1285,7 +1283,9 @@ function renderDynamicWordWithOptions(
   style: SubtitleStyle,
   canvas: HTMLCanvasElement,
   options: { fontSize: number; yPosition: number },
-  wordTimings?: WordTiming[]
+  wordTimings?: WordTiming[],
+  currentTime?: number,
+  chunkEndTime?: number
 ) {
   const videoScale = canvas.height / 500;
   const fontSize = Math.round(options.fontSize * videoScale);
@@ -1331,16 +1331,24 @@ function renderDynamicWordWithOptions(
   const yCenter = canvas.height * (options.yPosition / 100);
   const startY = yCenter - totalHeight / 2 + lineHeight / 2;
 
+  const useTextFade = (style.textFadeIn ?? false) && wordTimings && currentTime != null;
+  const fadeOutDuration = 0.25;
+  const chunkFadeOut = (useTextFade && chunkEndTime != null)
+    ? Math.min(1, Math.max(0, (chunkEndTime - currentTime!) / fadeOutDuration))
+    : 1;
+
+  const needsWordByWord = (hasOverrides || useTextFade) && wordTimings;
+
   for (let i = 0; i < lines.length; i++) {
     const lineY = startY + i * lineHeight;
     const lineText = lines[i];
 
-    // If any word in this line has an override, render word-by-word
-    if (hasOverrides && wordTimings) {
+    if (needsWordByWord) {
       const indices = lineWordIndices[i];
       const lineWords = indices.map((idx) => ({
         text: upperWords[idx],
         override: wordTimings[idx]?.styleOverride,
+        timing: wordTimings[idx],
       }));
 
       const spaceWidth = ctx.measureText(' ').width;
@@ -1363,13 +1371,30 @@ function renderDynamicWordWithOptions(
         const wWidth = wordWidths[j];
         const wordX = cursor + wWidth / 2;
         const wordColor = w.override?.color ?? style.color;
+        const isKnockout = w.override?.effect === "knockout";
 
         if (w.override?.fontFamily || w.override?.fontSize) {
           ctx.font = buildWordFont(style, fontSize, fontFamily, w.override);
         }
 
-        // Render single word
-        renderDynamicSingleWord(ctx, w.text, wordX, lineY, style, wordColor, fontSize, videoScale, w.override?.effect);
+        // Compute per-character alphas for letter-by-letter fade
+        let charAlphas: number[] | undefined;
+        if (useTextFade && !isKnockout && w.timing) {
+          const timeSinceWordStart = currentTime! - w.timing.timestamp[0];
+          const wordDuration = w.timing.timestamp[1] - w.timing.timestamp[0];
+          const revealDuration = Math.min(0.3, wordDuration * 0.6);
+          const charCount = w.text.length;
+          const letterStagger = charCount > 0 ? revealDuration / charCount : 0;
+          charAlphas = [];
+          for (let ci = 0; ci < charCount; ci++) {
+            charAlphas.push(Math.min(1, Math.max(0, (timeSinceWordStart - ci * letterStagger) / 0.06)) * chunkFadeOut);
+          }
+        }
+
+        ctx.save();
+        if (!charAlphas) ctx.globalAlpha = chunkFadeOut;
+        renderDynamicSingleWord(ctx, w.text, wordX, lineY, style, wordColor, fontSize, videoScale, w.override?.effect, charAlphas);
+        ctx.restore();
 
         if (w.override?.fontFamily || w.override?.fontSize) {
           ctx.font = globalFont;
@@ -1378,7 +1403,7 @@ function renderDynamicWordWithOptions(
         cursor += wWidth + spaceWidth;
       }
     } else {
-      // Fast path: no overrides, render full line
+      // Fast path: no overrides and no textFadeIn, render full line
       renderDynamicSingleWord(ctx, lineText, x, lineY, style, style.color, fontSize, videoScale);
     }
   }
@@ -1394,9 +1419,59 @@ function renderDynamicSingleWord(
   fillColor: string,
   fontSize: number,
   videoScale: number,
-  effect?: "knockout"
+  effect?: "knockout",
+  charAlphas?: number[]
 ) {
+  const upperText = text.toUpperCase();
   const isKnockout = effect === "knockout";
+
+  // Per-character rendering when charAlphas provided
+  if (charAlphas && charAlphas.length > 0 && !isKnockout) {
+    const savedAlpha = ctx.globalAlpha;
+    const chars = upperText.split("");
+    const charWidths = chars.map(c => ctx.measureText(c).width);
+    const totalCharWidth = charWidths.reduce((a, b) => a + b, 0);
+    let charX = x - totalCharWidth / 2;
+
+    for (let ci = 0; ci < chars.length; ci++) {
+      const alpha = charAlphas[ci] ?? 1;
+      ctx.globalAlpha = savedAlpha * alpha;
+      const cx = charX + charWidths[ci] / 2;
+
+      const strokeWidth = Math.max(2, fontSize * 0.03);
+      ctx.save();
+      ctx.strokeStyle = style.borderColor || '#000000';
+      ctx.lineWidth = strokeWidth;
+      ctx.lineJoin = 'round';
+      ctx.miterLimit = 2;
+      ctx.strokeText(chars[ci], cx, y);
+      ctx.restore();
+
+      let charFillStyle: string | CanvasGradient = fillColor;
+      if (fillColor === style.color && (style.color === '#CCCCCC' || style.color === '#C0C0C0')) {
+        const tw = ctx.measureText(upperText).width;
+        const gradient = ctx.createLinearGradient(x - tw / 2, y - fontSize / 2, x + tw / 2, y + fontSize / 2);
+        gradient.addColorStop(0, '#FFFFFF');
+        gradient.addColorStop(0.5, '#CCCCCC');
+        gradient.addColorStop(1, '#999999');
+        charFillStyle = gradient;
+      }
+
+      ctx.save();
+      const shadowIntensity = Math.max(0.5, style.dropShadowIntensity);
+      ctx.shadowColor = `rgba(0,0,0,${shadowIntensity})`;
+      ctx.shadowBlur = Math.max(3, shadowIntensity * 6 * videoScale);
+      ctx.shadowOffsetX = 2 * videoScale;
+      ctx.shadowOffsetY = 2 * videoScale;
+      ctx.fillStyle = charFillStyle;
+      ctx.fillText(chars[ci], cx, y);
+      ctx.restore();
+
+      charX += charWidths[ci];
+    }
+    ctx.globalAlpha = savedAlpha;
+    return;
+  }
 
   if (!isKnockout) {
     const strokeWidth = Math.max(2, fontSize * 0.03);
@@ -1405,7 +1480,7 @@ function renderDynamicSingleWord(
     ctx.lineWidth = strokeWidth;
     ctx.lineJoin = 'round';
     ctx.miterLimit = 2;
-    ctx.strokeText(text, x, y);
+    ctx.strokeText(upperText, x, y);
     ctx.restore();
   }
 
@@ -1413,7 +1488,7 @@ function renderDynamicSingleWord(
     ctx.save();
     ctx.globalCompositeOperation = "difference";
     ctx.fillStyle = "#FFFFFF";
-    ctx.fillText(text, x, y);
+    ctx.fillText(upperText, x, y);
     ctx.restore();
     return;
   }
@@ -1423,7 +1498,7 @@ function renderDynamicSingleWord(
     fillColor === style.color &&
     (style.color === '#CCCCCC' || style.color === '#C0C0C0')
   ) {
-    const textWidth = ctx.measureText(text).width;
+    const textWidth = ctx.measureText(upperText).width;
     const gradient = ctx.createLinearGradient(
       x - textWidth / 2, y - fontSize / 2,
       x + textWidth / 2, y + fontSize / 2
@@ -1441,6 +1516,6 @@ function renderDynamicSingleWord(
   ctx.shadowOffsetX = 2 * videoScale;
   ctx.shadowOffsetY = 2 * videoScale;
   ctx.fillStyle = fillStyle;
-  ctx.fillText(text, x, y);
+  ctx.fillText(upperText, x, y);
   ctx.restore();
 }

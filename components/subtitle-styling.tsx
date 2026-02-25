@@ -55,7 +55,6 @@ export interface SubtitleStyle {
   backgroundRemovalEnabled: boolean;
   backgroundType: "solid" | "blur";
   solidBackgroundColor: string;
-  subtitleBehindPerson: boolean;
   // Dynamic subtitle controls
   dynamicEnabled: boolean; // toggle for behind/front 3D depth effect
   dynamicFontSize: number; // behind text font size in px at 500px preview height (default 80)
@@ -995,21 +994,6 @@ export function SubtitleStyling({
                   </div>
                 )}
 
-                <div className="flex items-center justify-between rounded-lg border border-border/50 px-3 py-2">
-                  <div>
-                    <p className="text-sm font-medium">Subtitles behind person</p>
-                    <p className="text-xs text-muted-foreground">
-                      Place subtitles behind the person for a 3D effect
-                    </p>
-                  </div>
-                  <Switch
-                    checked={style.subtitleBehindPerson}
-                    onCheckedChange={(checked) =>
-                      onChange({ ...style, subtitleBehindPerson: checked })
-                    }
-                    aria-label="Toggle subtitles behind person"
-                  />
-                </div>
               </>
             )}
           </div>

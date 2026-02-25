@@ -37,6 +37,9 @@ export const changelog: ChangelogEntry[] = [
       { type: "fixed", description: "Mobile styling and edit panels could not be switched directly — had to close one before opening the other. Bottom bar buttons are now toggles with mutual exclusion" },
       { type: "fixed", description: "Mobile drawer panels cut off at the bottom — content now fills the full available height down to the navigation bar" },
       { type: "fixed", description: "Mobile styling panel couldn't scroll to the last items — scroll area now accounts for the fixed bottom navigation bar" },
+      { type: "fixed", description: "Letter-by-letter text fade in now works in 3D depth mode — both behind and front text layers support per-character reveal and chunk fade-out" },
+      { type: "fixed", description: "Mobile transcript panel height was capped at 384px (max-h-96) — removed the cap on mobile so the list fills the drawer" },
+      { type: "removed", description: "Removed redundant \"Subtitles behind person\" toggle — its functionality is fully covered by the \"Dynamic depth 3D\" toggle" },
     ],
   },
   {

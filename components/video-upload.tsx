@@ -318,13 +318,9 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
           ctx.fillRect(0, 0, w, h);
         }
 
-        // Step 2: Render subtitle behind person
+        // Step 2: Render subtitle behind person (dynamic mode only)
         if (isDynamic && transcript) {
-          // Dynamic mode: render only "behind" words as big text
           renderDynamicBehindText(ctx, transcript, time, subtitleStyle, w, h);
-        } else if (subtitleStyle.subtitleBehindPerson && transcript) {
-          // Non-dynamic behind mode: render all text behind
-          renderSubtitleToCanvas(ctx, transcript, time, subtitleStyle, mode, w, h);
         }
 
         // Step 3: Draw masked foreground using canvas compositing
@@ -373,10 +369,9 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
 
         // Step 4: Render front text (dynamic) or on-top text (non-dynamic)
         if (isDynamic && transcript) {
-          // Estimate face from mask for positioning front text below chin
           const faceBounds = estimateFaceFromMask(mask.data, mask.width, mask.height, w, h);
           renderDynamicFrontText(ctx, transcript, time, subtitleStyle, w, h, faceBounds);
-        } else if (!subtitleStyle.subtitleBehindPerson && transcript) {
+        } else if (transcript) {
           renderSubtitleToCanvas(ctx, transcript, time, subtitleStyle, mode, w, h);
         }
 

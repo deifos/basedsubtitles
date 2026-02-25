@@ -59,7 +59,6 @@ const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
   backgroundRemovalEnabled: false,
   backgroundType: "solid",
   solidBackgroundColor: "#000000",
-  subtitleBehindPerson: false,
   dynamicEnabled: false,
   dynamicFontSize: 80,
   dynamicYPosition: 35,
@@ -193,7 +192,6 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
     setSubtitleStyle((prev) => ({
       ...prev,
       backgroundRemovalEnabled: false,
-      subtitleBehindPerson: false,
     }));
 
     // Clear uploaded file
@@ -620,7 +618,6 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
                           setSubtitleStyle((prev) => ({
                             ...prev,
                             backgroundRemovalEnabled: false,
-                            subtitleBehindPerson: false,
                           }));
                         }}
                         variant="outline"
