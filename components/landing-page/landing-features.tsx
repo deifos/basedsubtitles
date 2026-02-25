@@ -41,7 +41,7 @@ export function LandingFeatures(): JSX.Element {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* AI Subtitle Generation — Large hero card */}
           <div className="sm:col-span-2 lg:col-span-2 group relative rounded-2xl border border-slate-200/80 bg-gradient-to-br from-blue-50 to-white p-6 shadow-sm transition-all hover:shadow-lg hover:shadow-blue-100/60 hover:-translate-y-0.5 overflow-hidden">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-6">
+            <div className="flex flex-col items-center sm:flex-row sm:items-center gap-6">
               <div className="relative shrink-0">
                 {/* Big visual: subtitle text over waveform-like bars */}
                 <div className="w-32 h-32 sm:w-40 sm:h-40 rounded-2xl bg-blue-100/60 flex items-center justify-center relative overflow-hidden">
@@ -54,7 +54,7 @@ export function LandingFeatures(): JSX.Element {
                   <Captions className="h-14 w-14 text-blue-500 relative z-10" strokeWidth={1.2} />
                 </div>
               </div>
-              <div>
+              <div className="text-center sm:text-left">
                 <h3
                   className="text-lg font-bold text-slate-900"
                   style={{ fontFamily: "var(--font-outfit), sans-serif" }}
