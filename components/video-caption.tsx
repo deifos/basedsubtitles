@@ -138,7 +138,47 @@ export function VideoCaption({
     }
   }, [style, currentText]);
 
-  if (currentChunks.length === 0) return null;
+  // Always render the container to reserve space and prevent layout jumps
+  if (currentChunks.length === 0) {
+    const position = style.position ?? "bottom";
+    const isPortrait = ratio === "9:16";
+    const widthClass = isPortrait ? "w-[85%]" : "w-[90%]";
+    const posClasses = (() => {
+      switch (position) {
+        case "top":
+          return isPortrait ? `top-[6%] ${widthClass}` : `top-[12%] ${widthClass}`;
+        case "middle":
+          return `top-1/2 -translate-y-1/2 ${widthClass}`;
+        case "bottom":
+        default:
+          return isPortrait ? `bottom-[8%] ${widthClass}` : `bottom-[16%] ${widthClass}`;
+      }
+    })();
+
+    return (
+      <div
+        className={cn(
+          "absolute left-1/2 -translate-x-1/2 text-center pointer-events-none",
+          "z-10",
+          posClasses
+        )}
+        style={{
+          fontFamily: style.fontFamily,
+          fontSize: `clamp(12px, ${style.fontSize * 0.06}vw, ${style.fontSize}px)`,
+          fontWeight: style.fontWeight,
+        }}
+      >
+        <div
+          className="inline-block px-3 py-2"
+          style={{ opacity: 0 }}
+        >
+          <div className="flex flex-col gap-1">
+            <span>&nbsp;</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const rawChunk = currentChunks[0]; // Take the first matching chunk
 

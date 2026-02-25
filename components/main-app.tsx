@@ -527,33 +527,37 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
                 </div>
 
                 {/* Word chip bar for per-word editing when canvas compositing is active */}
-                {currentPhraseWords.length > 0 && mode === "phrase" && (
-                  <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5 px-2">
-                    <span className="text-xs text-muted-foreground mr-1">Edit word:</span>
-                    {currentPhraseWords.map((word, i) => {
-                      const isSelected =
-                        selectedWordTimestamp &&
-                        word.timestamp[0] === selectedWordTimestamp[0] &&
-                        word.timestamp[1] === selectedWordTimestamp[1];
-                      const hasOverride = result?.chunks.find(
-                        c => c.timestamp[0] === word.timestamp[0] && c.timestamp[1] === word.timestamp[1]
-                      )?.styleOverride;
-                      return (
-                        <button
-                          key={`${word.timestamp[0]}-${i}`}
-                          onClick={() => handleWordSelect(word.timestamp)}
-                          className={`px-2 py-0.5 text-xs rounded-md border transition-colors ${
-                            isSelected
-                              ? "bg-amber-500 text-white border-amber-500"
-                              : hasOverride
-                                ? "bg-amber-100 border-amber-300 text-amber-800 hover:bg-amber-200"
-                                : "bg-muted/50 border-border hover:bg-muted"
-                          }`}
-                        >
-                          {word.text}
-                        </button>
-                      );
-                    })}
+                {compositingActive && mode === "phrase" && (
+                  <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5 px-2 min-h-[28px]">
+                    {currentPhraseWords.length > 0 && (
+                      <>
+                        <span className="text-xs text-muted-foreground mr-1">Edit word:</span>
+                        {currentPhraseWords.map((word, i) => {
+                          const isSelected =
+                            selectedWordTimestamp &&
+                            word.timestamp[0] === selectedWordTimestamp[0] &&
+                            word.timestamp[1] === selectedWordTimestamp[1];
+                          const hasOverride = result?.chunks.find(
+                            c => c.timestamp[0] === word.timestamp[0] && c.timestamp[1] === word.timestamp[1]
+                          )?.styleOverride;
+                          return (
+                            <button
+                              key={`${word.timestamp[0]}-${i}`}
+                              onClick={() => handleWordSelect(word.timestamp)}
+                              className={`px-2 py-0.5 text-xs rounded-md border transition-colors ${
+                                isSelected
+                                  ? "bg-amber-500 text-white border-amber-500"
+                                  : hasOverride
+                                    ? "bg-amber-100 border-amber-300 text-amber-800 hover:bg-amber-200"
+                                    : "bg-muted/50 border-border hover:bg-muted"
+                              }`}
+                            >
+                              {word.text}
+                            </button>
+                          );
+                        })}
+                      </>
+                    )}
                   </div>
                 )}
 

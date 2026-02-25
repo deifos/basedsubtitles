@@ -422,7 +422,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
               <video
                 ref={ref}
                 src={videoSrc}
-                controls={!compositingActive}
+                playsInline
                 className={cn(
                   ratio === "16:9"
                     ? "object-cover w-full max-w-4xl max-h-[500px]"
@@ -430,13 +430,23 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
                       ? "object-cover h-[500px] max-h-[500px]"
                       : "object-contain h-[500px] max-h-[500px]"
                 )}
-                style={{
-                  aspectRatio: ratio === "16:9" ? "16/9" : "9/16",
-                }}
                 onTimeUpdate={handleTimeUpdate}
                 onPlay={() => setIsPlaying(true)}
                 onPause={() => setIsPlaying(false)}
                 onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
+                onClick={() => {
+                  if (!compositingActive) {
+                    const videoEl = ref && typeof ref !== "function" ? ref.current : null;
+                    if (videoEl) {
+                      if (videoEl.paused) videoEl.play();
+                      else videoEl.pause();
+                    }
+                  }
+                }}
+                style={{
+                  aspectRatio: ratio === "16:9" ? "16/9" : "9/16",
+                  cursor: "pointer",
+                }}
               />
               {/* Canvas overlay for background removal compositing */}
               {compositingActive && (
@@ -480,8 +490,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
                 />
               )}
             </div>
-            {/* Custom controls below video when compositing is active */}
-            {compositingActive && (
+            {/* Custom player controls — always visible */}
               <div className="flex items-center gap-2 px-3 py-2 bg-black/90 rounded-b-lg w-full">
                 {/* Play/Pause */}
                 <button
@@ -538,7 +547,6 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
                   {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
                 </button>
               </div>
-            )}
             </div>
           </div>
         ) : (

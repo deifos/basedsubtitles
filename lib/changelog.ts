@@ -8,7 +8,7 @@
  * - PATCH: Bug fixes and small improvements
  */
 
-export const APP_VERSION = "1.3.1";
+export const APP_VERSION = "1.4.0";
 
 export interface ChangelogEntry {
   version: string;
@@ -21,6 +21,28 @@ export interface ChangelogEntry {
 }
 
 export const changelog: ChangelogEntry[] = [
+  {
+    version: "1.4.0",
+    date: "2026-02-25",
+    title: "Camera Recording, Custom Player & Bug Fixes",
+    changes: [
+      { type: "added", description: "Camera recording — record video directly from your camera (front or back) with a 'Record video' button on the landing page" },
+      { type: "added", description: "Records straight to MP4 using MediaBunny (H.264 + AAC) — no WebM conversion needed" },
+      { type: "added", description: "Camera flip button to switch between front and back cameras on mobile" },
+      { type: "added", description: "Review screen after recording with re-record and 'Use this video' options" },
+      { type: "added", description: "Custom player controls (play/pause, seek bar, time, mute) shown consistently in all modes" },
+      { type: "added", description: "Click anywhere on the video to play/pause" },
+      { type: "added", description: "Umami analytics integration" },
+      { type: "added", description: "Powered by Transformers.js and MediaBunny attribution with logos in the footer" },
+      { type: "changed", description: "Removed native browser video controls — custom controls prevent subtitles from covering playback buttons" },
+      { type: "changed", description: "Landing hero tagline updated from 'Free forever' to 'Free'" },
+      { type: "fixed", description: "Selecting the 500MB model caused a blank screen — base model preload raced with the user's model choice, resolving the wrong download promise" },
+      { type: "fixed", description: "Added load ID tracking so stale model 'ready' messages from previous downloads can't resolve the wrong promise" },
+      { type: "fixed", description: "Cancelling the language modal on a fresh upload now returns to the landing page instead of showing a dead-end video screen" },
+      { type: "fixed", description: "Subtitle text appearing/disappearing no longer causes layout jumps — placeholder space is always reserved" },
+      { type: "fixed", description: "Word chip bar in compositing mode no longer causes layout shifts between phrases" },
+    ],
+  },
   {
     version: "1.3.1",
     date: "2026-02-25",
