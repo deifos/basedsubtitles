@@ -48,6 +48,7 @@ const FONT_MAPPINGS: Record<string, string> = {
   "var(--font-lora)": "Lora",
   "var(--font-plus-jakarta-sans)": "Plus Jakarta Sans",
   "var(--font-outfit)": "Outfit",
+  "var(--font-lilita-one)": "Lilita One",
 };
 
 function resolveFontFamily(fontFamily: string): string {
@@ -383,7 +384,7 @@ function renderDynamicTextBlock(
           ctx.font = buildWordFont(style, fontSize, w.override);
         }
 
-        renderDynamicWord(ctx, w.text, wordX, lineY, style, wordColor, fontSize, videoScale);
+        renderDynamicWord(ctx, w.text, wordX, lineY, style, wordColor, fontSize, videoScale, w.override?.effect);
 
         // Restore font
         if (w.override?.fontFamily || w.override?.fontSize) {
@@ -408,17 +409,31 @@ function renderDynamicWord(
   style: SubtitleStyle,
   fillColor: string,
   fontSize: number,
-  videoScale: number
+  videoScale: number,
+  effect?: "knockout"
 ) {
-  // Stroke
-  const strokeWidth = Math.max(2, fontSize * 0.03);
-  ctx.save();
-  ctx.strokeStyle = style.borderColor || "#000000";
-  ctx.lineWidth = strokeWidth;
-  ctx.lineJoin = "round";
-  ctx.miterLimit = 2;
-  ctx.strokeText(text, x, y);
-  ctx.restore();
+  const isKnockout = effect === "knockout";
+
+  // Stroke (skip for knockout)
+  if (!isKnockout) {
+    const strokeWidth = Math.max(2, fontSize * 0.03);
+    ctx.save();
+    ctx.strokeStyle = style.borderColor || "#000000";
+    ctx.lineWidth = strokeWidth;
+    ctx.lineJoin = "round";
+    ctx.miterLimit = 2;
+    ctx.strokeText(text, x, y);
+    ctx.restore();
+  }
+
+  if (isKnockout) {
+    ctx.save();
+    ctx.globalCompositeOperation = "difference";
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillText(text, x, y);
+    ctx.restore();
+    return;
+  }
 
   // Fill
   let fillStyle: string | CanvasGradient = fillColor;
@@ -570,16 +585,49 @@ function renderChunkToCanvas(
     Number.isFinite(currentTime);
 
   if (canEmphasize) {
-    const lineWordGroups =
-      splitPoint !== null && phraseWords
-        ? [
-            phraseWords.slice(0, splitPoint),
-            phraseWords.slice(splitPoint),
-          ].filter((group) => group.length > 0)
-        : [phraseWords];
+    // Build line groups based on actual pixel width (accounts for per-word font overrides)
+    const maxLineWidth = canvasWidth * (isVerticalVideo ? 0.85 : 0.90);
+    const spaceWidth = 0.35 * finalFontSize;
+    const lineWordGroups: typeof phraseWords[] = [];
+    let currentLineWords: typeof phraseWords = [];
+    let currentLineWidth = 0;
+
+    for (let i = 0; i < phraseWords.length; i++) {
+      const word = phraseWords[i];
+      const wordText = word.text.toUpperCase();
+
+      // Measure with per-word font if needed
+      if (word.styleOverride?.fontFamily || word.styleOverride?.fontSize) {
+        ctx.font = buildWordFont(style, finalFontSize, word.styleOverride);
+      }
+      const wordWidth = ctx.measureText(wordText).width;
+      if (word.styleOverride?.fontFamily || word.styleOverride?.fontSize) {
+        ctx.font = fontString;
+      }
+
+      const scale = (currentTime >= word.timestamp[0] && currentTime <= word.timestamp[1] && style.wordEmphasisEnabled) ? 1.18 : 1;
+      const scaledWordWidth = wordWidth * scale;
+      const widthIfAdded = currentLineWidth + (currentLineWords.length > 0 ? spaceWidth : 0) + scaledWordWidth;
+
+      if (currentLineWords.length > 0 && widthIfAdded > maxLineWidth) {
+        lineWordGroups.push(currentLineWords);
+        currentLineWords = [word];
+        currentLineWidth = scaledWordWidth;
+      } else {
+        currentLineWords.push(word);
+        currentLineWidth = widthIfAdded;
+      }
+    }
+    if (currentLineWords.length > 0) {
+      lineWordGroups.push(currentLineWords);
+    }
+
+    // Recalculate vertical layout with the actual number of lines
+    const emphTotalHeight = lineWordGroups.length * lineHeight + Math.max(0, lineWordGroups.length - 1) * lineGap;
+    const emphStartY = baseY - emphTotalHeight / 2 + lineHeight / 2;
 
     lineWordGroups.forEach((wordGroup, index) => {
-      const lineY = startY + index * (lineHeight + lineGap);
+      const lineY = emphStartY + index * (lineHeight + lineGap);
       renderPhraseLineWithEmphasis(
         ctx,
         wordGroup,
@@ -736,7 +784,8 @@ function renderPhraseLineWithEmphasis(
 
     if (isActive) {
       const boxWidth = scaledWidth + highlightPaddingX * 2;
-      const boxHeight = finalFontSize * scale + highlightPaddingY * 2;
+      const wordFontSize = word.styleOverride?.fontSize ? Math.round(finalFontSize * word.styleOverride.fontSize) : finalFontSize;
+      const boxHeight = wordFontSize * scale + highlightPaddingY * 2;
 
       ctx.save();
       ctx.fillStyle = emphasisBgColor;
@@ -769,7 +818,8 @@ function renderPhraseLineWithEmphasis(
       baseScale,
       scale,
       baseWidth,
-      fillColor
+      fillColor,
+      word.styleOverride?.effect
     );
 
     // Restore global font
@@ -790,11 +840,13 @@ function drawWordText(
   baseScale: number,
   scale: number,
   baseWidth: number,
-  fillColor: string
+  fillColor: string,
+  effect?: "knockout"
 ) {
   const uppercase = text.toUpperCase();
+  const isKnockout = effect === "knockout";
 
-  if (style.borderWidth > 0) {
+  if (style.borderWidth > 0 && !isKnockout) {
     ctx.save();
     ctx.strokeStyle = style.borderColor;
     const scaledBorderWidth = Math.max(
@@ -808,6 +860,18 @@ function drawWordText(
     ctx.miterLimit = 2;
     ctx.strokeText(uppercase, 0, 0);
     ctx.restore();
+  }
+
+  if (isKnockout) {
+    // difference compositing: white fill on video = inverted video in text shape
+    ctx.save();
+    ctx.globalCompositeOperation = "difference";
+    ctx.fillStyle = "#FFFFFF";
+    ctx.translate(centerX, centerY);
+    ctx.scale(scale, scale);
+    ctx.fillText(uppercase, 0, 0);
+    ctx.restore();
+    return;
   }
 
   let fillStyle: string | CanvasGradient = fillColor;

@@ -8,7 +8,7 @@
  * - PATCH: Bug fixes and small improvements
  */
 
-export const APP_VERSION = "1.4.1";
+export const APP_VERSION = "1.5.0";
 
 export interface ChangelogEntry {
   version: string;
@@ -21,6 +21,17 @@ export interface ChangelogEntry {
 }
 
 export const changelog: ChangelogEntry[] = [
+  {
+    version: "1.5.0",
+    date: "2026-02-25",
+    title: "Knockout Text Effect & New Font",
+    changes: [
+      { type: "added", description: "Knockout text effect — per-word style option that makes the text shape reveal an inverted/negative version of the video behind it" },
+      { type: "added", description: "Knockout toggle in the word style popover under a new 'Effect' section" },
+      { type: "added", description: "Knockout renders in DOM preview (mix-blend-mode: difference), canvas compositing (3D depth mode), and video export" },
+      { type: "added", description: "Lilita One font — thick, bold display font with a magazine-cover aesthetic, great for knockout effects" },
+    ],
+  },
   {
     version: "1.4.1",
     date: "2026-02-25",

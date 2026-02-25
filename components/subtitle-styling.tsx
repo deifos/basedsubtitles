@@ -190,6 +190,11 @@ export const FONT_FAMILIES = {
     value: "var(--font-lora), 'Lora', serif",
     cssFont: "var(--font-lora), Lora, serif",
   },
+  lilitaOne: {
+    label: "Lilita One",
+    value: "var(--font-lilita-one), 'Lilita One', sans-serif",
+    cssFont: "var(--font-lilita-one), 'Lilita One', sans-serif",
+  },
   arial: {
     label: "Arial",
     value: "Arial, sans-serif",

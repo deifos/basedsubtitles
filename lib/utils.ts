@@ -50,6 +50,7 @@ export interface WordStyleOverride {
   fontFamily?: string;
   fontSize?: number;  // multiplier (e.g. 1.5 = 150% of global)
   color?: string;
+  effect?: "knockout";
 }
 
 export interface ProcessedWord {

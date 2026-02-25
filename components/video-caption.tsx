@@ -197,6 +197,12 @@ export function VideoCaption({
   const text = currentChunk.text;
   const currentWordInPhrase = getCurrentWordInPhrase(currentChunk);
 
+  // Detect if any word uses knockout — need to avoid stacking context isolation
+  // so mix-blend-mode: difference can reach the video behind
+  const hasKnockout = mode === "phrase" && currentChunk.words?.some(
+    (w: ProcessedWord) => w.styleOverride?.effect === "knockout"
+  );
+
   const isMetallicColor = style.color === "#CCCCCC" || style.color === "#C0C0C0";
   const previewStrokeWidth = style.borderWidth > 0 ? Math.max(0.5, style.borderWidth) : 0;
   const previewStroke = previewStrokeWidth > 0 ? `${previewStrokeWidth}px ${style.borderColor}` : "none";
@@ -262,8 +268,18 @@ export function VideoCaption({
             word.timestamp[1] === selectedWordTimestamp[1];
 
           // Build per-word override styles
+          const isKnockout = word.styleOverride?.effect === "knockout";
           const overrideStyles: React.CSSProperties = {};
-          if (word.styleOverride?.color) {
+          if (isKnockout) {
+            // difference blend with white text = inverted video in text shape
+            // Parent containers must NOT create stacking contexts (see hasKnockout)
+            overrideStyles.mixBlendMode = "difference";
+            overrideStyles.color = "#FFFFFF";
+            overrideStyles.WebkitTextFillColor = "#FFFFFF";
+            overrideStyles.WebkitTextStroke = "none";
+            overrideStyles.filter = "none";
+            overrideStyles.transform = "none"; // avoid stacking context on the span
+          } else if (word.styleOverride?.color) {
             overrideStyles.color = word.styleOverride.color;
           }
           if (word.styleOverride?.fontFamily) {
@@ -277,25 +293,33 @@ export function VideoCaption({
             ...baseTypographyStyles,
             ...(isActive ? {} : metallicTypographyStyles),
             display: "inline-block",
-            transition: "transform 0.18s ease, background-color 0.18s ease",
+            transition: isKnockout ? "none" : "transform 0.18s ease, background-color 0.18s ease",
             padding: "0 0.15em",
             borderRadius: "0.35em",
-            transform: "scale(1)",
+            transform: isKnockout ? "none" : "scale(1)",
             backgroundColor: "transparent",
             cursor: onWordSelect ? "pointer" : undefined,
             ...overrideStyles,
           };
 
           const activeWordStyles: React.CSSProperties = isActive
-            ? {
-                transform: "scale(1.18)",
-                backgroundColor: emphasisBgColor,
-                color: word.styleOverride?.color ?? emphasisTextColor,
-                WebkitTextStroke: "none",
-                background: "none",
-                WebkitBackgroundClip: "initial",
-                WebkitTextFillColor: "inherit",
-              }
+            ? isKnockout
+              ? {
+                  // No transform — must stay outside stacking context for blend
+                  mixBlendMode: "difference" as const,
+                  color: "#FFFFFF",
+                  WebkitTextFillColor: "#FFFFFF",
+                  WebkitTextStroke: "none",
+                  filter: "none",
+                }
+              : {
+                  transform: "scale(1.18)",
+                  backgroundColor: emphasisBgColor,
+                  color: word.styleOverride?.color ?? emphasisTextColor,
+                  WebkitTextStroke: "none",
+                  WebkitBackgroundClip: "initial",
+                  WebkitTextFillColor: "inherit",
+                }
             : {};
 
           const selectedStyles: React.CSSProperties = isSelected
@@ -371,7 +395,10 @@ export function VideoCaption({
           ? `top-[6%] ${widthClass}`
           : `top-[12%] ${widthClass}`;
       case "middle":
-        return `top-1/2 -translate-y-1/2 ${widthClass}`;
+        // When knockout active, avoid transform for vertical centering
+        return hasKnockout
+          ? `inset-y-0 my-auto h-fit ${widthClass}`
+          : `top-1/2 -translate-y-1/2 ${widthClass}`;
       case "bottom":
       default:
         return isPortrait
@@ -381,11 +408,13 @@ export function VideoCaption({
   })();
 
   // Animation states - more subtle with shake
+  // When knockout is active, avoid transform and z-index on containers
+  // so mix-blend-mode: difference on word spans can reach the video backdrop
   return (
     <div
       className={cn(
-        "absolute left-1/2 -translate-x-1/2 text-center",
-        "z-10",
+        "absolute text-center",
+        hasKnockout ? "inset-x-0 mx-auto" : "left-1/2 -translate-x-1/2 z-10",
         onWordSelect ? "pointer-events-auto" : "pointer-events-none",
         positionClasses
       )}
@@ -400,7 +429,7 @@ export function VideoCaption({
         style={{
           backgroundColor: style.backgroundColor,
           borderRadius: style.backgroundColor && style.backgroundColor !== "transparent" ? "0.5rem" : undefined,
-          transform: "scale(1) translateY(0)",
+          ...(hasKnockout ? {} : { transform: "scale(1) translateY(0)" }),
           opacity: isAnimating ? 1 : 0,
           transition: "opacity 0.15s ease-in",
         }}

@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/select";
 import { FONT_FAMILIES } from "@/components/subtitle-styling";
 import { X, RotateCcw } from "lucide-react";
-import type { WordStyleOverride } from "@/lib/utils";
+import { cn, type WordStyleOverride } from "@/lib/utils";
 
 const fontOptions = Object.values(FONT_FAMILIES);
 
@@ -71,10 +71,21 @@ export function WordStylePopover({
 
   const sizePercent = Math.round((override.fontSize ?? 1) * 100);
 
+  const handleToggleKnockout = () => {
+    if (override.effect === "knockout") {
+      const next = { ...override };
+      delete next.effect;
+      onChange(next);
+    } else {
+      onChange({ ...override, effect: "knockout" });
+    }
+  };
+
   const hasOverrides =
     override.fontFamily !== undefined ||
     override.fontSize !== undefined ||
-    override.color !== undefined;
+    override.color !== undefined ||
+    override.effect !== undefined;
 
   return (
     <div
@@ -178,6 +189,22 @@ export function WordStylePopover({
               <span className="text-xs text-slate-400">Same as global</span>
             )}
           </div>
+        </div>
+
+        {/* Knockout Effect */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-slate-600 block">Effect</label>
+          <button
+            onClick={handleToggleKnockout}
+            className={cn(
+              "w-full text-xs px-3 py-1.5 rounded-md border transition-colors text-left",
+              override.effect === "knockout"
+                ? "bg-slate-900 text-white border-slate-900"
+                : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+            )}
+          >
+            Knockout
+          </button>
         </div>
 
         {/* Reset All */}
