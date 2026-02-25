@@ -32,6 +32,11 @@ export const changelog: ChangelogEntry[] = [
       { type: "changed", description: "Per-word selection in 3D/bg-removal mode uses the reliable chip bar instead of canvas click coordinates" },
       { type: "fixed", description: "Clicking anywhere on the canvas in 3D mode no longer incorrectly triggers word editing" },
       { type: "fixed", description: "Hidden and disabled words can no longer be selected for editing" },
+      { type: "fixed", description: "Major memory leak in video export — frame pixel data (~8MB) was allocated per-frame instead of reusing an offscreen canvas via GPU blit" },
+      { type: "fixed", description: "AudioContext not closed on error during export, leaking audio memory" },
+      { type: "fixed", description: "Reusable canvases and buffers from export were never released after completion, staying in memory indefinitely" },
+      { type: "changed", description: "Font mapping table (24 entries) extracted to a single module-level constant — was duplicated in 5 functions and recreated per-frame during export" },
+      { type: "removed", description: "Removed dead hitTestOnly prop from VideoCaption and unused renderDynamicWordToCanvas function" },
     ],
   },
   {

@@ -22,6 +22,45 @@ import { processTranscriptChunks, type WordStyleOverride } from '@/lib/utils';
 import { estimateFaceFromMask, type FaceBounds } from '@/lib/render-subtitle';
 import type { MaskData } from '@/hooks/useBackgroundRemoval';
 
+// Shared font mapping — CSS custom properties to actual font names for Canvas rendering
+const FONT_MAPPINGS: Record<string, string> = {
+  'var(--font-bangers)': 'Bangers',
+  'var(--font-montserrat)': 'Montserrat',
+  'var(--font-inter)': 'Inter',
+  'var(--font-bebas-neue)': 'Bebas Neue',
+  'var(--font-poppins)': 'Poppins',
+  'var(--font-open-sans)': 'Open Sans',
+  'var(--font-oswald)': 'Oswald',
+  'var(--font-anton)': 'Anton',
+  'var(--font-fredoka)': 'Fredoka',
+  'var(--font-righteous)': 'Righteous',
+  'var(--font-nunito)': 'Nunito',
+  'var(--font-roboto)': 'Roboto',
+  'var(--font-permanent-marker)': 'Permanent Marker',
+  'var(--font-pacifico)': 'Pacifico',
+  'var(--font-lobster)': 'Lobster',
+  'var(--font-alfa-slab-one)': 'Alfa Slab One',
+  'var(--font-staatliches)': 'Staatliches',
+  'var(--font-fugaz-one)': 'Fugaz One',
+  'var(--font-chewy)': 'Chewy',
+  'var(--font-playfair-display)': 'Playfair Display',
+  'var(--font-lora)': 'Lora',
+  'var(--font-plus-jakarta-sans)': 'Plus Jakarta Sans',
+  'var(--font-outfit)': 'Outfit',
+};
+
+/** Resolve CSS var(--font-*) to actual font name for Canvas */
+function resolveFontFamily(fontFamily: string): string {
+  if (!fontFamily.includes('var(')) return fontFamily;
+  for (const [cssVar, actualFont] of Object.entries(FONT_MAPPINGS)) {
+    if (fontFamily.includes(cssVar)) {
+      return fontFamily.replace(cssVar, actualFont);
+    }
+  }
+  const fallbackMatch = fontFamily.match(/,\s*(.+)$/);
+  return fallbackMatch ? fallbackMatch[1] : 'Arial, sans-serif';
+}
+
 // Types
 interface TranscriptChunk {
   text: string;
@@ -114,6 +153,14 @@ export function useVideoDownloadMediaBunny({
 
     let cancelled = false;
 
+    // Declare reusable buffers outside try so finally can null them for GC
+    let reusableBlurCanvas: HTMLCanvasElement | null = null;
+    let reusableFgCanvas: HTMLCanvasElement | null = null;
+    let reusableMaskCanvas: HTMLCanvasElement | null = null;
+    let reusableMaskImageData: ImageData | null = null;
+    let reusableFrameCanvas: HTMLCanvasElement | null = null;
+    let reusableFrameCtx: CanvasRenderingContext2D | null = null;
+
     try {
       // Create canvas matching video dimensions
       const canvas = document.createElement('canvas');
@@ -159,9 +206,10 @@ export function useVideoDownloadMediaBunny({
       let audioSource: AudioBufferSource | null = null;
       if (originalAudioTrack) {
         setStatus('Processing audio...');
+        let audioContext: AudioContext | null = null;
         try {
           const arrayBuffer = await videoBlob.arrayBuffer();
-          const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+          audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
           const audioBuffer = await audioContext.decodeAudioData(arrayBuffer.slice(0));
 
           audioSource = new AudioBufferSource({
@@ -174,9 +222,13 @@ export function useVideoDownloadMediaBunny({
           await output.start();
           await audioSource.add(audioBuffer);
           audioSource.close();
-          await audioContext.close();
         } catch (error) {
           await output.start();
+        } finally {
+          // Always close AudioContext to free audio memory
+          if (audioContext) {
+            try { await audioContext.close(); } catch {}
+          }
         }
       } else {
         await output.start();
@@ -224,11 +276,7 @@ export function useVideoDownloadMediaBunny({
         : null;
       let iteratorResult: IteratorResult<VideoSample | null> | undefined;
 
-      // Reusable canvases and ImageData to avoid per-frame allocations
-      let reusableBlurCanvas: HTMLCanvasElement | null = null;
-      let reusableFgCanvas: HTMLCanvasElement | null = null;
-      let reusableMaskCanvas: HTMLCanvasElement | null = null;
-      let reusableMaskImageData: ImageData | null = null;
+      // Reusable canvases/buffers are declared before try block for cleanup in finally
 
       // Render each frame
       for (let frameIndex = 0; frameIndex < totalFrames; frameIndex++) {
@@ -276,11 +324,19 @@ export function useVideoDownloadMediaBunny({
 
         if (needsCompositing) {
           // Compositing at full resolution (bg removal or dynamic mode)
-          const frameImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          // Save current frame to offscreen canvas via GPU blit (fast, no ImageData needed for restore)
+          if (!reusableFrameCanvas) {
+            reusableFrameCanvas = document.createElement('canvas');
+            reusableFrameCanvas.width = canvas.width;
+            reusableFrameCanvas.height = canvas.height;
+            reusableFrameCtx = reusableFrameCanvas.getContext('2d');
+          }
+          reusableFrameCtx!.drawImage(canvas, 0, 0);
 
-          // Process frame through bg removal worker at full resolution
+          // Get pixel data for bg removal — only allocation per frame, GC'd after use
+          const framePixels = ctx.getImageData(0, 0, canvas.width, canvas.height);
           const mask = await bgProcessFrame(
-            frameImageData.data,
+            framePixels.data,
             canvas.width,
             canvas.height,
             frameIndex
@@ -289,8 +345,8 @@ export function useVideoDownloadMediaBunny({
           // Step 1: Draw background
           ctx.clearRect(0, 0, canvas.width, canvas.height);
           if (isDynamicMode) {
-            // Dynamic mode: keep original video as background
-            ctx.putImageData(frameImageData, 0, 0);
+            // Dynamic mode: keep original video as background (GPU blit)
+            ctx.drawImage(reusableFrameCanvas!, 0, 0);
           } else if (subtitleStyle.backgroundType === 'blur') {
             // Reuse blurCanvas across frames
             if (!reusableBlurCanvas) {
@@ -300,7 +356,7 @@ export function useVideoDownloadMediaBunny({
             reusableBlurCanvas.height = canvas.height;
             const blurCtx = reusableBlurCanvas.getContext('2d');
             if (blurCtx) {
-              blurCtx.putImageData(frameImageData, 0, 0);
+              blurCtx.drawImage(reusableFrameCanvas!, 0, 0);
               ctx.filter = 'blur(20px)';
               ctx.drawImage(reusableBlurCanvas, 0, 0);
               ctx.filter = 'none';
@@ -329,7 +385,7 @@ export function useVideoDownloadMediaBunny({
           reusableFgCanvas.height = canvas.height;
           const fgCtx = reusableFgCanvas.getContext('2d');
           if (fgCtx) {
-            fgCtx.putImageData(frameImageData, 0, 0);
+            fgCtx.drawImage(reusableFrameCanvas!, 0, 0);
 
             reusableMaskCanvas.width = mask.width;
             reusableMaskCanvas.height = mask.height;
@@ -441,6 +497,14 @@ export function useVideoDownloadMediaBunny({
       console.error('MediaBunny video processing failed:', error);
       setStatus(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
+      // Release all reusable canvases and buffers to free memory
+      reusableBlurCanvas = null;
+      reusableFgCanvas = null;
+      reusableMaskCanvas = null;
+      reusableMaskImageData = null;
+      reusableFrameCanvas = null;
+      reusableFrameCtx = null;
+
       cancelContextRef.current.output = null;
       cancelContextRef.current.videoSource = null;
       const wasCancelled = cancelled;
@@ -511,51 +575,7 @@ function renderSubtitle(
   // Use the video scale to maintain the same visual proportion
   const finalFontSize = Math.round(style.fontSize * videoScale);
 
-  // Handle font family - resolve CSS custom properties to actual font names
-  let fontFamily = style.fontFamily;
-  if (fontFamily.includes('var(')) {
-    // Map CSS custom properties to actual font names that Canvas can use
-    const fontMappings: { [key: string]: string } = {
-      'var(--font-bangers)': 'Bangers',
-      'var(--font-montserrat)': 'Montserrat',
-      'var(--font-inter)': 'Inter',
-      'var(--font-bebas-neue)': 'Bebas Neue',
-      'var(--font-poppins)': 'Poppins',
-      'var(--font-open-sans)': 'Open Sans',
-      'var(--font-oswald)': 'Oswald',
-      'var(--font-anton)': 'Anton',
-      'var(--font-fredoka)': 'Fredoka',
-      'var(--font-righteous)': 'Righteous',
-      'var(--font-nunito)': 'Nunito',
-      'var(--font-roboto)': 'Roboto',
-      'var(--font-permanent-marker)': 'Permanent Marker',
-      'var(--font-pacifico)': 'Pacifico',
-      'var(--font-lobster)': 'Lobster',
-      'var(--font-alfa-slab-one)': 'Alfa Slab One',
-      'var(--font-staatliches)': 'Staatliches',
-      'var(--font-fugaz-one)': 'Fugaz One',
-      'var(--font-chewy)': 'Chewy',
-      'var(--font-playfair-display)': 'Playfair Display',
-      'var(--font-lora)': 'Lora',
-      'var(--font-plus-jakarta-sans)': 'Plus Jakarta Sans',
-      'var(--font-outfit)': 'Outfit',
-    };
-    
-    // Find the CSS variable in the font family string
-    for (const [cssVar, actualFont] of Object.entries(fontMappings)) {
-      if (fontFamily.includes(cssVar)) {
-        // Replace the CSS variable with the actual font name
-        fontFamily = fontFamily.replace(cssVar, actualFont);
-        break;
-      }
-    }
-    
-    // If no mapping found, extract fallback fonts
-    if (fontFamily.includes('var(')) {
-      const fallbackMatch = fontFamily.match(/,\s*(.+)$/);
-      fontFamily = fallbackMatch ? fallbackMatch[1] : 'Arial, sans-serif';
-    }
-  }
+  const fontFamily = resolveFontFamily(style.fontFamily);
 
   // Set font properties with font loading check
   const fontString = `${style.fontWeight} ${finalFontSize}px ${fontFamily}`;
@@ -752,47 +772,9 @@ function buildWordFont(
   fontFamily: string,
   override?: WordStyleOverride
 ): string {
-  let family = fontFamily;
-  if (override?.fontFamily) {
-    family = override.fontFamily;
-    if (family.includes('var(')) {
-      const fontMappings: { [key: string]: string } = {
-        'var(--font-bangers)': 'Bangers',
-        'var(--font-montserrat)': 'Montserrat',
-        'var(--font-inter)': 'Inter',
-        'var(--font-bebas-neue)': 'Bebas Neue',
-        'var(--font-poppins)': 'Poppins',
-        'var(--font-open-sans)': 'Open Sans',
-        'var(--font-oswald)': 'Oswald',
-        'var(--font-anton)': 'Anton',
-        'var(--font-fredoka)': 'Fredoka',
-        'var(--font-righteous)': 'Righteous',
-        'var(--font-nunito)': 'Nunito',
-        'var(--font-roboto)': 'Roboto',
-        'var(--font-permanent-marker)': 'Permanent Marker',
-        'var(--font-pacifico)': 'Pacifico',
-        'var(--font-lobster)': 'Lobster',
-        'var(--font-alfa-slab-one)': 'Alfa Slab One',
-        'var(--font-staatliches)': 'Staatliches',
-        'var(--font-fugaz-one)': 'Fugaz One',
-        'var(--font-chewy)': 'Chewy',
-        'var(--font-playfair-display)': 'Playfair Display',
-        'var(--font-lora)': 'Lora',
-        'var(--font-plus-jakarta-sans)': 'Plus Jakarta Sans',
-        'var(--font-outfit)': 'Outfit',
-      };
-      for (const [cssVar, actualFont] of Object.entries(fontMappings)) {
-        if (family.includes(cssVar)) {
-          family = family.replace(cssVar, actualFont);
-          break;
-        }
-      }
-      if (family.includes('var(')) {
-        const fallbackMatch = family.match(/,\s*(.+)$/);
-        family = fallbackMatch ? fallbackMatch[1] : 'Arial, sans-serif';
-      }
-    }
-  }
+  const family = override?.fontFamily
+    ? resolveFontFamily(override.fontFamily)
+    : fontFamily;
   const size = override?.fontSize
     ? Math.round(finalFontSize * override.fontSize)
     : finalFontSize;
@@ -813,45 +795,7 @@ function renderPhraseLineWithEmphasis(
     return;
   }
 
-  // Resolve global font family for restoring after per-word changes
-  let globalFontFamily = style.fontFamily;
-  if (globalFontFamily.includes('var(')) {
-    const fontMappings: { [key: string]: string } = {
-      'var(--font-bangers)': 'Bangers',
-      'var(--font-montserrat)': 'Montserrat',
-      'var(--font-inter)': 'Inter',
-      'var(--font-bebas-neue)': 'Bebas Neue',
-      'var(--font-poppins)': 'Poppins',
-      'var(--font-open-sans)': 'Open Sans',
-      'var(--font-oswald)': 'Oswald',
-      'var(--font-anton)': 'Anton',
-      'var(--font-fredoka)': 'Fredoka',
-      'var(--font-righteous)': 'Righteous',
-      'var(--font-nunito)': 'Nunito',
-      'var(--font-roboto)': 'Roboto',
-      'var(--font-permanent-marker)': 'Permanent Marker',
-      'var(--font-pacifico)': 'Pacifico',
-      'var(--font-lobster)': 'Lobster',
-      'var(--font-alfa-slab-one)': 'Alfa Slab One',
-      'var(--font-staatliches)': 'Staatliches',
-      'var(--font-fugaz-one)': 'Fugaz One',
-      'var(--font-chewy)': 'Chewy',
-      'var(--font-playfair-display)': 'Playfair Display',
-      'var(--font-lora)': 'Lora',
-      'var(--font-plus-jakarta-sans)': 'Plus Jakarta Sans',
-      'var(--font-outfit)': 'Outfit',
-    };
-    for (const [cssVar, actualFont] of Object.entries(fontMappings)) {
-      if (globalFontFamily.includes(cssVar)) {
-        globalFontFamily = globalFontFamily.replace(cssVar, actualFont);
-        break;
-      }
-    }
-    if (globalFontFamily.includes('var(')) {
-      const fallbackMatch = globalFontFamily.match(/,\s*(.+)$/);
-      globalFontFamily = fallbackMatch ? fallbackMatch[1] : 'Arial, sans-serif';
-    }
-  }
+  const globalFontFamily = resolveFontFamily(style.fontFamily);
   const globalFont = `${style.fontWeight} ${finalFontSize}px ${globalFontFamily}`;
 
   const uppercaseWords = words.map((word) => word.text.toUpperCase());
@@ -1020,44 +964,7 @@ function renderDynamicWord(
   const fontSize = Math.round((style.dynamicFontSize ?? 80) * videoScale);
   const maxWidth = canvas.width * 0.85;
 
-  let fontFamily = style.fontFamily;
-  if (fontFamily.includes('var(')) {
-    const fontMappings: { [key: string]: string } = {
-      'var(--font-bangers)': 'Bangers',
-      'var(--font-montserrat)': 'Montserrat',
-      'var(--font-inter)': 'Inter',
-      'var(--font-bebas-neue)': 'Bebas Neue',
-      'var(--font-poppins)': 'Poppins',
-      'var(--font-open-sans)': 'Open Sans',
-      'var(--font-oswald)': 'Oswald',
-      'var(--font-anton)': 'Anton',
-      'var(--font-fredoka)': 'Fredoka',
-      'var(--font-righteous)': 'Righteous',
-      'var(--font-nunito)': 'Nunito',
-      'var(--font-roboto)': 'Roboto',
-      'var(--font-permanent-marker)': 'Permanent Marker',
-      'var(--font-pacifico)': 'Pacifico',
-      'var(--font-lobster)': 'Lobster',
-      'var(--font-alfa-slab-one)': 'Alfa Slab One',
-      'var(--font-staatliches)': 'Staatliches',
-      'var(--font-fugaz-one)': 'Fugaz One',
-      'var(--font-chewy)': 'Chewy',
-      'var(--font-playfair-display)': 'Playfair Display',
-      'var(--font-lora)': 'Lora',
-      'var(--font-plus-jakarta-sans)': 'Plus Jakarta Sans',
-      'var(--font-outfit)': 'Outfit',
-    };
-    for (const [cssVar, actualFont] of Object.entries(fontMappings)) {
-      if (fontFamily.includes(cssVar)) {
-        fontFamily = fontFamily.replace(cssVar, actualFont);
-        break;
-      }
-    }
-    if (fontFamily.includes('var(')) {
-      const fallbackMatch = fontFamily.match(/,\s*(.+)$/);
-      fontFamily = fallbackMatch ? fallbackMatch[1] : 'Arial, sans-serif';
-    }
-  }
+  const fontFamily = resolveFontFamily(style.fontFamily);
 
   ctx.font = `${style.fontWeight} ${fontSize}px ${fontFamily}`;
   ctx.textAlign = 'center';
@@ -1200,44 +1107,7 @@ function renderDynamicWordWithOptions(
   const fontSize = Math.round(options.fontSize * videoScale);
   const maxWidth = canvas.width * 0.85;
 
-  let fontFamily = style.fontFamily;
-  if (fontFamily.includes('var(')) {
-    const fontMappings: { [key: string]: string } = {
-      'var(--font-bangers)': 'Bangers',
-      'var(--font-montserrat)': 'Montserrat',
-      'var(--font-inter)': 'Inter',
-      'var(--font-bebas-neue)': 'Bebas Neue',
-      'var(--font-poppins)': 'Poppins',
-      'var(--font-open-sans)': 'Open Sans',
-      'var(--font-oswald)': 'Oswald',
-      'var(--font-anton)': 'Anton',
-      'var(--font-fredoka)': 'Fredoka',
-      'var(--font-righteous)': 'Righteous',
-      'var(--font-nunito)': 'Nunito',
-      'var(--font-roboto)': 'Roboto',
-      'var(--font-permanent-marker)': 'Permanent Marker',
-      'var(--font-pacifico)': 'Pacifico',
-      'var(--font-lobster)': 'Lobster',
-      'var(--font-alfa-slab-one)': 'Alfa Slab One',
-      'var(--font-staatliches)': 'Staatliches',
-      'var(--font-fugaz-one)': 'Fugaz One',
-      'var(--font-chewy)': 'Chewy',
-      'var(--font-playfair-display)': 'Playfair Display',
-      'var(--font-lora)': 'Lora',
-      'var(--font-plus-jakarta-sans)': 'Plus Jakarta Sans',
-      'var(--font-outfit)': 'Outfit',
-    };
-    for (const [cssVar, actualFont] of Object.entries(fontMappings)) {
-      if (fontFamily.includes(cssVar)) {
-        fontFamily = fontFamily.replace(cssVar, actualFont);
-        break;
-      }
-    }
-    if (fontFamily.includes('var(')) {
-      const fallbackMatch = fontFamily.match(/,\s*(.+)$/);
-      fontFamily = fallbackMatch ? fallbackMatch[1] : 'Arial, sans-serif';
-    }
-  }
+  const fontFamily = resolveFontFamily(style.fontFamily);
 
   const globalFont = `${style.fontWeight} ${fontSize}px ${fontFamily}`;
   ctx.font = globalFont;
