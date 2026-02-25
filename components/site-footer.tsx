@@ -40,43 +40,43 @@ export function SiteFooter(): JSX.Element {
             </Link>
           </div>
 
-          <div className="flex items-center gap-4">
-            <span className="text-xs font-bold uppercase tracking-widest text-black/40">
+          <div className="flex items-center gap-3">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-black/40">
               Powered by
             </span>
             <a
               href="https://huggingface.co/docs/transformers.js"
-              className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-black/60 hover:text-black transition-colors"
+              className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-black/60 hover:text-black transition-colors"
               target="_blank"
               rel="noopener noreferrer"
             >
               <Image
                 src="/huggingface-logo.svg"
                 alt="Hugging Face"
-                width={20}
-                height={20}
+                width={14}
+                height={14}
               />
               Transformers.js
             </a>
             <span className="text-black/20">&bull;</span>
             <a
               href="https://github.com/Vanilagy/mediabunny"
-              className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-black/60 hover:text-black transition-colors"
+              className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-black/60 hover:text-black transition-colors"
               target="_blank"
               rel="noopener noreferrer"
             >
               <Image
                 src="/mediabunny-logo.svg"
                 alt="MediaBunny"
-                width={20}
-                height={20}
+                width={14}
+                height={14}
               />
               MediaBunny
             </a>
-            <span className="text-black/20">&bull;</span>
+            <span className="hidden sm:inline text-black/20">&bull;</span>
             <a
               href="https://getbasedapps.com"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 border-2 border-black bg-black text-white text-xs font-bold uppercase tracking-wider hover:bg-white hover:text-black transition-colors duration-200"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 border-2 border-black bg-black text-white text-[10px] font-bold uppercase tracking-wider hover:bg-white hover:text-black transition-colors duration-200"
               target="_blank"
               rel="noopener noreferrer"
             >
