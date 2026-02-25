@@ -87,6 +87,7 @@ interface UseVideoDownloadMediaBunnyProps {
     height: number,
     frameIndex: number
   ) => Promise<MaskData>;
+  getMaskAtTime?: (time: number, fps?: number) => MaskData | null;
 }
 
 // Quality mapping
@@ -128,6 +129,7 @@ export function useVideoDownloadMediaBunny({
   fps = 30,
   bgRemovalReady = false,
   processFrame: bgProcessFrame,
+  getMaskAtTime,
 }: UseVideoDownloadMediaBunnyProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -333,14 +335,28 @@ export function useVideoDownloadMediaBunny({
           }
           reusableFrameCtx!.drawImage(canvas, 0, 0);
 
-          // Get pixel data for bg removal — only allocation per frame, GC'd after use
-          const framePixels = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const mask = await bgProcessFrame(
-            framePixels.data,
-            canvas.width,
-            canvas.height,
-            frameIndex
-          );
+          // Use pre-computed masks (5fps cache) when available — avoids costly per-frame AI inference
+          // Falls back to live inference only if cached masks aren't available
+          let mask: MaskData;
+          const cachedMask = getMaskAtTime?.(time);
+          if (cachedMask) {
+            mask = cachedMask;
+          } else if (bgProcessFrame) {
+            const framePixels = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            mask = await bgProcessFrame(
+              framePixels.data,
+              canvas.width,
+              canvas.height,
+              frameIndex
+            );
+          } else {
+            // No mask available — skip compositing for this frame
+            if (currentChunk) {
+              renderSubtitle(ctx, currentChunk, subtitleStyle, canvas, mode, time);
+            }
+            try { await videoSource.add(time, 1 / fps); } catch {}
+            continue;
+          }
 
           // Step 1: Draw background
           ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -516,7 +532,7 @@ export function useVideoDownloadMediaBunny({
       }
       cancelContextRef.current.cancelRequested = false;
     }
-  }, [video, transcriptChunks, subtitleStyle, mode, format, quality, fps, bgRemovalReady, bgProcessFrame]);
+  }, [video, transcriptChunks, subtitleStyle, mode, format, quality, fps, bgRemovalReady, bgProcessFrame, getMaskAtTime]);
 
   const cancelDownload = useCallback(() => {
     if (!isProcessing) {

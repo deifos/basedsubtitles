@@ -177,6 +177,7 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
     fps: 30,
     bgRemovalReady,
     processFrame: bgProcessFrame,
+    getMaskAtTime,
   });
 
   const handleRemoveBackground = useCallback(async () => {

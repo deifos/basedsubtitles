@@ -8,7 +8,7 @@
  * - PATCH: Bug fixes and small improvements
  */
 
-export const APP_VERSION = "1.3.0";
+export const APP_VERSION = "1.3.1";
 
 export interface ChangelogEntry {
   version: string;
@@ -21,6 +21,15 @@ export interface ChangelogEntry {
 }
 
 export const changelog: ChangelogEntry[] = [
+  {
+    version: "1.3.1",
+    date: "2026-02-25",
+    title: "3D Depth Export Performance Fix",
+    changes: [
+      { type: "fixed", description: "Video export with 3D depth enabled was re-running MODNet AI inference on every frame at 30fps (~1,800 calls per minute of video) — now uses pre-computed 5fps mask cache, reducing export time from ~15 minutes to under a minute" },
+      { type: "fixed", description: "Export with 3D depth consumed ~2GB+ RAM from per-frame 8MB getImageData allocations and data copies to the AI worker — eliminated entirely by using cached masks" },
+    ],
+  },
   {
     version: "1.3.0",
     date: "2026-02-24",
