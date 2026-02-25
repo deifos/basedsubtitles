@@ -455,10 +455,10 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
                   className={cn(
                     "absolute inset-0 cursor-pointer",
                     ratio === "16:9"
-                      ? "w-full max-w-4xl max-h-[500px]"
+                      ? "w-full max-w-4xl max-h-[500px] mx-auto"
                       : ratio === "9:16" && zoomPortrait
-                        ? "h-[500px] max-h-[500px]"
-                        : "h-[500px] max-h-[500px]"
+                        ? "h-[500px] max-h-[500px] mx-auto"
+                        : "h-[500px] max-h-[500px] mx-auto"
                   )}
                   style={{
                     aspectRatio: ratio === "16:9" ? "16/9" : "9/16",
