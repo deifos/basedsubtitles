@@ -1,5 +1,5 @@
 import { SubtitleStyle } from "@/components/subtitle-styling";
-import { processTranscriptChunks } from "@/lib/utils";
+import { processTranscriptChunks, type WordStyleOverride } from "@/lib/utils";
 
 interface TranscriptData {
   text: string;
@@ -9,6 +9,7 @@ interface TranscriptData {
     disabled?: boolean;
     subtitleHidden?: boolean;
     dynamicPosition?: "behind" | "front";
+    styleOverride?: WordStyleOverride;
   }>;
 }
 
@@ -16,6 +17,7 @@ interface WordTiming {
   text: string;
   timestamp: [number, number];
   dynamicPosition?: "behind" | "front";
+  styleOverride?: WordStyleOverride;
 }
 
 export interface FaceBounds {
@@ -211,7 +213,7 @@ export function renderDynamicBehindText(
   renderDynamicTextBlock(ctx, behindText, style, canvasWidth, canvasHeight, {
     fontSize: style.dynamicFontSize ?? 80,
     yPosition: style.dynamicYPosition ?? 35,
-  });
+  }, behindWords);
 }
 
 /**
@@ -275,11 +277,12 @@ export function renderDynamicFrontText(
   renderDynamicTextBlock(ctx, frontText, style, canvasWidth, canvasHeight, {
     fontSize: style.dynamicFrontFontSize ?? 40,
     yPosition,
-  });
+  }, frontWords);
 }
 
 /**
  * Shared renderer for dynamic text blocks (both behind and front layers).
+ * When `wordTimings` is provided and any word has a styleOverride, renders word-by-word.
  */
 function renderDynamicTextBlock(
   ctx: CanvasRenderingContext2D,
@@ -287,40 +290,57 @@ function renderDynamicTextBlock(
   style: SubtitleStyle,
   canvasWidth: number,
   canvasHeight: number,
-  options: { fontSize: number; yPosition: number }
+  options: { fontSize: number; yPosition: number },
+  wordTimings?: WordTiming[]
 ) {
-  const upperText = text.toUpperCase();
   const fontFamily = resolveFontFamily(style.fontFamily);
   const videoScale = canvasHeight / 500;
-
   const fontSize = Math.round(options.fontSize * videoScale);
   const maxWidth = canvasWidth * 0.85;
+  const globalFont = `${style.fontWeight} ${fontSize}px ${fontFamily}`;
 
-  ctx.font = `${style.fontWeight} ${fontSize}px ${fontFamily}`;
+  ctx.font = globalFont;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
-  // Word-wrap
-  const words = upperText.split(" ");
-  const lines: string[] = [];
-  let currentLine = "";
+  const hasOverrides = wordTimings?.some((w) => w.styleOverride);
 
-  for (const word of words) {
+  // Word-wrap into lines (indices track which wordTimings belong to each line)
+  const upperWords = text.toUpperCase().split(" ");
+  const lines: string[] = [];
+  const lineWordIndices: number[][] = []; // per-line array of wordTimings indices
+  let currentLine = "";
+  let currentIndices: number[] = [];
+
+  for (let wi = 0; wi < upperWords.length; wi++) {
+    const word = upperWords[wi];
     const testLine = currentLine ? `${currentLine} ${word}` : word;
-    const metrics = ctx.measureText(testLine);
-    if (metrics.width > maxWidth && currentLine) {
+
+    // Measure with per-word font if override exists
+    if (hasOverrides && wordTimings?.[wi]?.styleOverride?.fontFamily) {
+      ctx.font = buildWordFont(style, fontSize, wordTimings[wi].styleOverride);
+    }
+    const testWidth = ctx.measureText(testLine).width;
+    if (hasOverrides) ctx.font = globalFont;
+
+    if (testWidth > maxWidth && currentLine) {
       lines.push(currentLine);
+      lineWordIndices.push(currentIndices);
       currentLine = word;
+      currentIndices = [wi];
     } else {
       currentLine = testLine;
+      currentIndices.push(wi);
     }
   }
-  if (currentLine) lines.push(currentLine);
+  if (currentLine) {
+    lines.push(currentLine);
+    lineWordIndices.push(currentIndices);
+  }
 
   const lineHeight = fontSize * 1.1;
   const totalHeight = lines.length * lineHeight;
   const x = canvasWidth / 2;
-
   const yCenter = canvasHeight * (options.yPosition / 100);
   const startY = yCenter - totalHeight / 2 + lineHeight / 2;
 
@@ -328,136 +348,108 @@ function renderDynamicTextBlock(
     const lineY = startY + i * lineHeight;
     const lineText = lines[i];
 
-    // Stroke
-    const strokeWidth = Math.max(2, fontSize * 0.03);
-    ctx.save();
-    ctx.strokeStyle = style.borderColor || "#000000";
-    ctx.lineWidth = strokeWidth;
-    ctx.lineJoin = "round";
-    ctx.miterLimit = 2;
-    ctx.strokeText(lineText, x, lineY);
-    ctx.restore();
+    // If any word in this line has an override, render word-by-word
+    if (hasOverrides && wordTimings) {
+      const indices = lineWordIndices[i];
+      const lineWords = indices.map((idx) => ({
+        text: upperWords[idx],
+        override: wordTimings[idx]?.styleOverride,
+      }));
 
-    // Fill
-    let fillStyle: string | CanvasGradient = style.color;
-    if (style.color === "#CCCCCC" || style.color === "#C0C0C0") {
-      const textWidth = ctx.measureText(lineText).width;
-      const gradient = ctx.createLinearGradient(
-        x - textWidth / 2,
-        lineY - fontSize / 2,
-        x + textWidth / 2,
-        lineY + fontSize / 2
-      );
-      gradient.addColorStop(0, "#FFFFFF");
-      gradient.addColorStop(0.5, "#CCCCCC");
-      gradient.addColorStop(1, "#999999");
-      fillStyle = gradient;
+      // Measure each word and compute total width for centering
+      const spaceWidth = ctx.measureText(" ").width;
+      const wordWidths = lineWords.map((w) => {
+        if (w.override?.fontFamily || w.override?.fontSize) {
+          ctx.font = buildWordFont(style, fontSize, w.override);
+          const width = ctx.measureText(w.text).width;
+          ctx.font = globalFont;
+          return width;
+        }
+        return ctx.measureText(w.text).width;
+      });
+      const totalLineWidth =
+        wordWidths.reduce((a, b) => a + b, 0) +
+        spaceWidth * Math.max(0, lineWords.length - 1);
+      let cursor = x - totalLineWidth / 2;
+
+      for (let j = 0; j < lineWords.length; j++) {
+        const w = lineWords[j];
+        const wWidth = wordWidths[j];
+        const wordX = cursor + wWidth / 2;
+        const wordColor = w.override?.color ?? style.color;
+
+        // Set per-word font
+        if (w.override?.fontFamily || w.override?.fontSize) {
+          ctx.font = buildWordFont(style, fontSize, w.override);
+        }
+
+        renderDynamicWord(ctx, w.text, wordX, lineY, style, wordColor, fontSize, videoScale);
+
+        // Restore font
+        if (w.override?.fontFamily || w.override?.fontSize) {
+          ctx.font = globalFont;
+        }
+
+        cursor += wWidth + spaceWidth;
+      }
+    } else {
+      // Fast path: no overrides, render full line at once
+      renderDynamicWord(ctx, lineText, x, lineY, style, style.color, fontSize, videoScale);
     }
-
-    ctx.save();
-    const shadowIntensity = Math.max(0.5, style.dropShadowIntensity);
-    ctx.shadowColor = `rgba(0,0,0,${shadowIntensity})`;
-    ctx.shadowBlur = Math.max(3, shadowIntensity * 6 * videoScale);
-    ctx.shadowOffsetX = 2 * videoScale;
-    ctx.shadowOffsetY = 2 * videoScale;
-    ctx.fillStyle = fillStyle;
-    ctx.fillText(lineText, x, lineY);
-    ctx.restore();
   }
 }
 
-/**
- * Render dynamic subtitle - large text with configurable size and position.
- * Text wraps onto multiple lines when too wide. The person mask creates natural
- * behind/in-front depth as parts of the text overlap with the person.
- */
-function renderDynamicWordToCanvas(
+/** Render a single word/line of dynamic text at a given position. */
+function renderDynamicWord(
   ctx: CanvasRenderingContext2D,
   text: string,
+  x: number,
+  y: number,
   style: SubtitleStyle,
-  canvasWidth: number,
-  canvasHeight: number
+  fillColor: string,
+  fontSize: number,
+  videoScale: number
 ) {
-  const upperText = text.toUpperCase();
-  const fontFamily = resolveFontFamily(style.fontFamily);
-  const videoScale = canvasHeight / 500;
+  // Stroke
+  const strokeWidth = Math.max(2, fontSize * 0.03);
+  ctx.save();
+  ctx.strokeStyle = style.borderColor || "#000000";
+  ctx.lineWidth = strokeWidth;
+  ctx.lineJoin = "round";
+  ctx.miterLimit = 2;
+  ctx.strokeText(text, x, y);
+  ctx.restore();
 
-  // Use configurable font size, scaled to canvas
-  const fontSize = Math.round((style.dynamicFontSize ?? 80) * videoScale);
-  const maxWidth = canvasWidth * 0.85;
-
-  ctx.font = `${style.fontWeight} ${fontSize}px ${fontFamily}`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-
-  // Word-wrap the text to fit within maxWidth
-  const words = upperText.split(" ");
-  const lines: string[] = [];
-  let currentLine = "";
-
-  for (const word of words) {
-    const testLine = currentLine ? `${currentLine} ${word}` : word;
-    const metrics = ctx.measureText(testLine);
-    if (metrics.width > maxWidth && currentLine) {
-      lines.push(currentLine);
-      currentLine = word;
-    } else {
-      currentLine = testLine;
-    }
+  // Fill
+  let fillStyle: string | CanvasGradient = fillColor;
+  if (
+    fillColor === style.color &&
+    (style.color === "#CCCCCC" || style.color === "#C0C0C0")
+  ) {
+    const textWidth = ctx.measureText(text).width;
+    const gradient = ctx.createLinearGradient(
+      x - textWidth / 2,
+      y - fontSize / 2,
+      x + textWidth / 2,
+      y + fontSize / 2
+    );
+    gradient.addColorStop(0, "#FFFFFF");
+    gradient.addColorStop(0.5, "#CCCCCC");
+    gradient.addColorStop(1, "#999999");
+    fillStyle = gradient;
   }
-  if (currentLine) lines.push(currentLine);
 
-  const lineHeight = fontSize * 1.1;
-  const totalHeight = lines.length * lineHeight;
-  const x = canvasWidth / 2;
-
-  // Configurable vertical position (0=top, 100=bottom)
-  const yPercent = style.dynamicYPosition ?? 35;
-  const yCenter = canvasHeight * (yPercent / 100);
-  const startY = yCenter - totalHeight / 2 + lineHeight / 2;
-
-  // Render each line
-  for (let i = 0; i < lines.length; i++) {
-    const lineY = startY + i * lineHeight;
-    const lineText = lines[i];
-
-    // Stroke
-    const strokeWidth = Math.max(2, fontSize * 0.03);
-    ctx.save();
-    ctx.strokeStyle = style.borderColor || "#000000";
-    ctx.lineWidth = strokeWidth;
-    ctx.lineJoin = "round";
-    ctx.miterLimit = 2;
-    ctx.strokeText(lineText, x, lineY);
-    ctx.restore();
-
-    // Fill
-    let fillStyle: string | CanvasGradient = style.color;
-    if (style.color === "#CCCCCC" || style.color === "#C0C0C0") {
-      const textWidth = ctx.measureText(lineText).width;
-      const gradient = ctx.createLinearGradient(
-        x - textWidth / 2,
-        lineY - fontSize / 2,
-        x + textWidth / 2,
-        lineY + fontSize / 2
-      );
-      gradient.addColorStop(0, "#FFFFFF");
-      gradient.addColorStop(0.5, "#CCCCCC");
-      gradient.addColorStop(1, "#999999");
-      fillStyle = gradient;
-    }
-
-    ctx.save();
-    const shadowIntensity = Math.max(0.5, style.dropShadowIntensity);
-    ctx.shadowColor = `rgba(0,0,0,${shadowIntensity})`;
-    ctx.shadowBlur = Math.max(3, shadowIntensity * 6 * videoScale);
-    ctx.shadowOffsetX = 2 * videoScale;
-    ctx.shadowOffsetY = 2 * videoScale;
-    ctx.fillStyle = fillStyle;
-    ctx.fillText(lineText, x, lineY);
-    ctx.restore();
-  }
+  ctx.save();
+  const shadowIntensity = Math.max(0.5, style.dropShadowIntensity);
+  ctx.shadowColor = `rgba(0,0,0,${shadowIntensity})`;
+  ctx.shadowBlur = Math.max(3, shadowIntensity * 6 * videoScale);
+  ctx.shadowOffsetX = 2 * videoScale;
+  ctx.shadowOffsetY = 2 * videoScale;
+  ctx.fillStyle = fillStyle;
+  ctx.fillText(text, x, y);
+  ctx.restore();
 }
+
 
 function renderChunkToCanvas(
   ctx: CanvasRenderingContext2D,
@@ -666,6 +658,21 @@ function renderTextLine(
   ctx.restore();
 }
 
+/** Build a font string, optionally applying per-word overrides. */
+function buildWordFont(
+  style: SubtitleStyle,
+  finalFontSize: number,
+  override?: WordStyleOverride
+): string {
+  const family = override?.fontFamily
+    ? resolveFontFamily(override.fontFamily)
+    : resolveFontFamily(style.fontFamily);
+  const size = override?.fontSize
+    ? Math.round(finalFontSize * override.fontSize)
+    : finalFontSize;
+  return `${style.fontWeight} ${size}px ${family}`;
+}
+
 function renderPhraseLineWithEmphasis(
   ctx: CanvasRenderingContext2D,
   words: WordTiming[],
@@ -678,6 +685,7 @@ function renderPhraseLineWithEmphasis(
 ) {
   if (words.length === 0) return;
 
+  const globalFont = `${style.fontWeight} ${finalFontSize}px ${resolveFontFamily(style.fontFamily)}`;
   const uppercaseWords = words.map((word) => word.text.toUpperCase());
   const spaceWidth = 0.35 * finalFontSize;
   const scales = words.map((word) =>
@@ -688,9 +696,18 @@ function renderPhraseLineWithEmphasis(
       : 1
   );
 
-  const baseWidths = uppercaseWords.map(
-    (value) => ctx.measureText(value).width
-  );
+  // Measure each word with its own font (per-word override support)
+  const baseWidths = uppercaseWords.map((value, index) => {
+    const word = words[index];
+    if (word.styleOverride?.fontFamily || word.styleOverride?.fontSize) {
+      ctx.font = buildWordFont(style, finalFontSize, word.styleOverride);
+      const w = ctx.measureText(value).width;
+      ctx.font = globalFont; // restore
+      return w;
+    }
+    return ctx.measureText(value).width;
+  });
+
   const scaledWidths = baseWidths.map(
     (width, index) => width * scales[index]
   );
@@ -735,7 +752,13 @@ function renderPhraseLineWithEmphasis(
       ctx.restore();
     }
 
-    const fillColor = isActive ? emphasisTextColor : style.color;
+    const wordColor = word.styleOverride?.color;
+    const fillColor = isActive ? emphasisTextColor : (wordColor ?? style.color);
+
+    // Set per-word font if override exists
+    if (word.styleOverride?.fontFamily || word.styleOverride?.fontSize) {
+      ctx.font = buildWordFont(style, finalFontSize, word.styleOverride);
+    }
 
     drawWordText(
       ctx,
@@ -748,6 +771,11 @@ function renderPhraseLineWithEmphasis(
       baseWidth,
       fillColor
     );
+
+    // Restore global font
+    if (word.styleOverride?.fontFamily || word.styleOverride?.fontSize) {
+      ctx.font = globalFont;
+    }
 
     cursor += scaledWidth + spaceWidth;
   });

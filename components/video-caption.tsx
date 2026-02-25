@@ -1,13 +1,22 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { SubtitleStyle } from "./subtitle-styling";
+import { SubtitleStyle, FONT_FAMILIES } from "./subtitle-styling";
 import {
   processTranscriptChunks,
   type ProcessedChunk,
   type ProcessedWord,
+  type WordStyleOverride,
 } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+
+const fontOptions = Object.values(FONT_FAMILIES);
+
+/** Resolve a fontFamily value to its cssFont for rendering */
+function resolveCssFont(fontFamily: string): string {
+  const match = fontOptions.find((f) => f.value === fontFamily);
+  return match?.cssFont ?? fontFamily;
+}
 
 interface VideoCaptionProps {
   transcript: {
@@ -17,6 +26,7 @@ interface VideoCaptionProps {
       timestamp: [number, number];
       disabled?: boolean;
       subtitleHidden?: boolean;
+      styleOverride?: WordStyleOverride;
       words?: Array<{
         text: string;
         timestamp: [number, number];
@@ -27,6 +37,8 @@ interface VideoCaptionProps {
   style: SubtitleStyle;
   mode: "word" | "phrase";
   ratio: "16:9" | "9:16";
+  onWordSelect?: (timestamp: [number, number]) => void;
+  selectedWordTimestamp?: [number, number] | null;
 }
 
 // Helper to determine if a color is light or dark
@@ -51,6 +63,8 @@ export function VideoCaption({
   style,
   mode,
   ratio,
+  onWordSelect,
+  selectedWordTimestamp,
 }: VideoCaptionProps) {
   const [isAnimating, setIsAnimating] = useState(false);
   const [currentText, setCurrentText] = useState("");
@@ -196,10 +210,28 @@ export function VideoCaption({
             word.timestamp[0] === currentWordInPhrase.timestamp[0];
 
           // Determine emphasis colors based on text color
-          const textIsLight = isLightColor(style.color);
+          const wordColor = word.styleOverride?.color ?? style.color;
+          const textIsLight = isLightColor(wordColor);
           const emphasisBgColor = textIsLight ? "rgba(0, 0, 0, 0.65)" : "rgba(255, 255, 255, 0.85)";
           const emphasisTextColor = textIsLight ? "#FFFFFF" : "#000000";
           const isActive = isCurrentWord && (style.wordEmphasisEnabled ?? true);
+
+          const isSelected =
+            selectedWordTimestamp &&
+            word.timestamp[0] === selectedWordTimestamp[0] &&
+            word.timestamp[1] === selectedWordTimestamp[1];
+
+          // Build per-word override styles
+          const overrideStyles: React.CSSProperties = {};
+          if (word.styleOverride?.color) {
+            overrideStyles.color = word.styleOverride.color;
+          }
+          if (word.styleOverride?.fontFamily) {
+            overrideStyles.fontFamily = resolveCssFont(word.styleOverride.fontFamily);
+          }
+          if (word.styleOverride?.fontSize) {
+            overrideStyles.fontSize = `${word.styleOverride.fontSize}em`;
+          }
 
           const baseWordStyles: React.CSSProperties = {
             ...baseTypographyStyles,
@@ -210,13 +242,15 @@ export function VideoCaption({
             borderRadius: "0.35em",
             transform: "scale(1)",
             backgroundColor: "transparent",
+            cursor: onWordSelect ? "pointer" : undefined,
+            ...overrideStyles,
           };
 
           const activeWordStyles: React.CSSProperties = isActive
             ? {
                 transform: "scale(1.18)",
                 backgroundColor: emphasisBgColor,
-                color: emphasisTextColor,
+                color: word.styleOverride?.color ?? emphasisTextColor,
                 WebkitTextStroke: "none",
                 background: "none",
                 WebkitBackgroundClip: "initial",
@@ -224,9 +258,27 @@ export function VideoCaption({
               }
             : {};
 
+          const selectedStyles: React.CSSProperties = isSelected
+            ? {
+                outline: "2px solid rgba(250, 204, 21, 0.8)",
+                outlineOffset: "1px",
+              }
+            : {};
+
           return (
             <React.Fragment key={`${word.timestamp[0]}-${index}`}>
-              <span style={{ ...baseWordStyles, ...activeWordStyles }}>
+              <span
+                style={{ ...baseWordStyles, ...activeWordStyles, ...selectedStyles }}
+                onClick={
+                  onWordSelect
+                    ? (e) => {
+                        e.stopPropagation();
+                        onWordSelect(word.timestamp);
+                      }
+                    : undefined
+                }
+                className={onWordSelect ? "pointer-events-auto" : undefined}
+              >
                 {word.text}
               </span>
               {index < (currentChunk.words?.length || 0) - 1 && (
@@ -292,7 +344,9 @@ export function VideoCaption({
   return (
     <div
       className={cn(
-        "absolute left-1/2 -translate-x-1/2 text-center pointer-events-none z-10",
+        "absolute left-1/2 -translate-x-1/2 text-center",
+        "z-10",
+        onWordSelect ? "pointer-events-auto" : "pointer-events-none",
         positionClasses
       )}
       style={{

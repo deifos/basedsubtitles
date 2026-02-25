@@ -1,7 +1,7 @@
 "use client";
 
 import type { JSX } from "react";
-import { useRef, useState, useCallback, useEffect } from "react";
+import { useRef, useState, useCallback, useEffect, useMemo } from "react";
 import { SiteFooter } from "@/components/site-footer";
 import { BuyMeCoffee } from "@/components/buy-me-coffee";
 import { VideoUpload } from "@/components/video-upload";
@@ -18,8 +18,10 @@ import {
   SubtitleStyling,
   SubtitleStyle,
 } from "@/components/subtitle-styling";
+import { WordStylePopover } from "@/components/word-style-popover";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { processTranscriptChunks, type WordStyleOverride } from "@/lib/utils";
 import { ProcessingOverlay } from "@/components/processing-overlay";
 import { useTranscription, STATUS_MESSAGES, type TranscriptionResult, type ModelSize } from "@/hooks/useTranscription";
 import { useVideoDownloadMediaBunny } from "@/hooks/useVideoDownloadMediaBunny";
@@ -80,6 +82,7 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [showStylingDrawer, setShowStylingDrawer] = useState(false);
   const [showEditingDrawer, setShowEditingDrawer] = useState(false);
+  const [selectedWordTimestamp, setSelectedWordTimestamp] = useState<[number, number] | null>(null);
   const previousResultRef = useRef<TranscriptionResult | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -178,7 +181,7 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
 
   const handleRemoveBackground = useCallback(async () => {
     if (!videoRef.current) return;
-    setSubtitleStyle((prev) => ({ ...prev, backgroundRemovalEnabled: true }));
+    setSubtitleStyle((prev) => ({ ...prev, backgroundRemovalEnabled: true, dynamicEnabled: true }));
     await processBgRemoval(videoRef.current);
   }, [processBgRemoval]);
 
@@ -237,6 +240,71 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
   const handleZoomPortraitChange = useCallback((zoom: boolean) => {
     setZoomPortrait(zoom);
   }, []);
+
+  const handleWordSelect = useCallback((timestamp: [number, number]) => {
+    setSelectedWordTimestamp((prev) =>
+      prev && prev[0] === timestamp[0] && prev[1] === timestamp[1]
+        ? null // deselect if clicking the same word
+        : timestamp
+    );
+  }, []);
+
+  const handleWordStyleChange = useCallback((override: WordStyleOverride) => {
+    if (!result || !selectedWordTimestamp) return;
+    setResult((prev) => {
+      if (!prev) return prev;
+      const updatedChunks = prev.chunks.map((chunk) => {
+        if (
+          chunk.timestamp[0] === selectedWordTimestamp[0] &&
+          chunk.timestamp[1] === selectedWordTimestamp[1]
+        ) {
+          return { ...chunk, styleOverride: Object.keys(override).length > 0 ? override : undefined };
+        }
+        return chunk;
+      });
+      return { ...prev, chunks: updatedChunks };
+    });
+  }, [result, selectedWordTimestamp, setResult]);
+
+  const handleWordStyleReset = useCallback(() => {
+    handleWordStyleChange({});
+  }, [handleWordStyleChange]);
+
+  const handleWordStyleClose = useCallback(() => {
+    setSelectedWordTimestamp(null);
+  }, []);
+
+  // Get the selected word's text and current override
+  const selectedWordInfo = useMemo(() => {
+    if (!result || !selectedWordTimestamp) return null;
+    const chunk = result.chunks.find(
+      (c) =>
+        c.timestamp[0] === selectedWordTimestamp[0] &&
+        c.timestamp[1] === selectedWordTimestamp[1]
+    );
+    if (!chunk) return null;
+    return { text: chunk.text, override: chunk.styleOverride ?? {} };
+  }, [result, selectedWordTimestamp]);
+
+  // Whether canvas compositing is active (word clicks on video don't work)
+  const compositingActive = subtitleStyle.dynamicEnabled ||
+    (bgRemovalReady && subtitleStyle.backgroundRemovalEnabled);
+
+  // Get current phrase words for the word chip bar (shown when compositing is active)
+  const currentPhraseWords = useMemo(() => {
+    if (!result || mode !== "phrase" || !compositingActive) return [];
+    const chunks = processTranscriptChunks(result, "phrase", subtitleStyle.maxWordsPerLine, subtitleStyle.dynamicEnabled);
+    const activeChunk = chunks.find(
+      (c) => currentTime >= c.timestamp[0] && currentTime <= c.timestamp[1]
+    );
+    if (!activeChunk?.words) return [];
+    return activeChunk.words.filter(w => {
+      const original = result.chunks.find(
+        oc => oc.timestamp[0] === w.timestamp[0] && oc.timestamp[1] === w.timestamp[1]
+      );
+      return !original?.disabled && !original?.subtitleHidden;
+    });
+  }, [result, mode, compositingActive, subtitleStyle.maxWordsPerLine, subtitleStyle.dynamicEnabled, currentTime]);
 
   // Determine if we should show the loading overlay
   // Don't show overlay when status is 'ready' and we're just waiting for user to transcribe
@@ -418,6 +486,7 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
               {/* Video Column */}
               <div className="flex-1 flex flex-col">
                 {/* Video Upload Component */}
+                <div className="relative">
                 <VideoUpload
                   key={uploadKey}
                   className="w-full"
@@ -434,7 +503,50 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
                   initialFile={initialFile}
                   bgRemovalReady={bgRemovalReady}
                   getMaskAtTime={getMaskAtTime}
+                  onWordSelect={mode === "phrase" ? handleWordSelect : undefined}
+                  selectedWordTimestamp={selectedWordTimestamp}
                 />
+                {selectedWordInfo && (
+                  <WordStylePopover
+                    wordText={selectedWordInfo.text}
+                    override={selectedWordInfo.override}
+                    onChange={handleWordStyleChange}
+                    onReset={handleWordStyleReset}
+                    onClose={handleWordStyleClose}
+                  />
+                )}
+                </div>
+
+                {/* Word chip bar for per-word editing when canvas compositing is active */}
+                {currentPhraseWords.length > 0 && mode === "phrase" && (
+                  <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5 px-2">
+                    <span className="text-xs text-muted-foreground mr-1">Edit word:</span>
+                    {currentPhraseWords.map((word, i) => {
+                      const isSelected =
+                        selectedWordTimestamp &&
+                        word.timestamp[0] === selectedWordTimestamp[0] &&
+                        word.timestamp[1] === selectedWordTimestamp[1];
+                      const hasOverride = result?.chunks.find(
+                        c => c.timestamp[0] === word.timestamp[0] && c.timestamp[1] === word.timestamp[1]
+                      )?.styleOverride;
+                      return (
+                        <button
+                          key={`${word.timestamp[0]}-${i}`}
+                          onClick={() => handleWordSelect(word.timestamp)}
+                          className={`px-2 py-0.5 text-xs rounded-md border transition-colors ${
+                            isSelected
+                              ? "bg-amber-500 text-white border-amber-500"
+                              : hasOverride
+                                ? "bg-amber-100 border-amber-300 text-amber-800 hover:bg-amber-200"
+                                : "bg-muted/50 border-border hover:bg-muted"
+                          }`}
+                        >
+                          {word.text}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
 
                 {result && (
                   <div className="mt-3 flex flex-col items-center gap-3">

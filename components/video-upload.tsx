@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState, forwardRef, useEffect, memo, useRef } from "react";
-import { cn, formatTime } from "@/lib/utils";
+import { cn, formatTime, type WordStyleOverride } from "@/lib/utils";
 import { VideoCaption } from "./video-caption";
 import { SubtitleStyle } from "./subtitle-styling";
 import { UploadIcon, Play, Pause, Volume2, VolumeX } from "lucide-react";
@@ -20,6 +20,7 @@ interface VideoUploadProps {
       timestamp: [number, number];
       disabled?: boolean;
       subtitleHidden?: boolean;
+      styleOverride?: WordStyleOverride;
     }>;
   } | null;
   currentTime?: number;
@@ -30,6 +31,8 @@ interface VideoUploadProps {
   initialFile?: File | null;
   bgRemovalReady?: boolean;
   getMaskAtTime?: (time: number, fps?: number) => MaskData | null;
+  onWordSelect?: (timestamp: [number, number]) => void;
+  selectedWordTimestamp?: [number, number] | null;
 }
 
 const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
@@ -48,6 +51,8 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
       initialFile,
       bgRemovalReady = false,
       getMaskAtTime,
+      onWordSelect,
+      selectedWordTimestamp,
     },
     ref
   ) => {
@@ -462,7 +467,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
                   Skipping disabled segment
                 </div>
               )}
-              {/* Only show DOM-based captions when NOT compositing (compositing draws its own) */}
+              {/* DOM-based captions: visible when not compositing, invisible hit-targets when compositing + word select active */}
               {transcript && !compositingActive && (
                 <VideoCaption
                   transcript={transcript}
@@ -470,6 +475,8 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
                   style={subtitleStyle}
                   mode={mode}
                   ratio={ratio}
+                  onWordSelect={onWordSelect}
+                  selectedWordTimestamp={selectedWordTimestamp}
                 />
               )}
             </div>

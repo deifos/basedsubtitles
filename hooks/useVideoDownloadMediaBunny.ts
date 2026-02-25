@@ -18,7 +18,7 @@ import {
   Conversion
 } from 'mediabunny';
 import { SubtitleStyle } from '@/components/subtitle-styling';
-import { processTranscriptChunks } from '@/lib/utils';
+import { processTranscriptChunks, type WordStyleOverride } from '@/lib/utils';
 import { estimateFaceFromMask, type FaceBounds } from '@/lib/render-subtitle';
 import type { MaskData } from '@/hooks/useBackgroundRemoval';
 
@@ -29,6 +29,7 @@ interface TranscriptChunk {
   disabled?: boolean;
   subtitleHidden?: boolean;
   dynamicPosition?: "behind" | "front";
+  styleOverride?: WordStyleOverride;
   words?: WordTiming[];
 }
 
@@ -61,6 +62,7 @@ interface WordTiming {
   text: string;
   timestamp: [number, number];
   dynamicPosition?: "behind" | "front";
+  styleOverride?: WordStyleOverride;
 }
 
 type ProcessedChunk = ReturnType<typeof processTranscriptChunks>[number];
@@ -743,6 +745,60 @@ function isLightColor(color: string): boolean {
   return false;
 }
 
+/** Build a font string, optionally applying per-word overrides. */
+function buildWordFont(
+  style: SubtitleStyle,
+  finalFontSize: number,
+  fontFamily: string,
+  override?: WordStyleOverride
+): string {
+  let family = fontFamily;
+  if (override?.fontFamily) {
+    family = override.fontFamily;
+    if (family.includes('var(')) {
+      const fontMappings: { [key: string]: string } = {
+        'var(--font-bangers)': 'Bangers',
+        'var(--font-montserrat)': 'Montserrat',
+        'var(--font-inter)': 'Inter',
+        'var(--font-bebas-neue)': 'Bebas Neue',
+        'var(--font-poppins)': 'Poppins',
+        'var(--font-open-sans)': 'Open Sans',
+        'var(--font-oswald)': 'Oswald',
+        'var(--font-anton)': 'Anton',
+        'var(--font-fredoka)': 'Fredoka',
+        'var(--font-righteous)': 'Righteous',
+        'var(--font-nunito)': 'Nunito',
+        'var(--font-roboto)': 'Roboto',
+        'var(--font-permanent-marker)': 'Permanent Marker',
+        'var(--font-pacifico)': 'Pacifico',
+        'var(--font-lobster)': 'Lobster',
+        'var(--font-alfa-slab-one)': 'Alfa Slab One',
+        'var(--font-staatliches)': 'Staatliches',
+        'var(--font-fugaz-one)': 'Fugaz One',
+        'var(--font-chewy)': 'Chewy',
+        'var(--font-playfair-display)': 'Playfair Display',
+        'var(--font-lora)': 'Lora',
+        'var(--font-plus-jakarta-sans)': 'Plus Jakarta Sans',
+        'var(--font-outfit)': 'Outfit',
+      };
+      for (const [cssVar, actualFont] of Object.entries(fontMappings)) {
+        if (family.includes(cssVar)) {
+          family = family.replace(cssVar, actualFont);
+          break;
+        }
+      }
+      if (family.includes('var(')) {
+        const fallbackMatch = family.match(/,\s*(.+)$/);
+        family = fallbackMatch ? fallbackMatch[1] : 'Arial, sans-serif';
+      }
+    }
+  }
+  const size = override?.fontSize
+    ? Math.round(finalFontSize * override.fontSize)
+    : finalFontSize;
+  return `${style.fontWeight} ${size}px ${family}`;
+}
+
 function renderPhraseLineWithEmphasis(
   ctx: CanvasRenderingContext2D,
   words: WordTiming[],
@@ -757,6 +813,47 @@ function renderPhraseLineWithEmphasis(
     return;
   }
 
+  // Resolve global font family for restoring after per-word changes
+  let globalFontFamily = style.fontFamily;
+  if (globalFontFamily.includes('var(')) {
+    const fontMappings: { [key: string]: string } = {
+      'var(--font-bangers)': 'Bangers',
+      'var(--font-montserrat)': 'Montserrat',
+      'var(--font-inter)': 'Inter',
+      'var(--font-bebas-neue)': 'Bebas Neue',
+      'var(--font-poppins)': 'Poppins',
+      'var(--font-open-sans)': 'Open Sans',
+      'var(--font-oswald)': 'Oswald',
+      'var(--font-anton)': 'Anton',
+      'var(--font-fredoka)': 'Fredoka',
+      'var(--font-righteous)': 'Righteous',
+      'var(--font-nunito)': 'Nunito',
+      'var(--font-roboto)': 'Roboto',
+      'var(--font-permanent-marker)': 'Permanent Marker',
+      'var(--font-pacifico)': 'Pacifico',
+      'var(--font-lobster)': 'Lobster',
+      'var(--font-alfa-slab-one)': 'Alfa Slab One',
+      'var(--font-staatliches)': 'Staatliches',
+      'var(--font-fugaz-one)': 'Fugaz One',
+      'var(--font-chewy)': 'Chewy',
+      'var(--font-playfair-display)': 'Playfair Display',
+      'var(--font-lora)': 'Lora',
+      'var(--font-plus-jakarta-sans)': 'Plus Jakarta Sans',
+      'var(--font-outfit)': 'Outfit',
+    };
+    for (const [cssVar, actualFont] of Object.entries(fontMappings)) {
+      if (globalFontFamily.includes(cssVar)) {
+        globalFontFamily = globalFontFamily.replace(cssVar, actualFont);
+        break;
+      }
+    }
+    if (globalFontFamily.includes('var(')) {
+      const fallbackMatch = globalFontFamily.match(/,\s*(.+)$/);
+      globalFontFamily = fallbackMatch ? fallbackMatch[1] : 'Arial, sans-serif';
+    }
+  }
+  const globalFont = `${style.fontWeight} ${finalFontSize}px ${globalFontFamily}`;
+
   const uppercaseWords = words.map((word) => word.text.toUpperCase());
   // Match preview spacer span width: 0.35em
   const spaceWidth = 0.35 * finalFontSize;
@@ -766,7 +863,18 @@ function renderPhraseLineWithEmphasis(
       : 1
   );
 
-  const baseWidths = uppercaseWords.map((value) => ctx.measureText(value).width);
+  // Measure each word with its own font (per-word override support)
+  const baseWidths = uppercaseWords.map((value, index) => {
+    const word = words[index];
+    if (word.styleOverride?.fontFamily || word.styleOverride?.fontSize) {
+      ctx.font = buildWordFont(style, finalFontSize, globalFontFamily, word.styleOverride);
+      const w = ctx.measureText(value).width;
+      ctx.font = globalFont;
+      return w;
+    }
+    return ctx.measureText(value).width;
+  });
+
   const scaledWidths = baseWidths.map((width, index) => width * scales[index]);
   const totalWidth = scaledWidths.reduce((total, width) => total + width, 0) + spaceWidth * Math.max(0, words.length - 1);
   let cursor = centerX - totalWidth / 2;
@@ -781,7 +889,7 @@ function renderPhraseLineWithEmphasis(
   const emphasisBgColor = textIsLight ? 'rgba(0, 0, 0, 0.65)' : 'rgba(255, 255, 255, 0.85)';
   const emphasisTextColor = textIsLight ? '#FFFFFF' : '#000000';
 
-  words.forEach((_word, index) => {
+  words.forEach((word, index) => {
     const displayText = uppercaseWords[index];
     const scale = scales[index];
     const scaledWidth = scaledWidths[index];
@@ -807,7 +915,13 @@ function renderPhraseLineWithEmphasis(
       ctx.restore();
     }
 
-    const fillColor = isActive ? emphasisTextColor : style.color;
+    const wordColor = word.styleOverride?.color;
+    const fillColor = isActive ? emphasisTextColor : (wordColor ?? style.color);
+
+    // Set per-word font if override exists
+    if (word.styleOverride?.fontFamily || word.styleOverride?.fontSize) {
+      ctx.font = buildWordFont(style, finalFontSize, globalFontFamily, word.styleOverride);
+    }
 
     drawWordText(
       ctx,
@@ -820,6 +934,11 @@ function renderPhraseLineWithEmphasis(
       baseWidth,
       fillColor
     );
+
+    // Restore global font
+    if (word.styleOverride?.fontFamily || word.styleOverride?.fontSize) {
+      ctx.font = globalFont;
+    }
 
     cursor += scaledWidth + spaceWidth;
   });
@@ -1030,7 +1149,7 @@ function renderDynamicBehindInExport(
   renderDynamicWordWithOptions(ctx, behindText, style, canvas, {
     fontSize: style.dynamicFontSize ?? 80,
     yPosition: style.dynamicYPosition ?? 35,
-  });
+  }, behindWords);
 }
 
 // Render only "front" words from a dynamic chunk
@@ -1064,18 +1183,19 @@ function renderDynamicFrontInExport(
   renderDynamicWordWithOptions(ctx, frontText, style, canvas, {
     fontSize: style.dynamicFrontFontSize ?? 40,
     yPosition,
-  });
+  }, frontWords);
 }
 
 // Shared dynamic text renderer with configurable size and position
+// When `wordTimings` is provided and any word has a styleOverride, renders word-by-word.
 function renderDynamicWordWithOptions(
   ctx: CanvasRenderingContext2D,
   text: string,
   style: SubtitleStyle,
   canvas: HTMLCanvasElement,
-  options: { fontSize: number; yPosition: number }
+  options: { fontSize: number; yPosition: number },
+  wordTimings?: WordTiming[]
 ) {
-  const upperText = text.toUpperCase();
   const videoScale = canvas.height / 500;
   const fontSize = Math.round(options.fontSize * videoScale);
   const maxWidth = canvas.width * 0.85;
@@ -1119,23 +1239,37 @@ function renderDynamicWordWithOptions(
     }
   }
 
-  ctx.font = `${style.fontWeight} ${fontSize}px ${fontFamily}`;
+  const globalFont = `${style.fontWeight} ${fontSize}px ${fontFamily}`;
+  ctx.font = globalFont;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
-  const words = upperText.split(' ');
+  const hasOverrides = wordTimings?.some((w) => w.styleOverride);
+
+  // Word-wrap into lines, tracking word indices
+  const upperWords = text.toUpperCase().split(' ');
   const lines: string[] = [];
+  const lineWordIndices: number[][] = [];
   let currentLine = '';
-  for (const word of words) {
+  let currentIndices: number[] = [];
+
+  for (let wi = 0; wi < upperWords.length; wi++) {
+    const word = upperWords[wi];
     const testLine = currentLine ? `${currentLine} ${word}` : word;
     if (ctx.measureText(testLine).width > maxWidth && currentLine) {
       lines.push(currentLine);
+      lineWordIndices.push(currentIndices);
       currentLine = word;
+      currentIndices = [wi];
     } else {
       currentLine = testLine;
+      currentIndices.push(wi);
     }
   }
-  if (currentLine) lines.push(currentLine);
+  if (currentLine) {
+    lines.push(currentLine);
+    lineWordIndices.push(currentIndices);
+  }
 
   const lineHeight = fontSize * 1.1;
   const totalHeight = lines.length * lineHeight;
@@ -1147,36 +1281,98 @@ function renderDynamicWordWithOptions(
     const lineY = startY + i * lineHeight;
     const lineText = lines[i];
 
-    const strokeWidth = Math.max(2, fontSize * 0.03);
-    ctx.save();
-    ctx.strokeStyle = style.borderColor || '#000000';
-    ctx.lineWidth = strokeWidth;
-    ctx.lineJoin = 'round';
-    ctx.miterLimit = 2;
-    ctx.strokeText(lineText, x, lineY);
-    ctx.restore();
+    // If any word in this line has an override, render word-by-word
+    if (hasOverrides && wordTimings) {
+      const indices = lineWordIndices[i];
+      const lineWords = indices.map((idx) => ({
+        text: upperWords[idx],
+        override: wordTimings[idx]?.styleOverride,
+      }));
 
-    let fillStyle: string | CanvasGradient = style.color;
-    if (style.color === '#CCCCCC' || style.color === '#C0C0C0') {
-      const textWidth = ctx.measureText(lineText).width;
-      const gradient = ctx.createLinearGradient(
-        x - textWidth / 2, lineY - fontSize / 2,
-        x + textWidth / 2, lineY + fontSize / 2
-      );
-      gradient.addColorStop(0, '#FFFFFF');
-      gradient.addColorStop(0.5, '#CCCCCC');
-      gradient.addColorStop(1, '#999999');
-      fillStyle = gradient;
+      const spaceWidth = ctx.measureText(' ').width;
+      const wordWidths = lineWords.map((w) => {
+        if (w.override?.fontFamily || w.override?.fontSize) {
+          ctx.font = buildWordFont(style, fontSize, fontFamily, w.override);
+          const width = ctx.measureText(w.text).width;
+          ctx.font = globalFont;
+          return width;
+        }
+        return ctx.measureText(w.text).width;
+      });
+      const totalLineWidth =
+        wordWidths.reduce((a, b) => a + b, 0) +
+        spaceWidth * Math.max(0, lineWords.length - 1);
+      let cursor = x - totalLineWidth / 2;
+
+      for (let j = 0; j < lineWords.length; j++) {
+        const w = lineWords[j];
+        const wWidth = wordWidths[j];
+        const wordX = cursor + wWidth / 2;
+        const wordColor = w.override?.color ?? style.color;
+
+        if (w.override?.fontFamily || w.override?.fontSize) {
+          ctx.font = buildWordFont(style, fontSize, fontFamily, w.override);
+        }
+
+        // Render single word
+        renderDynamicSingleWord(ctx, w.text, wordX, lineY, style, wordColor, fontSize, videoScale);
+
+        if (w.override?.fontFamily || w.override?.fontSize) {
+          ctx.font = globalFont;
+        }
+
+        cursor += wWidth + spaceWidth;
+      }
+    } else {
+      // Fast path: no overrides, render full line
+      renderDynamicSingleWord(ctx, lineText, x, lineY, style, style.color, fontSize, videoScale);
     }
-
-    ctx.save();
-    const shadowIntensity = Math.max(0.5, style.dropShadowIntensity);
-    ctx.shadowColor = `rgba(0,0,0,${shadowIntensity})`;
-    ctx.shadowBlur = Math.max(3, shadowIntensity * 6 * videoScale);
-    ctx.shadowOffsetX = 2 * videoScale;
-    ctx.shadowOffsetY = 2 * videoScale;
-    ctx.fillStyle = fillStyle;
-    ctx.fillText(lineText, x, lineY);
-    ctx.restore();
   }
+}
+
+/** Render a single word/line of dynamic text at a given position (export). */
+function renderDynamicSingleWord(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  style: SubtitleStyle,
+  fillColor: string,
+  fontSize: number,
+  videoScale: number
+) {
+  const strokeWidth = Math.max(2, fontSize * 0.03);
+  ctx.save();
+  ctx.strokeStyle = style.borderColor || '#000000';
+  ctx.lineWidth = strokeWidth;
+  ctx.lineJoin = 'round';
+  ctx.miterLimit = 2;
+  ctx.strokeText(text, x, y);
+  ctx.restore();
+
+  let fillStyle: string | CanvasGradient = fillColor;
+  if (
+    fillColor === style.color &&
+    (style.color === '#CCCCCC' || style.color === '#C0C0C0')
+  ) {
+    const textWidth = ctx.measureText(text).width;
+    const gradient = ctx.createLinearGradient(
+      x - textWidth / 2, y - fontSize / 2,
+      x + textWidth / 2, y + fontSize / 2
+    );
+    gradient.addColorStop(0, '#FFFFFF');
+    gradient.addColorStop(0.5, '#CCCCCC');
+    gradient.addColorStop(1, '#999999');
+    fillStyle = gradient;
+  }
+
+  ctx.save();
+  const shadowIntensity = Math.max(0.5, style.dropShadowIntensity);
+  ctx.shadowColor = `rgba(0,0,0,${shadowIntensity})`;
+  ctx.shadowBlur = Math.max(3, shadowIntensity * 6 * videoScale);
+  ctx.shadowOffsetX = 2 * videoScale;
+  ctx.shadowOffsetY = 2 * videoScale;
+  ctx.fillStyle = fillStyle;
+  ctx.fillText(text, x, y);
+  ctx.restore();
 }

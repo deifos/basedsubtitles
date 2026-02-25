@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { extractAudioFromVideo } from "@/lib/audio-utils";
+import type { WordStyleOverride } from "@/lib/utils";
 
 type DeviceType = "webgpu" | "wasm";
 export type ModelSize = "tiny" | "base" | "small";
@@ -21,6 +22,7 @@ export interface TranscriptionResult {
     disabled?: boolean;
     subtitleHidden?: boolean;
     dynamicPosition?: "behind" | "front";
+    styleOverride?: WordStyleOverride;
   }>;
   generationTime?: number;
 }

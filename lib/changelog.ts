@@ -8,7 +8,7 @@
  * - PATCH: Bug fixes and small improvements
  */
 
-export const APP_VERSION = "1.1.0";
+export const APP_VERSION = "1.3.0";
 
 export interface ChangelogEntry {
   version: string;
@@ -21,6 +21,32 @@ export interface ChangelogEntry {
 }
 
 export const changelog: ChangelogEntry[] = [
+  {
+    version: "1.3.0",
+    date: "2026-02-24",
+    title: "Word Chip Bar & Auto 3D Depth",
+    changes: [
+      { type: "added", description: "Word chip bar — clickable word buttons appear below the video when 3D depth mode is active, letting you select any word for per-word styling" },
+      { type: "added", description: "Words with custom style overrides are highlighted with an amber tint in the chip bar" },
+      { type: "changed", description: "3D depth mode now auto-enables when background removal starts — no extra toggle needed" },
+      { type: "changed", description: "Per-word selection in 3D/bg-removal mode uses the reliable chip bar instead of canvas click coordinates" },
+      { type: "fixed", description: "Clicking anywhere on the canvas in 3D mode no longer incorrectly triggers word editing" },
+      { type: "fixed", description: "Hidden and disabled words can no longer be selected for editing" },
+    ],
+  },
+  {
+    version: "1.2.0",
+    date: "2026-02-24",
+    title: "Per-Word Styling & Preset Preview",
+    changes: [
+      { type: "added", description: "Per-word custom styling — click any word in the video preview to override its font, size, and color independently" },
+      { type: "added", description: "Word style popover with font family picker, size multiplier (50%–200%), color picker, and reset button" },
+      { type: "added", description: "Selected word highlight with yellow outline in the video preview" },
+      { type: "added", description: "Per-word overrides render correctly in both the live preview and exported video" },
+      { type: "changed", description: "Preset buttons now render with their actual font — Bangers for Green, Permanent Marker for Gold, Outfit for Subtitle, Bebas Neue for Gamer" },
+      { type: "changed", description: "Preset buttons show the correct font weight so you can preview the style before applying" },
+    ],
+  },
   {
     version: "1.1.0",
     date: "2026-02-24",

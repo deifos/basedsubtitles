@@ -46,12 +46,19 @@ export function formatVttTime(seconds: number): string {
     .padStart(3, "0")}`;
 }
 
+export interface WordStyleOverride {
+  fontFamily?: string;
+  fontSize?: number;  // multiplier (e.g. 1.5 = 150% of global)
+  color?: string;
+}
+
 export interface ProcessedWord {
   text: string;
   timestamp: [number, number];
   disabled?: boolean;
   subtitleHidden?: boolean;
   dynamicPosition?: "behind" | "front";
+  styleOverride?: WordStyleOverride;
 }
 
 export interface ProcessedChunk {
@@ -69,6 +76,7 @@ interface SourceTranscript {
     disabled?: boolean;
     subtitleHidden?: boolean;
     dynamicPosition?: "behind" | "front";
+    styleOverride?: WordStyleOverride;
   }>;
 }
 
@@ -146,6 +154,7 @@ export function processTranscriptChunks(
       disabled: chunk.disabled,
       subtitleHidden: chunk.subtitleHidden,
       dynamicPosition: chunk.dynamicPosition,
+      styleOverride: chunk.styleOverride,
     };
 
     if (!currentGroup) {

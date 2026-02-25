@@ -74,7 +74,7 @@ interface SubtitleStylingProps {
   bgRemovalReady?: boolean;
 }
 
-const FONT_FAMILIES = {
+export const FONT_FAMILIES = {
   plusJakartaSans: {
     label: "Plus Jakarta Sans",
     value: "var(--font-plus-jakarta-sans), 'Plus Jakarta Sans', sans-serif",
@@ -369,11 +369,22 @@ interface PresetButtonProps {
 }
 
 function PresetButton({ preset, isActive, onApply }: PresetButtonProps) {
+  // Look up the cssFont value so the button renders with the actual Google Font
+  const presetCssFont = useMemo(() => {
+    const match = fontOptions.find((f) => f.value === preset.style.fontFamily);
+    return match?.cssFont ?? preset.style.fontFamily;
+  }, [preset.style.fontFamily]);
+
+  const fontStyles: CSSProperties = {
+    fontFamily: presetCssFont,
+    fontWeight: preset.style.fontWeight as CSSProperties["fontWeight"],
+  };
+
   return (
     <Button
       onClick={onApply}
       variant={isActive ? "default" : "ghost"}
-      className="group relative h-10 w-full rounded-lg text-xs font-semibold transition-all"
+      className="group relative h-10 w-full rounded-lg text-xs transition-all"
       style={
         isActive
           ? {
@@ -383,8 +394,9 @@ function PresetButton({ preset, isActive, onApply }: PresetButtonProps) {
                 preset.style.borderWidth && preset.style.borderWidth > 0
                   ? `0 0 0 ${preset.style.borderWidth}px ${preset.style.borderColor}`
                   : "0 0 0 2px rgba(255,255,255,0.7)",
+              ...fontStyles,
             }
-          : preset.inactiveStyles
+          : { ...preset.inactiveStyles, ...fontStyles }
       }
     >
       {preset.label.toUpperCase()}
