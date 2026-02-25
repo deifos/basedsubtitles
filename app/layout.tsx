@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import {
   Geist,
   Geist_Mono,
@@ -249,6 +250,12 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} ${montserrat.variable} ${bebasNeue.variable} ${poppins.variable} ${oswald.variable} ${anton.variable} ${bangers.variable} ${fredoka.variable} ${righteous.variable} ${nunito.variable} ${roboto.variable} ${openSans.variable} ${inter.variable} ${permanentMarker.variable} ${pacifico.variable} ${lobster.variable} ${alfaSlabOne.variable} ${staatliches.variable} ${fugazOne.variable} ${chewy.variable} ${playfairDisplay.variable} ${lora.variable} ${plusJakartaSans.variable} ${outfit.variable} antialiased`}
       >
         {children}
+        <Script
+          defer
+          src="https://cloud.umami.is/script.js"
+          data-website-id="0a0b9573-0bbf-4229-a918-3a5224cb2d1b"
+          strategy="afterInteractive"
+        />
       </body>
     </html>
   );

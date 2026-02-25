@@ -145,15 +145,6 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
     setShowLanguageModal(true);
   }, [result, setResult]);
 
-  const handleModalClose = useCallback(() => {
-    // If user cancels and we have a previous result, restore it
-    if (previousResultRef.current && !result) {
-      setResult(previousResultRef.current);
-    }
-    setShowLanguageModal(false);
-    previousResultRef.current = null;
-  }, [result, setResult]);
-
   // Auto-close modal when transcription actually starts (not during model loading)
   useEffect(() => {
     if (showLanguageModal && (status === 'processing' || status === 'extracting' || status === 'transcribing')) {
@@ -220,6 +211,23 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
 
     onReturnToLanding?.();
   }, [resetTranscription, resetBgRemoval, onReturnToLanding]);
+
+  const handleModalClose = useCallback(() => {
+    if (previousResultRef.current && !result) {
+      // User cancelled "Change Language" — restore previous result
+      setResult(previousResultRef.current);
+      setShowLanguageModal(false);
+      previousResultRef.current = null;
+    } else if (!result) {
+      // No transcription yet — go back to landing page
+      setShowLanguageModal(false);
+      previousResultRef.current = null;
+      handleResetVideo();
+    } else {
+      setShowLanguageModal(false);
+      previousResultRef.current = null;
+    }
+  }, [result, setResult, handleResetVideo]);
 
   const handleTimeUpdate = useCallback((time: number) => {
     setCurrentTime(time);

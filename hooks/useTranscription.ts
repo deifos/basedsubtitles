@@ -63,6 +63,8 @@ export function useTranscription() {
   const modelLoadingPromiseRef = useRef<Promise<void> | null>(null);
   const modelLoadResolveRef = useRef<(() => void) | null>(null);
   const modelLoadRejectRef = useRef<((error: Error) => void) | null>(null);
+  const loadIdRef = useRef(0);
+  const activeLoadIdRef = useRef(0);
   const statusRef = useRef<TranscriptionStatus>("idle");
 
   const updateStatus = useCallback((nextStatus: TranscriptionStatus) => {
@@ -94,17 +96,20 @@ export function useTranscription() {
         break;
 
       case "ready":
-        modelReadyRef.current = true;
-        if (statusRef.current === "loading") {
-          updateStatus("ready");
+        // Only resolve if this "ready" matches the most recent load request
+        if (activeLoadIdRef.current === loadIdRef.current) {
+          modelReadyRef.current = true;
+          if (statusRef.current === "loading") {
+            updateStatus("ready");
+          }
+          setProgress((prev) => Math.max(prev, 90));
+          if (modelLoadResolveRef.current) {
+            modelLoadResolveRef.current();
+          }
+          modelLoadingPromiseRef.current = null;
+          modelLoadResolveRef.current = null;
+          modelLoadRejectRef.current = null;
         }
-        setProgress((prev) => Math.max(prev, 90));
-        if (modelLoadResolveRef.current) {
-          modelLoadResolveRef.current();
-        }
-        modelLoadingPromiseRef.current = null;
-        modelLoadResolveRef.current = null;
-        modelLoadRejectRef.current = null;
         break;
 
       case "complete": {
@@ -198,6 +203,10 @@ export function useTranscription() {
     modelSizeRef.current = modelSize;
 
     if (!modelLoadingPromiseRef.current) {
+      // Increment load ID so stale "ready" messages from previous loads are ignored
+      loadIdRef.current++;
+      activeLoadIdRef.current = loadIdRef.current;
+
       modelLoadingPromiseRef.current = new Promise<void>((resolve, reject) => {
         modelLoadResolveRef.current = resolve;
         modelLoadRejectRef.current = reject;
@@ -218,28 +227,11 @@ export function useTranscription() {
   }, []);
 
   const handleVideoSelect = async (file: File) => {
-    try {
-      // Reset states
-      setError(null);
-      setResult(null);
-      setProgress(0);
-
-      // Just preload the model, don't transcribe yet
-      if (!modelReadyRef.current) {
-        updateStatus("loading");
-        await ensureModelLoaded();
-      }
-      
-      updateStatus("ready");
-    } catch (err) {
-      console.error("Error in handleVideoSelect:", err);
-      if (err instanceof Error) {
-        console.error("Error stack:", err.stack);
-      }
-      setError(err instanceof Error ? err.message : String(err));
-      updateStatus("idle");
-      setProgress(0);
-    }
+    // Reset states — don't preload any model here; let the user pick model size first
+    setError(null);
+    setResult(null);
+    setProgress(0);
+    updateStatus("ready");
   };
 
   const startTranscription = async (file: File, language: string = "en", modelSize: ModelSize = "base") => {
@@ -277,7 +269,7 @@ export function useTranscription() {
         },
       });
     } catch (err) {
-      console.error("Error in handleVideoSelect:", err);
+      console.error("Error in startTranscription:", err);
       if (err instanceof Error) {
         console.error("Error stack:", err.stack);
       }
