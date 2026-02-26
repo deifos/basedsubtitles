@@ -309,7 +309,11 @@ function renderDynamicTextBlock(
   const hasOverrides = wordTimings?.some((w) => w.styleOverride);
 
   // Word-wrap into lines (indices track which wordTimings belong to each line)
-  const upperWords = text.toUpperCase().split(" ");
+  // Use emoji as display text when set
+  const rawUpperWords = text.toUpperCase().split(" ");
+  const upperWords = rawUpperWords.map((w, i) =>
+    wordTimings?.[i]?.styleOverride?.emoji ? wordTimings[i].styleOverride!.emoji! : w
+  );
   const lines: string[] = [];
   const lineWordIndices: number[][] = []; // per-line array of wordTimings indices
   let currentLine = "";
@@ -363,7 +367,7 @@ function renderDynamicTextBlock(
     if (needsWordByWord) {
       const indices = lineWordIndices[i];
       const lineWords = indices.map((idx) => ({
-        text: upperWords[idx],
+        text: wordTimings[idx]?.styleOverride?.emoji ? wordTimings[idx].styleOverride!.emoji! : upperWords[idx],
         override: wordTimings[idx]?.styleOverride,
         timing: wordTimings[idx],
       }));
@@ -390,15 +394,16 @@ function renderDynamicTextBlock(
         const wordX = cursor + wWidth / 2;
         const wordColor = w.override?.color ?? style.color;
         const isKnockout = w.override?.effect === "knockout";
+        const hasEmojiReplace = !!w.override?.emoji;
 
         // Set per-word font
         if (w.override?.fontFamily || w.override?.fontSize) {
           ctx.font = buildWordFont(style, fontSize, w.override);
         }
 
-        // Compute per-character alphas for letter-by-letter fade
+        // Compute per-character alphas for letter-by-letter fade (skip for emoji replace)
         let charAlphas: number[] | undefined;
-        if (useTextFade && !isKnockout && w.timing) {
+        if (useTextFade && !isKnockout && !hasEmojiReplace && w.timing) {
           const timeSinceWordStart = currentTime! - w.timing.timestamp[0];
           const wordDuration = w.timing.timestamp[1] - w.timing.timestamp[0];
           const revealDuration = Math.min(0.3, wordDuration * 0.6);
@@ -414,6 +419,25 @@ function renderDynamicTextBlock(
         if (!charAlphas) ctx.globalAlpha = chunkFadeOut;
         renderDynamicWord(ctx, w.text, wordX, lineY, style, wordColor, fontSize, videoScale, w.override?.effect, charAlphas);
         ctx.restore();
+
+        // Draw emoji overlay above the word
+        if (w.override?.emojiOverlay) {
+          const effectiveFontSize = w.override?.fontSize ? Math.round(fontSize * w.override.fontSize) : fontSize;
+          ctx.save();
+          ctx.shadowColor = "transparent";
+          ctx.shadowBlur = 0;
+          ctx.shadowOffsetX = 0;
+          ctx.shadowOffsetY = 0;
+          ctx.strokeStyle = "transparent";
+          ctx.lineWidth = 0;
+          const overlayFontSize = effectiveFontSize * 1.4;
+          ctx.font = `${overlayFontSize}px sans-serif`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillStyle = "#000000";
+          ctx.fillText(w.override.emojiOverlay, wordX, lineY - effectiveFontSize * 1.2);
+          ctx.restore();
+        }
 
         // Restore font
         if (w.override?.fontFamily || w.override?.fontSize) {
@@ -675,7 +699,8 @@ function renderChunkToCanvas(
 
     for (let i = 0; i < phraseWords.length; i++) {
       const word = phraseWords[i];
-      const wordText = word.text.toUpperCase();
+      // Use emoji as display text for measurement when set
+      const wordText = word.styleOverride?.emoji ? word.styleOverride.emoji : word.text.toUpperCase();
 
       // Measure with per-word font if needed
       if (word.styleOverride?.fontFamily || word.styleOverride?.fontSize) {
@@ -835,7 +860,10 @@ function renderPhraseLineWithEmphasis(
   if (words.length === 0) return;
 
   const globalFont = `${style.fontWeight} ${finalFontSize}px ${resolveFontFamily(style.fontFamily)}`;
-  const uppercaseWords = words.map((word) => word.text.toUpperCase());
+  // Build display texts: emoji replaces word text when set
+  const displayTexts = words.map((word) =>
+    word.styleOverride?.emoji ? word.styleOverride.emoji : word.text.toUpperCase()
+  );
   const spaceWidth = 0.35 * finalFontSize;
   const scales = words.map((word) =>
     currentTime >= word.timestamp[0] &&
@@ -846,7 +874,7 @@ function renderPhraseLineWithEmphasis(
   );
 
   // Measure each word with its own font (per-word override support)
-  const baseWidths = uppercaseWords.map((value, index) => {
+  const baseWidths = displayTexts.map((value, index) => {
     const word = words[index];
     if (word.styleOverride?.fontFamily || word.styleOverride?.fontSize) {
       ctx.font = buildWordFont(style, finalFontSize, word.styleOverride);
@@ -880,13 +908,14 @@ function renderPhraseLineWithEmphasis(
   const useTextFade = style.textFadeIn ?? false;
 
   words.forEach((word, index) => {
-    const displayText = uppercaseWords[index];
+    const displayText = displayTexts[index];
     const scale = scales[index];
     const scaledWidth = scaledWidths[index];
     const baseWidth = baseWidths[index];
     const isActive = scale > 1;
     const wordCenterX = cursor + scaledWidth / 2;
     const isKnockout = word.styleOverride?.effect === "knockout";
+    const hasEmojiReplace = !!word.styleOverride?.emoji;
 
     // Per-word fade
     const timeSinceWordStart = currentTime - word.timestamp[0];
@@ -923,9 +952,14 @@ function renderPhraseLineWithEmphasis(
       ctx.font = buildWordFont(style, finalFontSize, word.styleOverride);
     }
 
-    // Compute per-character alphas for letter-by-letter fade
+    // Compute effective font size for this word
+    const effectiveFontSize = word.styleOverride?.fontSize
+      ? Math.round(finalFontSize * word.styleOverride.fontSize)
+      : finalFontSize;
+
+    // Compute per-character alphas for letter-by-letter fade (skip for emoji replace)
     let charAlphas: number[] | undefined;
-    if (useTextFade && !isKnockout) {
+    if (useTextFade && !isKnockout && !hasEmojiReplace) {
       const wordDuration = word.timestamp[1] - word.timestamp[0];
       const revealDuration = Math.min(0.3, wordDuration * 0.6);
       const charCount = displayText.length;
@@ -949,6 +983,25 @@ function renderPhraseLineWithEmphasis(
       word.styleOverride?.effect,
       charAlphas
     );
+
+    // Draw emoji overlay above the word
+    if (word.styleOverride?.emojiOverlay) {
+      ctx.save();
+      // Clear stroke/shadow before drawing overlay emoji
+      ctx.shadowColor = "transparent";
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
+      ctx.strokeStyle = "transparent";
+      ctx.lineWidth = 0;
+      const overlayFontSize = effectiveFontSize * 1.4;
+      ctx.font = `${overlayFontSize}px sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "#000000";
+      ctx.fillText(word.styleOverride.emojiOverlay, wordCenterX, centerY - effectiveFontSize * 1.2);
+      ctx.restore();
+    }
 
     // Restore global font
     if (word.styleOverride?.fontFamily || word.styleOverride?.fontSize) {

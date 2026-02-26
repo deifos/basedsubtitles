@@ -523,8 +523,9 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
                   onWordSelect={mode === "phrase" ? handleWordSelect : undefined}
                   selectedWordTimestamp={selectedWordTimestamp}
                 />
-                {selectedWordInfo && (
+                {selectedWordInfo && selectedWordTimestamp && (
                   <WordStylePopover
+                    key={`${selectedWordTimestamp[0]}-${selectedWordTimestamp[1]}`}
                     wordText={selectedWordInfo.text}
                     override={selectedWordInfo.override}
                     onChange={handleWordStyleChange}

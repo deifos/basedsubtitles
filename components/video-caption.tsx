@@ -244,6 +244,40 @@ export function VideoCaption({
   const renderPhraseWithHighlight = () => {
     // For word mode, just display the single word
     if (mode === "word") {
+      // Look up styleOverride from the matching transcript chunk
+      const wordChunk = transcript.chunks.find(
+        (c) =>
+          c.timestamp[0] === currentChunk.timestamp[0] &&
+          c.timestamp[1] === currentChunk.timestamp[1]
+      );
+      const wordOverride = wordChunk?.styleOverride;
+
+      // Emoji replace: show emoji instead of text
+      if (wordOverride?.emoji) {
+        return (
+          <span style={{ ...baseTypographyStyles, ...metallicTypographyStyles, position: "relative", display: "inline-block" }}>
+            {wordOverride.emojiOverlay && (
+              <span style={{ position: "absolute", top: "-1.4em", left: "50%", transform: "translateX(-50%)", fontSize: "1.4em", lineHeight: 1, pointerEvents: "none" }}>
+                {wordOverride.emojiOverlay}
+              </span>
+            )}
+            <span style={{ fontSize: "1.2em", lineHeight: 1 }}>{wordOverride.emoji}</span>
+          </span>
+        );
+      }
+
+      // Emoji overlay only (no replace)
+      if (wordOverride?.emojiOverlay) {
+        return (
+          <span style={{ ...baseTypographyStyles, ...metallicTypographyStyles, position: "relative", display: "inline-block" }}>
+            <span style={{ position: "absolute", top: "-1.4em", left: "50%", transform: "translateX(-50%)", fontSize: "1.4em", lineHeight: 1, pointerEvents: "none" }}>
+              {wordOverride.emojiOverlay}
+            </span>
+            {text}
+          </span>
+        );
+      }
+
       return (
         <span style={{ ...baseTypographyStyles, ...metallicTypographyStyles }}>
           {text}
@@ -348,8 +382,15 @@ export function VideoCaption({
               }
             : {};
 
+          // Emoji replace: show emoji instead of word text
+          const hasEmojiReplace = !!word.styleOverride?.emoji;
+          const hasEmojiOverlay = !!word.styleOverride?.emojiOverlay;
+
           // Letter-by-letter fade: compute per-char alphas
           const renderWordContent = () => {
+            // Emoji replace: render emoji instead of text, skip letter fade
+            if (hasEmojiReplace) return <span style={{ fontSize: "1.2em", lineHeight: 1 }}>{word.styleOverride!.emoji}</span>;
+
             if (!textFadeIn || isKnockout) return word.text;
             const wordDuration = word.timestamp[1] - word.timestamp[0];
             const revealDuration = Math.min(0.3, wordDuration * 0.6);
@@ -365,10 +406,15 @@ export function VideoCaption({
             });
           };
 
+          // Add relative positioning when overlay emoji is present
+          const positionStyles: React.CSSProperties = hasEmojiOverlay
+            ? { position: "relative" }
+            : {};
+
           return (
             <React.Fragment key={`${word.timestamp[0]}-${index}`}>
               <span
-                style={{ ...baseWordStyles, ...activeWordStyles, ...selectedStyles }}
+                style={{ ...baseWordStyles, ...activeWordStyles, ...selectedStyles, ...positionStyles }}
                 onClick={
                   onWordSelect
                     ? (e) => {
@@ -379,6 +425,11 @@ export function VideoCaption({
                 }
                 className={onWordSelect ? "pointer-events-auto" : undefined}
               >
+                {hasEmojiOverlay && (
+                  <span style={{ position: "absolute", top: "-1.4em", left: "50%", transform: "translateX(-50%)", fontSize: "1.4em", lineHeight: 1, pointerEvents: "none" }}>
+                    {word.styleOverride!.emojiOverlay}
+                  </span>
+                )}
                 {renderWordContent()}
               </span>
               {index < (currentChunk.words?.length || 0) - 1 && (

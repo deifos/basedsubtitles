@@ -8,7 +8,7 @@
  * - PATCH: Bug fixes and small improvements
  */
 
-export const APP_VERSION = "1.6.0";
+export const APP_VERSION = "1.7.0";
 
 export interface ChangelogEntry {
   version: string;
@@ -21,6 +21,19 @@ export interface ChangelogEntry {
 }
 
 export const changelog: ChangelogEntry[] = [
+  {
+    version: "1.7.0",
+    date: "2026-02-25",
+    title: "Per-Word Emoji Replace & Overlay",
+    changes: [
+      { type: "added", description: "Per-word emoji replace — click any word and pick an emoji to replace the word text entirely with that emoji" },
+      { type: "added", description: "Per-word emoji overlay — place an emoji above any word while keeping the text visible underneath" },
+      { type: "added", description: "Emoji picker integrated into the per-word style popover with search support" },
+      { type: "added", description: "Emoji replace and overlay render in DOM preview, canvas compositing (3D depth mode), and video export" },
+      { type: "added", description: "Emoji size scales with the word's font size — enlarging a word also enlarges its emoji" },
+      { type: "fixed", description: "Word style popover in 3D mode did not update when clicking a different word badge — popover now resets and shows the correct word's settings" },
+    ],
+  },
   {
     version: "1.6.0",
     date: "2026-02-25",

@@ -51,6 +51,8 @@ export interface WordStyleOverride {
   fontSize?: number;  // multiplier (e.g. 1.5 = 150% of global)
   color?: string;
   effect?: "knockout";
+  emoji?: string;        // replaces word text with this emoji
+  emojiOverlay?: string; // renders this emoji above the word
 }
 
 export interface ProcessedWord {

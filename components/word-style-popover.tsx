@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, useMemo } from "react";
+import { ChangeEvent, useMemo, useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import {
@@ -14,6 +14,9 @@ import {
 import { FONT_FAMILIES } from "@/components/subtitle-styling";
 import { X, RotateCcw } from "lucide-react";
 import { cn, type WordStyleOverride } from "@/lib/utils";
+import dynamic from "next/dynamic";
+
+const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false });
 
 const fontOptions = Object.values(FONT_FAMILIES);
 
@@ -32,6 +35,22 @@ export function WordStylePopover({
   onReset,
   onClose,
 }: WordStylePopoverProps) {
+  const [showEmojiPicker, setShowEmojiPicker] = useState<"replace" | "overlay" | null>(null);
+  const pickerRef = useRef<HTMLDivElement>(null);
+
+  // Close picker on outside click
+  useEffect(() => {
+    if (!showEmojiPicker) return;
+    const handler = (e: MouseEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+        setShowEmojiPicker(null);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showEmojiPicker]);
+
+
   const currentFontCss = useMemo(() => {
     if (!override.fontFamily) return undefined;
     const match = fontOptions.find((f) => f.value === override.fontFamily);
@@ -81,11 +100,34 @@ export function WordStylePopover({
     }
   };
 
+  const handleEmojiSelect = (emojiData: { emoji: string }) => {
+    if (showEmojiPicker === "replace") {
+      onChange({ ...override, emoji: emojiData.emoji });
+    } else if (showEmojiPicker === "overlay") {
+      onChange({ ...override, emojiOverlay: emojiData.emoji });
+    }
+    setShowEmojiPicker(null);
+  };
+
+  const handleClearEmoji = () => {
+    const next = { ...override };
+    delete next.emoji;
+    onChange(next);
+  };
+
+  const handleClearEmojiOverlay = () => {
+    const next = { ...override };
+    delete next.emojiOverlay;
+    onChange(next);
+  };
+
   const hasOverrides =
     override.fontFamily !== undefined ||
     override.fontSize !== undefined ||
     override.color !== undefined ||
-    override.effect !== undefined;
+    override.effect !== undefined ||
+    override.emoji !== undefined ||
+    override.emojiOverlay !== undefined;
 
   return (
     <div
@@ -206,6 +248,80 @@ export function WordStylePopover({
             Knockout
           </button>
         </div>
+
+        {/* Emoji Replace */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-slate-600 block">Emoji Replace</label>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowEmojiPicker(showEmojiPicker === "replace" ? null : "replace")}
+              className={cn(
+                "flex-1 text-xs px-3 py-1.5 rounded-md border transition-colors text-left",
+                override.emoji
+                  ? "bg-slate-50 border-slate-300"
+                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+              )}
+            >
+              {override.emoji ? (
+                <span className="text-base">{override.emoji} <span className="text-xs text-slate-500">replacing text</span></span>
+              ) : (
+                "Replace with emoji..."
+              )}
+            </button>
+            {override.emoji && (
+              <button
+                onClick={handleClearEmoji}
+                className="text-xs text-slate-400 hover:text-slate-600 underline shrink-0"
+              >
+                clear
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Emoji Overlay */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-slate-600 block">Emoji Overlay</label>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowEmojiPicker(showEmojiPicker === "overlay" ? null : "overlay")}
+              className={cn(
+                "flex-1 text-xs px-3 py-1.5 rounded-md border transition-colors text-left",
+                override.emojiOverlay
+                  ? "bg-slate-50 border-slate-300"
+                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+              )}
+            >
+              {override.emojiOverlay ? (
+                <span className="text-base">{override.emojiOverlay} <span className="text-xs text-slate-500">above word</span></span>
+              ) : (
+                "Add emoji above..."
+              )}
+            </button>
+            {override.emojiOverlay && (
+              <button
+                onClick={handleClearEmojiOverlay}
+                className="text-xs text-slate-400 hover:text-slate-600 underline shrink-0"
+              >
+                clear
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Emoji Picker Dropdown */}
+        {showEmojiPicker && (
+          <div ref={pickerRef} className="relative">
+            <EmojiPicker
+              onEmojiClick={handleEmojiSelect}
+              width="100%"
+              height={350}
+              skinTonesDisabled
+              searchPlaceHolder="Search emoji..."
+              previewConfig={{ showPreview: false }}
+            />
+          </div>
+        )}
 
         {/* Reset All */}
         {hasOverrides && (
