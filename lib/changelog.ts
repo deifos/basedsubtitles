@@ -27,8 +27,11 @@ export const changelog: ChangelogEntry[] = [
     title: "Unified Word Editing & Min Words",
     changes: [
       { type: "added", description: "Per-word emoji size slider — scale each word's emoji independently from 50% to 200% (appears in word style popover when an emoji is set)" },
+      { type: "added", description: "Compact word style popover on mobile — collapsible icon tabs (Font, Size, Color, FX, Emoji) overlay the video without blocking subtitles or requiring scroll" },
       { type: "changed", description: "Word editing standardized to chip bar below video — works in all modes (3D on/off), replacing direct click-on-word in the preview" },
+      { type: "changed", description: "Word chips restyled with dark background for better visibility" },
       { type: "changed", description: "Min words per line lowered from 3 to 1 — allows single-word-at-a-time subtitle display" },
+      { type: "changed", description: "Emoji size is now per-word instead of global — moved from styling panel to the word style popover" },
       { type: "fixed", description: "Emoji overlay size was not applied during video export — now correctly uses per-word emojiScale in all render paths" },
     ],
   },

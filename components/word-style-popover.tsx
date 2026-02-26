@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { FONT_FAMILIES } from "@/components/subtitle-styling";
-import { X, RotateCcw } from "lucide-react";
+import { X, RotateCcw, Type, Palette, Zap, Smile, ALargeSmall } from "lucide-react";
 import { cn, type WordStyleOverride } from "@/lib/utils";
 import dynamic from "next/dynamic";
 
@@ -20,12 +20,16 @@ const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false });
 
 const fontOptions = Object.values(FONT_FAMILIES);
 
+type Section = "font" | "size" | "color" | "effect" | "emoji";
+
 interface WordStylePopoverProps {
   wordText: string;
   override: WordStyleOverride;
   onChange: (override: WordStyleOverride) => void;
   onReset: () => void;
   onClose: () => void;
+  className?: string;
+  compact?: boolean;
 }
 
 export function WordStylePopover({
@@ -34,8 +38,11 @@ export function WordStylePopover({
   onChange,
   onReset,
   onClose,
+  className,
+  compact = false,
 }: WordStylePopoverProps) {
   const [showEmojiPicker, setShowEmojiPicker] = useState<"replace" | "overlay" | null>(null);
+  const [activeSection, setActiveSection] = useState<Section | null>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
 
   // Close picker on outside click
@@ -144,13 +151,299 @@ export function WordStylePopover({
     override.emojiOverlay !== undefined ||
     override.emojiScale !== undefined;
 
+  // --- Section content renderers ---
+
+  const renderFontSection = () => (
+    <div className="space-y-1.5">
+      {!compact && <label className="text-xs font-medium text-slate-600 block">Font</label>}
+      <Select
+        value={override.fontFamily ?? "__none__"}
+        onValueChange={handleFontFamilyChange}
+      >
+        <SelectTrigger
+          className="w-full rounded-md border-slate-200 bg-white px-3 py-1.5 text-xs shadow-sm"
+          style={currentFontCss ? { fontFamily: currentFontCss } : undefined}
+        >
+          <SelectValue placeholder="Same as global" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectGroup>
+            <SelectItem value="__none__" className="text-xs">
+              Same as global
+            </SelectItem>
+            {fontOptions.map((option) => (
+              <SelectItem
+                key={option.value}
+                value={option.value}
+                className="text-xs"
+                style={{ fontFamily: option.cssFont }}
+              >
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        </SelectContent>
+      </Select>
+    </div>
+  );
+
+  const renderSizeSection = () => (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        {!compact && <label className="text-xs font-medium text-slate-600">Size</label>}
+        <span className="text-xs text-slate-400 tabular-nums">{sizePercent}%</span>
+      </div>
+      <Slider
+        value={[sizePercent]}
+        onValueChange={handleSizeChange}
+        min={50}
+        max={200}
+        step={10}
+        className="w-full"
+      />
+      <div className="flex justify-between text-[10px] text-slate-400">
+        <span>50%</span>
+        <span>100%</span>
+        <span>200%</span>
+      </div>
+    </div>
+  );
+
+  const renderColorSection = () => (
+    <div className="space-y-1.5">
+      {!compact && <label className="text-xs font-medium text-slate-600 block">Color</label>}
+      <div className="flex items-center gap-2">
+        <input
+          type="color"
+          value={override.color ?? "#FFFFFF"}
+          onChange={handleColorChange}
+          className="w-8 h-8 rounded cursor-pointer border border-slate-200"
+        />
+        {override.color ? (
+          <div className="flex items-center gap-1.5 flex-1">
+            <span className="text-xs uppercase text-slate-500">{override.color}</span>
+            <button
+              onClick={handleClearColor}
+              className="text-xs text-slate-400 hover:text-slate-600 underline"
+            >
+              reset
+            </button>
+          </div>
+        ) : (
+          <span className="text-xs text-slate-400">Same as global</span>
+        )}
+      </div>
+    </div>
+  );
+
+  const renderEffectSection = () => (
+    <div className="space-y-1.5">
+      {!compact && <label className="text-xs font-medium text-slate-600 block">Effect</label>}
+      <button
+        onClick={handleToggleKnockout}
+        className={cn(
+          "w-full text-xs px-3 py-1.5 rounded-md border transition-colors text-left",
+          override.effect === "knockout"
+            ? "bg-slate-900 text-white border-slate-900"
+            : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+        )}
+      >
+        Knockout
+      </button>
+    </div>
+  );
+
+  const renderEmojiSection = () => (
+    <div className="space-y-2">
+      {/* Emoji Replace */}
+      <div className="space-y-1.5">
+        {!compact && <label className="text-xs font-medium text-slate-600 block">Emoji Replace</label>}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowEmojiPicker(showEmojiPicker === "replace" ? null : "replace")}
+            className={cn(
+              "flex-1 text-xs px-3 py-1.5 rounded-md border transition-colors text-left",
+              override.emoji
+                ? "bg-slate-50 border-slate-300"
+                : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+            )}
+          >
+            {override.emoji ? (
+              <span className="text-base">{override.emoji} <span className="text-xs text-slate-500">replacing text</span></span>
+            ) : (
+              "Replace with emoji..."
+            )}
+          </button>
+          {override.emoji && (
+            <button
+              onClick={handleClearEmoji}
+              className="text-xs text-slate-400 hover:text-slate-600 underline shrink-0"
+            >
+              clear
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Emoji Overlay */}
+      <div className="space-y-1.5">
+        {!compact && <label className="text-xs font-medium text-slate-600 block">Emoji Overlay</label>}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowEmojiPicker(showEmojiPicker === "overlay" ? null : "overlay")}
+            className={cn(
+              "flex-1 text-xs px-3 py-1.5 rounded-md border transition-colors text-left",
+              override.emojiOverlay
+                ? "bg-slate-50 border-slate-300"
+                : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+            )}
+          >
+            {override.emojiOverlay ? (
+              <span className="text-base">{override.emojiOverlay} <span className="text-xs text-slate-500">above word</span></span>
+            ) : (
+              "Add emoji above..."
+            )}
+          </button>
+          {override.emojiOverlay && (
+            <button
+              onClick={handleClearEmojiOverlay}
+              className="text-xs text-slate-400 hover:text-slate-600 underline shrink-0"
+            >
+              clear
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Emoji Size */}
+      {hasEmoji && (
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-medium text-slate-600">Emoji Size</label>
+            <span className="text-xs text-slate-400 tabular-nums">{emojiScalePercent}%</span>
+          </div>
+          <Slider
+            value={[emojiScalePercent]}
+            onValueChange={handleEmojiScaleChange}
+            min={50}
+            max={200}
+            step={10}
+            className="w-full"
+          />
+          <div className="flex justify-between text-[10px] text-slate-400">
+            <span>50%</span>
+            <span>100%</span>
+            <span>200%</span>
+          </div>
+        </div>
+      )}
+
+      {/* Emoji Picker Dropdown */}
+      {showEmojiPicker && (
+        <div ref={pickerRef} className="relative">
+          <EmojiPicker
+            onEmojiClick={handleEmojiSelect}
+            width="100%"
+            height={compact ? 280 : 350}
+            skinTonesDisabled
+            searchPlaceHolder="Search emoji..."
+            previewConfig={{ showPreview: false }}
+          />
+        </div>
+      )}
+    </div>
+  );
+
+  // --- Compact (mobile) layout ---
+
+  if (compact) {
+    const sections: { key: Section; icon: React.ReactNode; label: string; hasValue: boolean }[] = [
+      { key: "font", icon: <Type className="h-3.5 w-3.5" />, label: "Font", hasValue: !!override.fontFamily },
+      { key: "size", icon: <ALargeSmall className="h-3.5 w-3.5" />, label: "Size", hasValue: !!override.fontSize },
+      { key: "color", icon: <Palette className="h-3.5 w-3.5" />, label: "Color", hasValue: !!override.color },
+      { key: "effect", icon: <Zap className="h-3.5 w-3.5" />, label: "FX", hasValue: !!override.effect },
+      { key: "emoji", icon: <Smile className="h-3.5 w-3.5" />, label: "Emoji", hasValue: !!(override.emoji || override.emojiOverlay) },
+    ];
+
+    const toggleSection = (key: Section) => {
+      setActiveSection(prev => prev === key ? null : key);
+      if (key !== "emoji") setShowEmojiPicker(null);
+    };
+
+    return (
+      <div
+        className={cn(
+          "bg-white border border-slate-200 rounded-xl shadow-xl p-3",
+          className
+        )}
+        style={{ fontFamily: "var(--font-outfit), sans-serif" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between mb-2">
+          <h4 className="text-xs font-semibold text-slate-900 truncate flex-1 mr-2">
+            &ldquo;{wordText}&rdquo;
+          </h4>
+          <div className="flex items-center gap-1">
+            {hasOverrides && (
+              <button
+                onClick={onReset}
+                className="p-1 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+                title="Reset to global"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="p-1 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Section tabs */}
+        <div className="flex gap-1 mb-2">
+          {sections.map((s) => (
+            <button
+              key={s.key}
+              onClick={() => toggleSection(s.key)}
+              className={cn(
+                "flex-1 flex flex-col items-center gap-0.5 py-1.5 rounded-lg border text-[10px] font-medium transition-colors",
+                activeSection === s.key
+                  ? "bg-slate-900 text-white border-slate-900"
+                  : s.hasValue
+                    ? "bg-amber-50 text-amber-700 border-amber-300 hover:bg-amber-100"
+                    : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+              )}
+            >
+              {s.icon}
+              {s.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Expanded section */}
+        {activeSection === "font" && renderFontSection()}
+        {activeSection === "size" && renderSizeSection()}
+        {activeSection === "color" && renderColorSection()}
+        {activeSection === "effect" && renderEffectSection()}
+        {activeSection === "emoji" && renderEmojiSection()}
+      </div>
+    );
+  }
+
+  // --- Full (desktop) layout ---
+
   return (
     <div
-      className="absolute z-50 bg-white border border-slate-200 rounded-xl shadow-xl p-4 w-72"
+      className={cn(
+        "bg-white border border-slate-200 rounded-xl shadow-xl p-4 w-72",
+        className
+      )}
       style={{
         fontFamily: "var(--font-outfit), sans-serif",
-        top: "8px",
-        right: "8px",
       }}
       onClick={(e) => e.stopPropagation()}
     >
@@ -168,198 +461,11 @@ export function WordStylePopover({
       </div>
 
       <div className="space-y-3">
-        {/* Font Family */}
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-slate-600 block">Font</label>
-          <Select
-            value={override.fontFamily ?? "__none__"}
-            onValueChange={handleFontFamilyChange}
-          >
-            <SelectTrigger
-              className="w-full rounded-md border-slate-200 bg-white px-3 py-1.5 text-xs shadow-sm"
-              style={currentFontCss ? { fontFamily: currentFontCss } : undefined}
-            >
-              <SelectValue placeholder="Same as global" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectItem value="__none__" className="text-xs">
-                  Same as global
-                </SelectItem>
-                {fontOptions.map((option) => (
-                  <SelectItem
-                    key={option.value}
-                    value={option.value}
-                    className="text-xs"
-                    style={{ fontFamily: option.cssFont }}
-                  >
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Font Size */}
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between">
-            <label className="text-xs font-medium text-slate-600">Size</label>
-            <span className="text-xs text-slate-400 tabular-nums">{sizePercent}%</span>
-          </div>
-          <Slider
-            value={[sizePercent]}
-            onValueChange={handleSizeChange}
-            min={50}
-            max={200}
-            step={10}
-            className="w-full"
-          />
-          <div className="flex justify-between text-[10px] text-slate-400">
-            <span>50%</span>
-            <span>100%</span>
-            <span>200%</span>
-          </div>
-        </div>
-
-        {/* Color */}
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-slate-600 block">Color</label>
-          <div className="flex items-center gap-2">
-            <input
-              type="color"
-              value={override.color ?? "#FFFFFF"}
-              onChange={handleColorChange}
-              className="w-8 h-8 rounded cursor-pointer border border-slate-200"
-            />
-            {override.color ? (
-              <div className="flex items-center gap-1.5 flex-1">
-                <span className="text-xs uppercase text-slate-500">{override.color}</span>
-                <button
-                  onClick={handleClearColor}
-                  className="text-xs text-slate-400 hover:text-slate-600 underline"
-                >
-                  reset
-                </button>
-              </div>
-            ) : (
-              <span className="text-xs text-slate-400">Same as global</span>
-            )}
-          </div>
-        </div>
-
-        {/* Knockout Effect */}
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-slate-600 block">Effect</label>
-          <button
-            onClick={handleToggleKnockout}
-            className={cn(
-              "w-full text-xs px-3 py-1.5 rounded-md border transition-colors text-left",
-              override.effect === "knockout"
-                ? "bg-slate-900 text-white border-slate-900"
-                : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-            )}
-          >
-            Knockout
-          </button>
-        </div>
-
-        {/* Emoji Replace */}
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-slate-600 block">Emoji Replace</label>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowEmojiPicker(showEmojiPicker === "replace" ? null : "replace")}
-              className={cn(
-                "flex-1 text-xs px-3 py-1.5 rounded-md border transition-colors text-left",
-                override.emoji
-                  ? "bg-slate-50 border-slate-300"
-                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-              )}
-            >
-              {override.emoji ? (
-                <span className="text-base">{override.emoji} <span className="text-xs text-slate-500">replacing text</span></span>
-              ) : (
-                "Replace with emoji..."
-              )}
-            </button>
-            {override.emoji && (
-              <button
-                onClick={handleClearEmoji}
-                className="text-xs text-slate-400 hover:text-slate-600 underline shrink-0"
-              >
-                clear
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Emoji Overlay */}
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-slate-600 block">Emoji Overlay</label>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowEmojiPicker(showEmojiPicker === "overlay" ? null : "overlay")}
-              className={cn(
-                "flex-1 text-xs px-3 py-1.5 rounded-md border transition-colors text-left",
-                override.emojiOverlay
-                  ? "bg-slate-50 border-slate-300"
-                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-              )}
-            >
-              {override.emojiOverlay ? (
-                <span className="text-base">{override.emojiOverlay} <span className="text-xs text-slate-500">above word</span></span>
-              ) : (
-                "Add emoji above..."
-              )}
-            </button>
-            {override.emojiOverlay && (
-              <button
-                onClick={handleClearEmojiOverlay}
-                className="text-xs text-slate-400 hover:text-slate-600 underline shrink-0"
-              >
-                clear
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Emoji Size — shown when emoji replace or overlay is set */}
-        {hasEmoji && (
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-medium text-slate-600">Emoji Size</label>
-              <span className="text-xs text-slate-400 tabular-nums">{emojiScalePercent}%</span>
-            </div>
-            <Slider
-              value={[emojiScalePercent]}
-              onValueChange={handleEmojiScaleChange}
-              min={50}
-              max={200}
-              step={10}
-              className="w-full"
-            />
-            <div className="flex justify-between text-[10px] text-slate-400">
-              <span>50%</span>
-              <span>100%</span>
-              <span>200%</span>
-            </div>
-          </div>
-        )}
-
-        {/* Emoji Picker Dropdown */}
-        {showEmojiPicker && (
-          <div ref={pickerRef} className="relative">
-            <EmojiPicker
-              onEmojiClick={handleEmojiSelect}
-              width="100%"
-              height={350}
-              skinTonesDisabled
-              searchPlaceHolder="Search emoji..."
-              previewConfig={{ showPreview: false }}
-            />
-          </div>
-        )}
+        {renderFontSection()}
+        {renderSizeSection()}
+        {renderColorSection()}
+        {renderEffectSection()}
+        {renderEmojiSection()}
 
         {/* Reset All */}
         {hasOverrides && (

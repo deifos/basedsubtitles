@@ -520,14 +520,29 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
 
 
                 />
+                {/* Desktop: full overlay popover on video */}
                 {selectedWordInfo && selectedWordTimestamp && (
                   <WordStylePopover
-                    key={`${selectedWordTimestamp[0]}-${selectedWordTimestamp[1]}`}
+                    key={`desktop-${selectedWordTimestamp[0]}-${selectedWordTimestamp[1]}`}
                     wordText={selectedWordInfo.text}
                     override={selectedWordInfo.override}
                     onChange={handleWordStyleChange}
                     onReset={handleWordStyleReset}
                     onClose={handleWordStyleClose}
+                    className="hidden lg:block absolute z-50 top-2 right-2"
+                  />
+                )}
+                {/* Mobile: compact overlay popover on video */}
+                {selectedWordInfo && selectedWordTimestamp && (
+                  <WordStylePopover
+                    key={`mobile-${selectedWordTimestamp[0]}-${selectedWordTimestamp[1]}`}
+                    wordText={selectedWordInfo.text}
+                    override={selectedWordInfo.override}
+                    onChange={handleWordStyleChange}
+                    onReset={handleWordStyleReset}
+                    onClose={handleWordStyleClose}
+                    className="lg:hidden absolute z-50 top-2 left-2 right-2"
+                    compact
                   />
                 )}
                 </div>
