@@ -375,6 +375,23 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
           renderSubtitleToCanvas(ctx, transcript, time, subtitleStyle, mode, w, h);
         }
 
+        // Step 5: Branding watermark
+        if (subtitleStyle.brandingWatermark) {
+          const fontSize = Math.max(10, Math.round(h * 0.012));
+          const padding = w * 0.03;
+          ctx.save();
+          ctx.font = `700 ${fontSize}px system-ui, -apple-system, sans-serif`;
+          ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
+          ctx.textAlign = "left";
+          ctx.textBaseline = "bottom";
+          ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
+          ctx.shadowBlur = 3;
+          ctx.shadowOffsetX = 0;
+          ctx.shadowOffsetY = 1;
+          ctx.fillText("basedsubs.getbasedapps.com", padding, h - h * 0.03);
+          ctx.restore();
+        }
+
         animFrameRef.current = requestAnimationFrame(render);
       };
 
@@ -470,6 +487,22 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
               {isSkipping && (
                 <div className="absolute top-4 right-4 bg-black bg-opacity-75 text-white px-3 py-1 rounded-md text-sm font-medium z-10">
                   Skipping disabled segment
+                </div>
+              )}
+              {/* Branding watermark DOM overlay (non-compositing mode) */}
+              {subtitleStyle.brandingWatermark && !compositingActive && (
+                <div
+                  className="absolute bottom-[3%] left-[3%] pointer-events-none z-20"
+                  style={{
+                    fontSize: "clamp(8px, 1.2vw, 13px)",
+                    fontWeight: 700,
+                    fontFamily: "system-ui, -apple-system, sans-serif",
+                    color: "rgba(255, 255, 255, 0.6)",
+                    textShadow: "0 1px 3px rgba(0, 0, 0, 0.5)",
+                    letterSpacing: "0.02em",
+                  }}
+                >
+                  basedsubs.getbasedapps.com
                 </div>
               )}
               {/* DOM-based captions: visible when not compositing, invisible hit-targets when compositing + word select active */}

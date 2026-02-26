@@ -66,6 +66,7 @@ const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
   dynamicFrontYPosition: 75,
   dynamicFollowWord: false,
   textFadeIn: false,
+  brandingWatermark: true,
 };
 
 export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps): JSX.Element {

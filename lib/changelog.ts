@@ -32,6 +32,7 @@ export const changelog: ChangelogEntry[] = [
       { type: "added", description: "Emoji replace and overlay render in DOM preview, canvas compositing (3D depth mode), and video export" },
       { type: "added", description: "Emoji size scales with the word's font size — enlarging a word also enlarges its emoji" },
       { type: "fixed", description: "Word style popover in 3D mode did not update when clicking a different word badge — popover now resets and shows the correct word's settings" },
+      { type: "added", description: "Branding watermark — toggleable \"basedsubs.getbasedapps.com\" text in the bottom-left corner, rendered in preview and baked into exported videos" },
     ],
   },
   {

@@ -63,6 +63,7 @@ export interface SubtitleStyle {
   dynamicFrontYPosition: number; // front text fallback Y position 0-100 (default 75)
   dynamicFollowWord: boolean; // highlight spoken word in front text (phrase mode only)
   textFadeIn: boolean; // letter-by-letter fade-in effect
+  brandingWatermark: boolean; // show "basedsubs.getbasedapps.com" watermark
 }
 
 interface SubtitleStylingProps {
@@ -998,6 +999,28 @@ export function SubtitleStyling({
             )}
           </div>
         )}
+      </div>
+
+      {/* Branding watermark toggle */}
+      <div className="relative overflow-hidden border-2 border-amber-400 bg-amber-50 rounded-lg p-2.5">
+        <div className="flex items-start gap-2.5">
+          <Switch
+            id="branding-watermark"
+            checked={style.brandingWatermark}
+            onCheckedChange={(checked) =>
+              onChange({ ...style, brandingWatermark: checked })
+            }
+            className="mt-0.5 flex-shrink-0"
+          />
+          <div className="space-y-1 min-w-0">
+            <label htmlFor="branding-watermark" className="text-xs font-bold uppercase tracking-wider leading-tight block cursor-pointer">
+              basedsubs.getbasedapps.com
+            </label>
+            <p className="text-[11px] text-black/60 leading-snug">
+              Support my work by keeping the watermark on your exports
+            </p>
+          </div>
+        </div>
       </div>
 
     </div>

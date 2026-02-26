@@ -112,6 +112,23 @@ function isPhraseChunk(chunk: ProcessedChunk): chunk is ProcessedChunk & { words
   return Array.isArray((chunk as { words?: WordTiming[] }).words);
 }
 
+function drawBrandingWatermark(ctx: CanvasRenderingContext2D, w: number, h: number, enabled?: boolean) {
+  if (!enabled) return;
+  const fontSize = Math.max(10, Math.round(h * 0.012));
+  const padding = w * 0.03;
+  ctx.save();
+  ctx.font = `700 ${fontSize}px system-ui, -apple-system, sans-serif`;
+  ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "bottom";
+  ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
+  ctx.shadowBlur = 3;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 1;
+  ctx.fillText("basedsubs.getbasedapps.com", padding, h - h * 0.03);
+  ctx.restore();
+}
+
 const LETTER_SPACING_EM = 0.05;
 const HIGHLIGHT_SPACE_EM = 0.35;
 const WORD_PADDING_X_EM = 0.15;
@@ -355,6 +372,7 @@ export function useVideoDownloadMediaBunny({
             if (currentChunk) {
               renderSubtitle(ctx, currentChunk, subtitleStyle, canvas, mode, time);
             }
+            drawBrandingWatermark(ctx, canvas.width, canvas.height, subtitleStyle.brandingWatermark);
             try { await videoSource.add(time, 1 / fps); } catch {}
             continue;
           }
@@ -441,6 +459,9 @@ export function useVideoDownloadMediaBunny({
             renderSubtitle(ctx, currentChunk, subtitleStyle, canvas, mode, time);
           }
         }
+
+        // Branding watermark — drawn on top of everything
+        drawBrandingWatermark(ctx, canvas.width, canvas.height, subtitleStyle.brandingWatermark);
 
         if (cancelContextRef.current.cancelRequested) {
           cancelled = true;
