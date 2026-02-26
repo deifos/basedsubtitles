@@ -63,7 +63,6 @@ export interface SubtitleStyle {
   dynamicFrontYPosition: number; // front text fallback Y position 0-100 (default 75)
   dynamicFollowWord: boolean; // highlight spoken word in front text (phrase mode only)
   textFadeIn: boolean; // letter-by-letter fade-in effect
-  emojiScale: number; // multiplier for emoji overlay/replace size (default 1.0)
   brandingWatermark: boolean; // show "basedsubs.getbasedapps.com" watermark
 }
 
@@ -792,13 +791,13 @@ export function SubtitleStyling({
               onValueChange={(values) => {
                 onChange({ ...style, maxWordsPerLine: values[0] });
               }}
-              min={3}
+              min={1}
               max={8}
               step={1}
               className="w-full"
             />
             <div className="flex justify-between text-xs text-muted-foreground mt-1">
-              <span>3</span>
+              <span>1</span>
               <span>8</span>
             </div>
           </div>
@@ -931,26 +930,6 @@ export function SubtitleStyling({
             onCheckedChange={(value) => onChange({ ...style, textFadeIn: value })}
             aria-label="Toggle text fade in"
           />
-        </div>
-
-        {/* Emoji Size slider */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <label className="text-sm font-medium">Emoji Size</label>
-            <span className="text-sm text-muted-foreground tabular-nums">{Math.round((style.emojiScale ?? 1) * 100)}%</span>
-          </div>
-          <Slider
-            value={[Math.round((style.emojiScale ?? 1) * 100)]}
-            onValueChange={(values) => onChange({ ...style, emojiScale: values[0] / 100 })}
-            min={50}
-            max={200}
-            step={5}
-            className="w-full"
-          />
-          <div className="flex justify-between text-xs text-muted-foreground mt-1">
-            <span>Small</span>
-            <span>Large</span>
-          </div>
         </div>
 
         {/* Background Removal Section - only when masks are ready */}

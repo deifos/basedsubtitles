@@ -37,8 +37,6 @@ interface VideoCaptionProps {
   style: SubtitleStyle;
   mode: "word" | "phrase";
   ratio: "16:9" | "9:16";
-  onWordSelect?: (timestamp: [number, number]) => void;
-  selectedWordTimestamp?: [number, number] | null;
 }
 
 // Helper to determine if a color is light or dark
@@ -63,8 +61,6 @@ export function VideoCaption({
   style,
   mode,
   ratio,
-  onWordSelect,
-  selectedWordTimestamp,
 }: VideoCaptionProps) {
   const [isAnimating, setIsAnimating] = useState(false);
   const [currentText, setCurrentText] = useState("");
@@ -253,7 +249,7 @@ export function VideoCaption({
       const wordOverride = wordChunk?.styleOverride;
 
       // Emoji replace: show emoji instead of text
-      const emojiScale = style.emojiScale ?? 1;
+      const emojiScale = wordOverride?.emojiScale ?? 1;
       if (wordOverride?.emoji) {
         return (
           <span style={{ ...baseTypographyStyles, ...metallicTypographyStyles, position: "relative", display: "inline-block" }}>
@@ -311,11 +307,6 @@ export function VideoCaption({
           const emphasisTextColor = textIsLight ? "#FFFFFF" : "#000000";
           const isActive = isCurrentWord && (style.wordEmphasisEnabled ?? false);
 
-          const isSelected =
-            selectedWordTimestamp &&
-            word.timestamp[0] === selectedWordTimestamp[0] &&
-            word.timestamp[1] === selectedWordTimestamp[1];
-
           // Build per-word override styles
           const isKnockout = word.styleOverride?.effect === "knockout";
           const overrideStyles: React.CSSProperties = {};
@@ -351,7 +342,8 @@ export function VideoCaption({
             borderRadius: "0.35em",
             transform: isKnockout ? "none" : "scale(1)",
             backgroundColor: "transparent",
-            cursor: onWordSelect ? "pointer" : undefined,
+
+
             opacity: wordOpacity,
             ...overrideStyles,
           };
@@ -376,13 +368,6 @@ export function VideoCaption({
                 }
             : {};
 
-          const selectedStyles: React.CSSProperties = isSelected
-            ? {
-                outline: "2px solid rgba(250, 204, 21, 0.8)",
-                outlineOffset: "1px",
-              }
-            : {};
-
           // Emoji replace: show emoji instead of word text
           const hasEmojiReplace = !!word.styleOverride?.emoji;
           const hasEmojiOverlay = !!word.styleOverride?.emojiOverlay;
@@ -390,7 +375,7 @@ export function VideoCaption({
           // Letter-by-letter fade: compute per-char alphas
           const renderWordContent = () => {
             // Emoji replace: render emoji instead of text, skip letter fade
-            const eScale = style.emojiScale ?? 1;
+            const eScale = word.styleOverride?.emojiScale ?? 1;
             if (hasEmojiReplace) return <span style={{ fontSize: `${1.2 * eScale}em`, lineHeight: 1 }}>{word.styleOverride!.emoji}</span>;
 
             if (!textFadeIn || isKnockout) return word.text;
@@ -416,19 +401,10 @@ export function VideoCaption({
           return (
             <React.Fragment key={`${word.timestamp[0]}-${index}`}>
               <span
-                style={{ ...baseWordStyles, ...activeWordStyles, ...selectedStyles, ...positionStyles }}
-                onClick={
-                  onWordSelect
-                    ? (e) => {
-                        e.stopPropagation();
-                        onWordSelect(word.timestamp);
-                      }
-                    : undefined
-                }
-                className={onWordSelect ? "pointer-events-auto" : undefined}
+                style={{ ...baseWordStyles, ...activeWordStyles, ...positionStyles }}
               >
                 {hasEmojiOverlay && (
-                  <span style={{ position: "absolute", top: `${-1.4 * (style.emojiScale ?? 1)}em`, left: "50%", transform: "translateX(-50%)", fontSize: `${1.4 * (style.emojiScale ?? 1)}em`, lineHeight: 1, pointerEvents: "none" }}>
+                  <span style={{ position: "absolute", top: `${-1.4 * (word.styleOverride?.emojiScale ?? 1)}em`, left: "50%", transform: "translateX(-50%)", fontSize: `${1.4 * (word.styleOverride?.emojiScale ?? 1)}em`, lineHeight: 1, pointerEvents: "none" }}>
                     {word.styleOverride!.emojiOverlay}
                   </span>
                 )}
@@ -504,7 +480,7 @@ export function VideoCaption({
       className={cn(
         "absolute text-center",
         hasKnockout ? "inset-x-0 mx-auto" : "left-1/2 -translate-x-1/2 z-10",
-        onWordSelect ? "pointer-events-auto" : "pointer-events-none",
+        "pointer-events-none",
         positionClasses
       )}
       style={{

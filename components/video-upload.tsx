@@ -31,8 +31,6 @@ interface VideoUploadProps {
   initialFile?: File | null;
   bgRemovalReady?: boolean;
   getMaskAtTime?: (time: number, fps?: number) => MaskData | null;
-  onWordSelect?: (timestamp: [number, number]) => void;
-  selectedWordTimestamp?: [number, number] | null;
 }
 
 const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
@@ -51,8 +49,6 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
       initialFile,
       bgRemovalReady = false,
       getMaskAtTime,
-      onWordSelect,
-      selectedWordTimestamp,
     },
     ref
   ) => {
@@ -513,8 +509,8 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
                   style={subtitleStyle}
                   mode={mode}
                   ratio={ratio}
-                  onWordSelect={onWordSelect}
-                  selectedWordTimestamp={selectedWordTimestamp}
+
+
                 />
               )}
             </div>

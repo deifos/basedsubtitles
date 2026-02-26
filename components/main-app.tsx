@@ -66,7 +66,6 @@ const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
   dynamicFrontYPosition: 75,
   dynamicFollowWord: false,
   textFadeIn: false,
-  emojiScale: 1,
   brandingWatermark: true,
 };
 
@@ -301,13 +300,9 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
     return { text: chunk.text, override: chunk.styleOverride ?? {} };
   }, [result, selectedWordTimestamp]);
 
-  // Whether canvas compositing is active (word clicks on video don't work)
-  const compositingActive = subtitleStyle.dynamicEnabled ||
-    (bgRemovalReady && subtitleStyle.backgroundRemovalEnabled);
-
-  // Get current phrase words for the word chip bar (shown when compositing is active)
+  // Get current phrase words for the word chip bar
   const currentPhraseWords = useMemo(() => {
-    if (!result || mode !== "phrase" || !compositingActive) return [];
+    if (!result || mode !== "phrase") return [];
     const chunks = processTranscriptChunks(result, "phrase", subtitleStyle.maxWordsPerLine, subtitleStyle.dynamicEnabled);
     const activeChunk = chunks.find(
       (c) => currentTime >= c.timestamp[0] && currentTime <= c.timestamp[1]
@@ -319,7 +314,7 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
       );
       return !original?.disabled && !original?.subtitleHidden;
     });
-  }, [result, mode, compositingActive, subtitleStyle.maxWordsPerLine, subtitleStyle.dynamicEnabled, currentTime]);
+  }, [result, mode, subtitleStyle.maxWordsPerLine, subtitleStyle.dynamicEnabled, currentTime]);
 
   // Determine if we should show the loading overlay
   // Don't show overlay when status is 'ready' and we're just waiting for user to transcribe
@@ -522,8 +517,8 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
                   initialFile={initialFile}
                   bgRemovalReady={bgRemovalReady}
                   getMaskAtTime={getMaskAtTime}
-                  onWordSelect={mode === "phrase" ? handleWordSelect : undefined}
-                  selectedWordTimestamp={selectedWordTimestamp}
+
+
                 />
                 {selectedWordInfo && selectedWordTimestamp && (
                   <WordStylePopover
@@ -537,12 +532,12 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
                 )}
                 </div>
 
-                {/* Word chip bar for per-word editing when canvas compositing is active */}
-                {compositingActive && mode === "phrase" && (
+                {/* Word chip bar for per-word editing in phrase mode */}
+                {mode === "phrase" && (
                   <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5 px-2 min-h-[28px]">
-                    {currentPhraseWords.length > 0 && (
+                    {currentPhraseWords.length > 1 && (
                       <>
-                        <span className="text-xs text-muted-foreground mr-1">Edit word:</span>
+                        <span className="text-xs text-muted-foreground mr-1 font-medium">Edit word:</span>
                         {currentPhraseWords.map((word, i) => {
                           const isSelected =
                             selectedWordTimestamp &&
@@ -555,12 +550,12 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
                             <button
                               key={`${word.timestamp[0]}-${i}`}
                               onClick={() => handleWordSelect(word.timestamp)}
-                              className={`px-2 py-0.5 text-xs rounded-md border transition-colors ${
+                              className={`px-2.5 py-1 text-xs font-medium rounded-md border transition-colors ${
                                 isSelected
-                                  ? "bg-amber-500 text-white border-amber-500"
+                                  ? "bg-amber-500 text-white border-amber-500 shadow-sm"
                                   : hasOverride
-                                    ? "bg-amber-100 border-amber-300 text-amber-800 hover:bg-amber-200"
-                                    : "bg-muted/50 border-border hover:bg-muted"
+                                    ? "bg-amber-100 border-amber-400 text-amber-900 hover:bg-amber-200"
+                                    : "bg-slate-800 text-white border-slate-700 hover:bg-slate-700"
                               }`}
                             >
                               {word.text}

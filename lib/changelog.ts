@@ -8,7 +8,7 @@
  * - PATCH: Bug fixes and small improvements
  */
 
-export const APP_VERSION = "1.7.0";
+export const APP_VERSION = "1.8.0";
 
 export interface ChangelogEntry {
   version: string;
@@ -21,6 +21,17 @@ export interface ChangelogEntry {
 }
 
 export const changelog: ChangelogEntry[] = [
+  {
+    version: "1.8.0",
+    date: "2026-02-26",
+    title: "Unified Word Editing & Min Words",
+    changes: [
+      { type: "added", description: "Per-word emoji size slider — scale each word's emoji independently from 50% to 200% (appears in word style popover when an emoji is set)" },
+      { type: "changed", description: "Word editing standardized to chip bar below video — works in all modes (3D on/off), replacing direct click-on-word in the preview" },
+      { type: "changed", description: "Min words per line lowered from 3 to 1 — allows single-word-at-a-time subtitle display" },
+      { type: "fixed", description: "Emoji overlay size was not applied during video export — now correctly uses per-word emojiScale in all render paths" },
+    ],
+  },
   {
     version: "1.7.0",
     date: "2026-02-25",

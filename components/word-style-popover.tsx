@@ -121,13 +121,28 @@ export function WordStylePopover({
     onChange(next);
   };
 
+  const handleEmojiScaleChange = (values: number[]) => {
+    const val = values[0] / 100;
+    if (val === 1) {
+      const next = { ...override };
+      delete next.emojiScale;
+      onChange(next);
+    } else {
+      onChange({ ...override, emojiScale: val });
+    }
+  };
+
+  const emojiScalePercent = Math.round((override.emojiScale ?? 1) * 100);
+  const hasEmoji = override.emoji || override.emojiOverlay;
+
   const hasOverrides =
     override.fontFamily !== undefined ||
     override.fontSize !== undefined ||
     override.color !== undefined ||
     override.effect !== undefined ||
     override.emoji !== undefined ||
-    override.emojiOverlay !== undefined;
+    override.emojiOverlay !== undefined ||
+    override.emojiScale !== undefined;
 
   return (
     <div
@@ -308,6 +323,29 @@ export function WordStylePopover({
             )}
           </div>
         </div>
+
+        {/* Emoji Size — shown when emoji replace or overlay is set */}
+        {hasEmoji && (
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium text-slate-600">Emoji Size</label>
+              <span className="text-xs text-slate-400 tabular-nums">{emojiScalePercent}%</span>
+            </div>
+            <Slider
+              value={[emojiScalePercent]}
+              onValueChange={handleEmojiScaleChange}
+              min={50}
+              max={200}
+              step={10}
+              className="w-full"
+            />
+            <div className="flex justify-between text-[10px] text-slate-400">
+              <span>50%</span>
+              <span>100%</span>
+              <span>200%</span>
+            </div>
+          </div>
+        )}
 
         {/* Emoji Picker Dropdown */}
         {showEmojiPicker && (

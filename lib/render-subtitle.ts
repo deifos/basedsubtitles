@@ -423,7 +423,7 @@ function renderDynamicTextBlock(
         // Draw emoji overlay above the word
         if (w.override?.emojiOverlay) {
           const effectiveFontSize = w.override?.fontSize ? Math.round(fontSize * w.override.fontSize) : fontSize;
-          const emojiScale = style.emojiScale ?? 1;
+          const emojiScale = w.override?.emojiScale ?? 1;
           ctx.save();
           ctx.shadowColor = "transparent";
           ctx.shadowBlur = 0;
@@ -987,7 +987,7 @@ function renderPhraseLineWithEmphasis(
 
     // Draw emoji overlay above the word
     if (word.styleOverride?.emojiOverlay) {
-      const emojiScale = style.emojiScale ?? 1;
+      const emojiScale = word.styleOverride?.emojiScale ?? 1;
       ctx.save();
       // Clear stroke/shadow before drawing overlay emoji
       ctx.shadowColor = "transparent";
