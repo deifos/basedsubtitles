@@ -66,6 +66,7 @@ const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
   dynamicFrontYPosition: 75,
   dynamicFollowWord: false,
   textFadeIn: false,
+  emojiScale: 1,
   brandingWatermark: true,
 };
 

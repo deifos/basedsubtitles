@@ -423,6 +423,7 @@ function renderDynamicTextBlock(
         // Draw emoji overlay above the word
         if (w.override?.emojiOverlay) {
           const effectiveFontSize = w.override?.fontSize ? Math.round(fontSize * w.override.fontSize) : fontSize;
+          const emojiScale = style.emojiScale ?? 1;
           ctx.save();
           ctx.shadowColor = "transparent";
           ctx.shadowBlur = 0;
@@ -430,12 +431,12 @@ function renderDynamicTextBlock(
           ctx.shadowOffsetY = 0;
           ctx.strokeStyle = "transparent";
           ctx.lineWidth = 0;
-          const overlayFontSize = effectiveFontSize * 1.4;
+          const overlayFontSize = effectiveFontSize * 1.4 * emojiScale;
           ctx.font = `${overlayFontSize}px sans-serif`;
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
           ctx.fillStyle = "#000000";
-          ctx.fillText(w.override.emojiOverlay, wordX, lineY - effectiveFontSize * 1.2);
+          ctx.fillText(w.override.emojiOverlay, wordX, lineY - effectiveFontSize * 1.2 * emojiScale);
           ctx.restore();
         }
 
@@ -986,6 +987,7 @@ function renderPhraseLineWithEmphasis(
 
     // Draw emoji overlay above the word
     if (word.styleOverride?.emojiOverlay) {
+      const emojiScale = style.emojiScale ?? 1;
       ctx.save();
       // Clear stroke/shadow before drawing overlay emoji
       ctx.shadowColor = "transparent";
@@ -994,12 +996,12 @@ function renderPhraseLineWithEmphasis(
       ctx.shadowOffsetY = 0;
       ctx.strokeStyle = "transparent";
       ctx.lineWidth = 0;
-      const overlayFontSize = effectiveFontSize * 1.4;
+      const overlayFontSize = effectiveFontSize * 1.4 * emojiScale;
       ctx.font = `${overlayFontSize}px sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillStyle = "#000000";
-      ctx.fillText(word.styleOverride.emojiOverlay, wordCenterX, centerY - effectiveFontSize * 1.2);
+      ctx.fillText(word.styleOverride.emojiOverlay, wordCenterX, centerY - effectiveFontSize * 1.2 * emojiScale);
       ctx.restore();
     }
 

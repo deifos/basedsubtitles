@@ -253,15 +253,16 @@ export function VideoCaption({
       const wordOverride = wordChunk?.styleOverride;
 
       // Emoji replace: show emoji instead of text
+      const emojiScale = style.emojiScale ?? 1;
       if (wordOverride?.emoji) {
         return (
           <span style={{ ...baseTypographyStyles, ...metallicTypographyStyles, position: "relative", display: "inline-block" }}>
             {wordOverride.emojiOverlay && (
-              <span style={{ position: "absolute", top: "-1.4em", left: "50%", transform: "translateX(-50%)", fontSize: "1.4em", lineHeight: 1, pointerEvents: "none" }}>
+              <span style={{ position: "absolute", top: `${-1.4 * emojiScale}em`, left: "50%", transform: "translateX(-50%)", fontSize: `${1.4 * emojiScale}em`, lineHeight: 1, pointerEvents: "none" }}>
                 {wordOverride.emojiOverlay}
               </span>
             )}
-            <span style={{ fontSize: "1.2em", lineHeight: 1 }}>{wordOverride.emoji}</span>
+            <span style={{ fontSize: `${1.2 * emojiScale}em`, lineHeight: 1 }}>{wordOverride.emoji}</span>
           </span>
         );
       }
@@ -270,7 +271,7 @@ export function VideoCaption({
       if (wordOverride?.emojiOverlay) {
         return (
           <span style={{ ...baseTypographyStyles, ...metallicTypographyStyles, position: "relative", display: "inline-block" }}>
-            <span style={{ position: "absolute", top: "-1.4em", left: "50%", transform: "translateX(-50%)", fontSize: "1.4em", lineHeight: 1, pointerEvents: "none" }}>
+            <span style={{ position: "absolute", top: `${-1.4 * emojiScale}em`, left: "50%", transform: "translateX(-50%)", fontSize: `${1.4 * emojiScale}em`, lineHeight: 1, pointerEvents: "none" }}>
               {wordOverride.emojiOverlay}
             </span>
             {text}
@@ -389,7 +390,8 @@ export function VideoCaption({
           // Letter-by-letter fade: compute per-char alphas
           const renderWordContent = () => {
             // Emoji replace: render emoji instead of text, skip letter fade
-            if (hasEmojiReplace) return <span style={{ fontSize: "1.2em", lineHeight: 1 }}>{word.styleOverride!.emoji}</span>;
+            const eScale = style.emojiScale ?? 1;
+            if (hasEmojiReplace) return <span style={{ fontSize: `${1.2 * eScale}em`, lineHeight: 1 }}>{word.styleOverride!.emoji}</span>;
 
             if (!textFadeIn || isKnockout) return word.text;
             const wordDuration = word.timestamp[1] - word.timestamp[0];
@@ -426,7 +428,7 @@ export function VideoCaption({
                 className={onWordSelect ? "pointer-events-auto" : undefined}
               >
                 {hasEmojiOverlay && (
-                  <span style={{ position: "absolute", top: "-1.4em", left: "50%", transform: "translateX(-50%)", fontSize: "1.4em", lineHeight: 1, pointerEvents: "none" }}>
+                  <span style={{ position: "absolute", top: `${-1.4 * (style.emojiScale ?? 1)}em`, left: "50%", transform: "translateX(-50%)", fontSize: `${1.4 * (style.emojiScale ?? 1)}em`, lineHeight: 1, pointerEvents: "none" }}>
                     {word.styleOverride!.emojiOverlay}
                   </span>
                 )}
