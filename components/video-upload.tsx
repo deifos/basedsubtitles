@@ -62,22 +62,22 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const animFrameRef = useRef<number>(0);
     const blurCanvasRef = useRef<HTMLCanvasElement | null>(null);
-    const seekBarRef = useRef<HTMLInputElement>(null);
+    const seekBarFillRef = useRef<HTMLDivElement>(null);
     const timeDisplayRef = useRef<HTMLSpanElement>(null);
-    // Transient seeking state stored in refs to avoid re-renders on every drag frame
+    // Transient seeking state in refs — avoids re-renders during drag
     const seekingRef = useRef(false);
     const seekValueRef = useRef(0);
 
-    // Sync seek bar + time display from currentTime prop, skip while dragging
+    // Sync progress bar fill + time display from currentTime prop, skip while dragging
     useEffect(() => {
       if (seekingRef.current) return;
-      if (seekBarRef.current) {
-        seekBarRef.current.value = String(currentTime);
+      if (seekBarFillRef.current && duration > 0) {
+        seekBarFillRef.current.style.width = `${(currentTime / duration) * 100}%`;
       }
       if (timeDisplayRef.current) {
         timeDisplayRef.current.textContent = formatTime(currentTime);
       }
-    }, [currentTime]);
+    }, [currentTime, duration]);
 
     // Whether compositing mode is active
     const isDynamicMode = subtitleStyle.dynamicEnabled && bgRemovalReady && getMaskAtTime;
@@ -209,6 +209,9 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
     // Function to handle time updates and skip disabled segments
     const handleTimeUpdate = useCallback(
       (e: React.SyntheticEvent<HTMLVideoElement>) => {
+        // During seeking the progress bar drives time — ignore video timeupdate
+        if (seekingRef.current) return;
+
         const video = e.currentTarget;
         const currentTime = video.currentTime;
 
@@ -551,45 +554,79 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
                   {formatTime(currentTime)}
                 </span>
 
-                {/* Seek bar — uncontrolled during drag, synced via ref (no re-renders).
-                    Only seeks video on release to avoid overwhelming the mobile decoder. */}
-                <input
-                  ref={seekBarRef}
-                  type="range"
-                  min={0}
-                  max={duration || 1}
-                  step={0.01}
-                  defaultValue={0}
-                  onPointerDown={() => {
+                {/* Custom progress bar — div-based with pointer capture for reliable mobile touch.
+                    No pause/resume during drag (avoids mobile autoplay restrictions).
+                    Seeks video only on release (avoids overwhelming mobile decoder).
+                    Calls onTimeUpdate during drag so subtitles stay in sync. */}
+                <div
+                  role="slider"
+                  tabIndex={0}
+                  aria-valuemin={0}
+                  aria-valuemax={duration || 1}
+                  aria-valuenow={currentTime}
+                  aria-label="Seek"
+                  className="flex-1 h-8 flex items-center cursor-pointer touch-none select-none"
+                  onPointerDown={(e) => {
                     seekingRef.current = true;
-                    seekValueRef.current = currentTime;
-                    const videoEl = ref && typeof ref !== "function" ? ref.current : null;
-                    if (videoEl && !videoEl.paused) {
-                      videoEl.pause();
-                      videoEl.dataset.wasPlaying = "1";
-                    }
+                    e.currentTarget.setPointerCapture(e.pointerId);
+
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const fraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                    const time = fraction * (duration || 1);
+                    seekValueRef.current = time;
+
+                    if (seekBarFillRef.current) seekBarFillRef.current.style.width = `${fraction * 100}%`;
+                    if (timeDisplayRef.current) timeDisplayRef.current.textContent = formatTime(time);
+                    onTimeUpdate?.(time);
                   }}
-                  onChange={(e) => {
-                    const val = parseFloat(e.target.value);
-                    seekValueRef.current = val;
-                    // Update time display directly via DOM — no setState, no re-render
-                    if (timeDisplayRef.current) {
-                      timeDisplayRef.current.textContent = formatTime(val);
-                    }
+                  onPointerMove={(e) => {
+                    if (!seekingRef.current) return;
+
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const fraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                    const time = fraction * (duration || 1);
+                    seekValueRef.current = time;
+
+                    if (seekBarFillRef.current) seekBarFillRef.current.style.width = `${fraction * 100}%`;
+                    if (timeDisplayRef.current) timeDisplayRef.current.textContent = formatTime(time);
+                    onTimeUpdate?.(time);
                   }}
                   onPointerUp={() => {
+                    seekingRef.current = false;
                     const videoEl = ref && typeof ref !== "function" ? ref.current : null;
                     if (videoEl) {
                       videoEl.currentTime = seekValueRef.current;
-                      if (videoEl.dataset.wasPlaying === "1") {
-                        delete videoEl.dataset.wasPlaying;
-                        videoEl.play().catch(() => {});
+                    }
+                  }}
+                  onLostPointerCapture={() => {
+                    // Fallback if pointer capture is lost (e.g. browser tab switch)
+                    if (seekingRef.current) {
+                      seekingRef.current = false;
+                      const videoEl = ref && typeof ref !== "function" ? ref.current : null;
+                      if (videoEl) {
+                        videoEl.currentTime = seekValueRef.current;
                       }
                     }
-                    seekingRef.current = false;
                   }}
-                  className="flex-1 h-1 appearance-none bg-white/30 rounded-full cursor-pointer touch-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-0"
-                />
+                  onKeyDown={(e) => {
+                    const videoEl = ref && typeof ref !== "function" ? ref.current : null;
+                    if (!videoEl) return;
+                    if (e.key === "ArrowLeft") {
+                      videoEl.currentTime = Math.max(0, videoEl.currentTime - 5);
+                      e.preventDefault();
+                    } else if (e.key === "ArrowRight") {
+                      videoEl.currentTime = Math.min(duration, videoEl.currentTime + 5);
+                      e.preventDefault();
+                    }
+                  }}
+                >
+                  <div className="relative w-full h-1 bg-white/30 rounded-full overflow-hidden">
+                    <div
+                      ref={seekBarFillRef}
+                      className="absolute inset-y-0 left-0 bg-white rounded-full"
+                    />
+                  </div>
+                </div>
 
                 {/* Duration */}
                 <span className="text-white text-xs tabular-nums shrink-0">
