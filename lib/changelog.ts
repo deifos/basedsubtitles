@@ -27,8 +27,11 @@ export const changelog: ChangelogEntry[] = [
     title: "Mobile Playback & Camera Fixes",
     changes: [
       { type: "fixed", description: "Camera recording showed black screen on mobile — video element didn't exist in the DOM when the stream was attached; now re-attaches via useEffect when the preview mounts" },
-      { type: "fixed", description: "Video seek bar unresponsive to touch drag on mobile — controlled React value fought with touch events; now uses local seeking state so dragging isn't overridden by timeupdate" },
-      { type: "fixed", description: "Video freezing after a few seconds on mobile — added preload=\"auto\" so mobile browsers fully buffer the video instead of lazy-loading" },
+      { type: "fixed", description: "Video seek bar unresponsive to touch drag on mobile — controlled React value fought with touch events; seek bar is now uncontrolled during drag with ref-based DOM updates (zero re-renders while dragging)" },
+      { type: "fixed", description: "Video freezing when scrubbing on mobile — was setting videoEl.currentTime on every drag frame, overwhelming the decoder; now only seeks once on pointer release (mediabunny pattern)" },
+      { type: "fixed", description: "Video not buffering fully on mobile — added preload=\"auto\" so mobile browsers load the complete video instead of lazy-loading" },
+      { type: "changed", description: "Seek bar and time display use refs for transient drag state instead of useState, eliminating unnecessary re-renders during scrubbing (Vercel React best practice: useRef for transient values)" },
+      { type: "changed", description: "Seek bar pauses video on drag start and resumes on release, preventing playback from fighting with seek operations" },
       { type: "changed", description: "Seek bar thumb enlarged from 12px to 16px for easier touch targeting on mobile" },
       { type: "changed", description: "Seek bar uses touch-none CSS to prevent browser gestures from intercepting scrubbing" },
     ],

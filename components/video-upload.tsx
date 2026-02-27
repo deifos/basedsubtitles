@@ -58,13 +58,26 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
     const [isPlaying, setIsPlaying] = useState(false);
     const [duration, setDuration] = useState(0);
     const [isMuted, setIsMuted] = useState(false);
-    const [isSeeking, setIsSeeking] = useState(false);
-    const [seekValue, setSeekValue] = useState(0);
     const processedFileRef = useRef<File | null>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const animFrameRef = useRef<number>(0);
     const blurCanvasRef = useRef<HTMLCanvasElement | null>(null);
     const seekBarRef = useRef<HTMLInputElement>(null);
+    const timeDisplayRef = useRef<HTMLSpanElement>(null);
+    // Transient seeking state stored in refs to avoid re-renders on every drag frame
+    const seekingRef = useRef(false);
+    const seekValueRef = useRef(0);
+
+    // Sync seek bar + time display from currentTime prop, skip while dragging
+    useEffect(() => {
+      if (seekingRef.current) return;
+      if (seekBarRef.current) {
+        seekBarRef.current.value = String(currentTime);
+      }
+      if (timeDisplayRef.current) {
+        timeDisplayRef.current.textContent = formatTime(currentTime);
+      }
+    }, [currentTime]);
 
     // Whether compositing mode is active
     const isDynamicMode = subtitleStyle.dynamicEnabled && bgRemovalReady && getMaskAtTime;
@@ -533,37 +546,48 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
                   {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                 </button>
 
-                {/* Time */}
-                <span className="text-white text-xs tabular-nums shrink-0">
+                {/* Time — updated via ref during drag to avoid re-renders */}
+                <span ref={timeDisplayRef} className="text-white text-xs tabular-nums shrink-0">
                   {formatTime(currentTime)}
                 </span>
 
-                {/* Seek bar — uses local state while dragging so mobile touch doesn't fight React */}
+                {/* Seek bar — uncontrolled during drag, synced via ref (no re-renders).
+                    Only seeks video on release to avoid overwhelming the mobile decoder. */}
                 <input
                   ref={seekBarRef}
                   type="range"
                   min={0}
                   max={duration || 1}
                   step={0.01}
-                  value={isSeeking ? seekValue : currentTime}
+                  defaultValue={0}
                   onPointerDown={() => {
-                    setIsSeeking(true);
-                    setSeekValue(currentTime);
-                  }}
-                  onTouchStart={() => {
-                    setIsSeeking(true);
-                    setSeekValue(currentTime);
+                    seekingRef.current = true;
+                    seekValueRef.current = currentTime;
+                    const videoEl = ref && typeof ref !== "function" ? ref.current : null;
+                    if (videoEl && !videoEl.paused) {
+                      videoEl.pause();
+                      videoEl.dataset.wasPlaying = "1";
+                    }
                   }}
                   onChange={(e) => {
                     const val = parseFloat(e.target.value);
-                    setSeekValue(val);
-                    const videoEl = ref && typeof ref !== "function" ? ref.current : null;
-                    if (videoEl) {
-                      videoEl.currentTime = val;
+                    seekValueRef.current = val;
+                    // Update time display directly via DOM — no setState, no re-render
+                    if (timeDisplayRef.current) {
+                      timeDisplayRef.current.textContent = formatTime(val);
                     }
                   }}
-                  onPointerUp={() => setIsSeeking(false)}
-                  onTouchEnd={() => setIsSeeking(false)}
+                  onPointerUp={() => {
+                    const videoEl = ref && typeof ref !== "function" ? ref.current : null;
+                    if (videoEl) {
+                      videoEl.currentTime = seekValueRef.current;
+                      if (videoEl.dataset.wasPlaying === "1") {
+                        delete videoEl.dataset.wasPlaying;
+                        videoEl.play().catch(() => {});
+                      }
+                    }
+                    seekingRef.current = false;
+                  }}
                   className="flex-1 h-1 appearance-none bg-white/30 rounded-full cursor-pointer touch-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-0"
                 />
 
