@@ -106,6 +106,21 @@ export function useCameraRecording(): UseCameraRecordingReturn {
     }
   }, []);
 
+  // On mobile, the <video> element doesn't exist during "requesting" state
+  // (component renders a spinner instead). When state transitions to "previewing"
+  // the element mounts but srcObject was never set. This effect re-attaches it.
+  useEffect(() => {
+    if (
+      previewRef.current &&
+      streamRef.current &&
+      (state === "previewing" || state === "recording") &&
+      previewRef.current.srcObject !== streamRef.current
+    ) {
+      previewRef.current.srcObject = streamRef.current;
+      previewRef.current.play().catch(() => {});
+    }
+  }, [state]);
+
   const requestStream = useCallback(
     async (facing: "user" | "environment"): Promise<MediaStream> => {
       try {

@@ -58,6 +58,8 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
     const [isPlaying, setIsPlaying] = useState(false);
     const [duration, setDuration] = useState(0);
     const [isMuted, setIsMuted] = useState(false);
+    const [isSeeking, setIsSeeking] = useState(false);
+    const [seekValue, setSeekValue] = useState(0);
     const processedFileRef = useRef<File | null>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const animFrameRef = useRef<number>(0);
@@ -431,6 +433,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
                 ref={ref}
                 src={videoSrc}
                 playsInline
+                preload="auto"
                 className={cn(
                   ratio === "16:9"
                     ? "object-cover w-full max-w-4xl max-h-[500px]"
@@ -535,21 +538,33 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
                   {formatTime(currentTime)}
                 </span>
 
-                {/* Seek bar */}
+                {/* Seek bar — uses local state while dragging so mobile touch doesn't fight React */}
                 <input
                   ref={seekBarRef}
                   type="range"
                   min={0}
                   max={duration || 1}
-                  step={0.1}
-                  value={currentTime}
+                  step={0.01}
+                  value={isSeeking ? seekValue : currentTime}
+                  onPointerDown={() => {
+                    setIsSeeking(true);
+                    setSeekValue(currentTime);
+                  }}
+                  onTouchStart={() => {
+                    setIsSeeking(true);
+                    setSeekValue(currentTime);
+                  }}
                   onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    setSeekValue(val);
                     const videoEl = ref && typeof ref !== "function" ? ref.current : null;
                     if (videoEl) {
-                      videoEl.currentTime = parseFloat(e.target.value);
+                      videoEl.currentTime = val;
                     }
                   }}
-                  className="flex-1 h-1 appearance-none bg-white/30 rounded-full cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-0"
+                  onPointerUp={() => setIsSeeking(false)}
+                  onTouchEnd={() => setIsSeeking(false)}
+                  className="flex-1 h-1 appearance-none bg-white/30 rounded-full cursor-pointer touch-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-0"
                 />
 
                 {/* Duration */}
