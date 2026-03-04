@@ -19,6 +19,7 @@ import {
   renderDynamicFrontText,
   estimateFaceFromMask,
 } from "@/lib/render-subtitle";
+import { computeCropX } from "@/lib/person-tracking";
 
 interface VideoUploadProps {
   onVideoSelect: (file: File) => void;
@@ -43,6 +44,8 @@ interface VideoUploadProps {
   initialFile?: File | null;
   bgRemovalReady?: boolean;
   getMaskAtTime?: (time: number, fps?: number) => MaskData | null;
+  getCenterX?: () => number;
+  isFaceTrackingActive?: boolean;
 }
 
 const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
@@ -61,6 +64,8 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
       initialFile,
       bgRemovalReady = false,
       getMaskAtTime,
+      getCenterX,
+      isFaceTrackingActive = false,
     },
     ref,
   ) => {
@@ -72,7 +77,9 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
     const [isMuted, setIsMuted] = useState(false);
     const processedFileRef = useRef<File | null>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const faceTrackCanvasRef = useRef<HTMLCanvasElement>(null);
     const animFrameRef = useRef<number>(0);
+    const faceTrackAnimFrameRef = useRef<number>(0);
     const blurCanvasRef = useRef<HTMLCanvasElement | null>(null);
     const seekBarFillRef = useRef<HTMLDivElement>(null);
     const timeDisplayRef = useRef<HTMLSpanElement>(null);
@@ -333,7 +340,11 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
           if (videoAR > canvasAR) {
             // Video is wider — crop sides
             sw = Math.round(vh * canvasAR);
-            sx = Math.round((vw - sw) / 2);
+            if (isFaceTrackingActive && getCenterX) {
+              sx = computeCropX(getCenterX(), vw, sw);
+            } else {
+              sx = Math.round((vw - sw) / 2);
+            }
           } else {
             // Video is taller — crop top/bottom
             sh = Math.round(vw / canvasAR);
@@ -491,7 +502,88 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
       transcript,
       mode,
       getMaskAtTime,
+      isFaceTrackingActive,
+      getCenterX,
     ]);
+
+    // Non-compositing face tracking canvas loop:
+    // When face tracking is active but compositing is NOT active,
+    // render a canvas that mirrors the video with dynamic crop.
+    const needsFaceTrackCanvas =
+      isFaceTrackingActive && !compositingActive && ratio === "9:16";
+
+    useEffect(() => {
+      if (!needsFaceTrackCanvas || !faceTrackCanvasRef.current) {
+        if (faceTrackAnimFrameRef.current) {
+          cancelAnimationFrame(faceTrackAnimFrameRef.current);
+          faceTrackAnimFrameRef.current = 0;
+        }
+        return;
+      }
+
+      const videoEl = ref && typeof ref !== "function" ? ref.current : null;
+      if (!videoEl) return;
+
+      const canvas = faceTrackCanvasRef.current;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      let lastRenderedTime = -1;
+
+      const render = () => {
+        if (!videoEl) {
+          faceTrackAnimFrameRef.current = requestAnimationFrame(render);
+          return;
+        }
+
+        const time = videoEl.currentTime;
+        if (videoEl.paused && time === lastRenderedTime) {
+          faceTrackAnimFrameRef.current = requestAnimationFrame(render);
+          return;
+        }
+        lastRenderedTime = time;
+
+        const displayWidth = canvas.clientWidth;
+        const displayHeight = canvas.clientHeight;
+        if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
+          canvas.width = displayWidth;
+          canvas.height = displayHeight;
+        }
+
+        const vw = videoEl.videoWidth;
+        const vh = videoEl.videoHeight;
+        const w = canvas.width;
+        const h = canvas.height;
+        const canvasAR = w / h;
+        const videoAR = vw / vh;
+
+        let sx = 0,
+          sy = 0,
+          sw = vw,
+          sh = vh;
+        if (videoAR > canvasAR) {
+          sw = Math.round(vh * canvasAR);
+          sx = getCenterX
+            ? computeCropX(getCenterX(), vw, sw)
+            : Math.round((vw - sw) / 2);
+        } else if (videoAR < canvasAR) {
+          sh = Math.round(vw / canvasAR);
+          sy = Math.round((vh - sh) / 2);
+        }
+
+        ctx.drawImage(videoEl, sx, sy, sw, sh, 0, 0, w, h);
+        faceTrackAnimFrameRef.current = requestAnimationFrame(render);
+      };
+
+      faceTrackAnimFrameRef.current = requestAnimationFrame(render);
+
+      return () => {
+        if (faceTrackAnimFrameRef.current) {
+          cancelAnimationFrame(faceTrackAnimFrameRef.current);
+          faceTrackAnimFrameRef.current = 0;
+        }
+      };
+    }, [needsFaceTrackCanvas, ref, ratio, getCenterX]);
 
     return (
       <div
@@ -530,6 +622,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
                       : ratio === "9:16" && !zoomPortrait
                         ? "object-cover h-[500px] max-h-[500px]"
                         : "object-contain h-[500px] max-h-[500px]",
+                    needsFaceTrackCanvas && "invisible",
                   )}
                   onTimeUpdate={handleTimeUpdate}
                   onPlay={() => setIsPlaying(true)}
@@ -538,7 +631,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
                     setDuration(e.currentTarget.duration)
                   }
                   onClick={() => {
-                    if (!compositingActive) {
+                    if (!compositingActive && !needsFaceTrackCanvas) {
                       const videoEl =
                         ref && typeof ref !== "function" ? ref.current : null;
                       if (videoEl) {
@@ -566,6 +659,29 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
                     )}
                     style={{
                       aspectRatio: ratio === "16:9" ? "16/9" : "9/16",
+                    }}
+                    onClick={() => {
+                      const videoEl =
+                        ref && typeof ref !== "function" ? ref.current : null;
+                      if (videoEl) {
+                        if (videoEl.paused) videoEl.play().catch(() => {});
+                        else videoEl.pause();
+                      }
+                    }}
+                  />
+                )}
+                {/* Canvas overlay for face-tracking crop (non-compositing mode) */}
+                {needsFaceTrackCanvas && (
+                  <canvas
+                    ref={faceTrackCanvasRef}
+                    className={cn(
+                      "absolute inset-0 cursor-pointer",
+                      ratio === "9:16" && zoomPortrait
+                        ? "h-[500px] max-h-[500px] mx-auto"
+                        : "h-[500px] max-h-[500px] mx-auto",
+                    )}
+                    style={{
+                      aspectRatio: "9/16",
                     }}
                     onClick={() => {
                       const videoEl =

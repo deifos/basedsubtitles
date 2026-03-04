@@ -21,6 +21,11 @@ import { SubtitleStyle } from "@/components/subtitle-styling";
 import { processTranscriptChunks, type WordStyleOverride } from "@/lib/utils";
 import { estimateFaceFromMask, type FaceBounds } from "@/lib/render-subtitle";
 import type { MaskData } from "@/hooks/useBackgroundRemoval";
+import {
+  type PositionTimeline,
+  interpolateCenterX,
+  computeCropX,
+} from "@/lib/person-tracking";
 
 // Shared font mapping — CSS custom properties to actual font names for Canvas rendering
 const FONT_MAPPINGS: Record<string, string> = {
@@ -90,6 +95,9 @@ interface UseVideoDownloadMediaBunnyProps {
     frameIndex: number,
   ) => Promise<MaskData>;
   getMaskAtTime?: (time: number, fps?: number) => MaskData | null;
+  buildExportTimeline?: (
+    videoElement: HTMLVideoElement,
+  ) => Promise<PositionTimeline>;
 }
 
 // Quality mapping
@@ -157,6 +165,7 @@ export function useVideoDownloadMediaBunny({
   bgRemovalReady = false,
   processFrame: bgProcessFrame,
   getMaskAtTime,
+  buildExportTimeline,
 }: UseVideoDownloadMediaBunnyProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -236,6 +245,13 @@ export function useVideoDownloadMediaBunny({
       canvas.width = exportWidth;
       canvas.height = exportHeight;
       const needsCrop = ratio === "9:16" && isLandscape;
+
+      // Build face tracking timeline for dynamic crop during export
+      let faceTimeline: PositionTimeline | null = null;
+      if (needsCrop && buildExportTimeline) {
+        setStatus("Analyzing face positions...");
+        faceTimeline = await buildExportTimeline(video);
+      }
 
       // For crop mode, sample.draw() doesn't support source crop, so decode
       // to a full-resolution canvas first, then blit the cropped region.
@@ -384,6 +400,11 @@ export function useVideoDownloadMediaBunny({
           );
         }
 
+        // Compute per-frame crop X (face tracking or static center)
+        const frameCropX = faceTimeline
+          ? computeCropX(interpolateCenterX(faceTimeline, time), srcW, cropW)
+          : cropX;
+
         // Clear canvas
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -398,7 +419,7 @@ export function useVideoDownloadMediaBunny({
                 sample.draw(decodeCtx, 0, 0, srcW, srcH);
                 ctx.drawImage(
                   decodeCanvas,
-                  cropX,
+                  frameCropX,
                   cropY,
                   cropW,
                   cropH,
@@ -435,7 +456,7 @@ export function useVideoDownloadMediaBunny({
           if (needsCrop) {
             ctx.drawImage(
               video,
-              cropX,
+              frameCropX,
               cropY,
               cropW,
               cropH,
@@ -594,7 +615,7 @@ export function useVideoDownloadMediaBunny({
               fgCtx.globalCompositeOperation = "destination-in";
               if (needsCrop && cachedMask) {
                 // Cached masks cover the full video frame — crop to match
-                const msx = (cropX / srcW) * mask.width;
+                const msx = (frameCropX / srcW) * mask.width;
                 const msy = (cropY / srcH) * mask.height;
                 const msw = (cropW / srcW) * mask.width;
                 const msh = (cropH / srcH) * mask.height;

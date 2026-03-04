@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@huggingface/transformers": "^3.7.3",
+    "@mediapipe/tasks-vision": "^0.10.32",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-progress": "^1.1.7",
     "@radix-ui/react-scroll-area": "^1.2.10",

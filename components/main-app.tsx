@@ -22,6 +22,7 @@ import {
 } from "@/hooks/useTranscription";
 import { useVideoDownloadMediaBunny } from "@/hooks/useVideoDownloadMediaBunny";
 import { useBackgroundRemoval } from "@/hooks/useBackgroundRemoval";
+import { useFaceTracking } from "@/hooks/useFaceTracking";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { type LanguageCode } from "@/components/language-selector";
 import { LanguageSelectionModal } from "@/components/language-selection-modal";
@@ -113,6 +114,50 @@ export function MainApp({
     processFrame: bgProcessFrame,
   } = useBackgroundRemoval();
 
+  const {
+    isLoading: isFaceTrackingLoading,
+    startTracking,
+    stopTracking,
+    getCenterX,
+    buildExportTimeline,
+  } = useFaceTracking();
+
+  // Track whether face tracking is actively running
+  const [isFaceTrackingActive, setIsFaceTrackingActive] = useState(false);
+
+  // Start/stop face tracking based on ratio and video availability
+  useEffect(() => {
+    const videoEl = videoRef.current;
+    if (!videoEl || !videoEl.src || videoEl.src === window.location.href) {
+      return;
+    }
+
+    const tryStart = () => {
+      if (!videoEl.videoWidth) return; // metadata not loaded yet
+      const isLandscape = videoEl.videoWidth > videoEl.videoHeight;
+      if (ratio === "9:16" && isLandscape) {
+        startTracking(videoEl);
+        setIsFaceTrackingActive(true);
+      } else {
+        stopTracking();
+        setIsFaceTrackingActive(false);
+      }
+    };
+
+    // If metadata is already loaded, start immediately
+    if (videoEl.readyState >= 1) {
+      tryStart();
+    } else {
+      videoEl.addEventListener("loadedmetadata", tryStart, { once: true });
+    }
+
+    return () => {
+      videoEl.removeEventListener("loadedmetadata", tryStart);
+      stopTracking();
+      setIsFaceTrackingActive(false);
+    };
+  }, [ratio, startTracking, stopTracking]);
+
   const handleVideoSelect = useCallback(
     (file: File) => {
       setUploadedFile(file);
@@ -184,6 +229,7 @@ export function MainApp({
     bgRemovalReady,
     processFrame: bgProcessFrame,
     getMaskAtTime,
+    buildExportTimeline,
   });
 
   const handleRemoveBackground = useCallback(async () => {
@@ -206,6 +252,10 @@ export function MainApp({
   const handleResetVideo = useCallback(() => {
     // Reset transcription state
     resetTranscription();
+
+    // Reset face tracking
+    stopTracking();
+    setIsFaceTrackingActive(false);
 
     // Reset background removal
     resetBgRemoval();
@@ -234,7 +284,7 @@ export function MainApp({
     }
 
     onReturnToLanding?.();
-  }, [resetTranscription, resetBgRemoval, onReturnToLanding]);
+  }, [resetTranscription, resetBgRemoval, stopTracking, onReturnToLanding]);
 
   const handleModalClose = useCallback(() => {
     if (previousResultRef.current && !result) {
@@ -576,6 +626,8 @@ export function MainApp({
                     initialFile={initialFile}
                     bgRemovalReady={bgRemovalReady}
                     getMaskAtTime={getMaskAtTime}
+                    getCenterX={getCenterX}
+                    isFaceTrackingActive={isFaceTrackingActive}
                   />
                   {/* Desktop: full overlay popover on video */}
                   {selectedWordInfo && selectedWordTimestamp && (
