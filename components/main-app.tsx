@@ -6,7 +6,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { BuyMeCoffee } from "@/components/buy-me-coffee";
 import { VideoUpload } from "@/components/video-upload";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Upload, Download, Video, ZoomIn, ZoomOut } from "lucide-react";
+import { Upload, Download, Video, ZoomIn, ZoomOut, ScanFace } from "lucide-react";
 import { TranscriptSidebar } from "@/components/transcript-sidebar";
 import { SubtitleStyling, SubtitleStyle } from "@/components/subtitle-styling";
 import { WordStylePopover } from "@/components/word-style-popover";
@@ -122,10 +122,12 @@ export function MainApp({
     buildExportTimeline,
   } = useFaceTracking();
 
-  // Track whether face tracking is actively running
+  // User toggle for face tracking + whether it's actively running
+  const [faceTrackingEnabled, setFaceTrackingEnabled] = useState(true);
   const [isFaceTrackingActive, setIsFaceTrackingActive] = useState(false);
+  const [isVideoLandscape, setIsVideoLandscape] = useState(false);
 
-  // Start/stop face tracking based on ratio and video availability
+  // Start/stop face tracking based on ratio, toggle, and video availability
   useEffect(() => {
     const videoEl = videoRef.current;
     if (!videoEl || !videoEl.src || videoEl.src === window.location.href) {
@@ -135,7 +137,8 @@ export function MainApp({
     const tryStart = () => {
       if (!videoEl.videoWidth) return; // metadata not loaded yet
       const isLandscape = videoEl.videoWidth > videoEl.videoHeight;
-      if (ratio === "9:16" && isLandscape) {
+      setIsVideoLandscape(isLandscape);
+      if (ratio === "9:16" && isLandscape && faceTrackingEnabled) {
         startTracking(videoEl);
         setIsFaceTrackingActive(true);
       } else {
@@ -156,7 +159,7 @@ export function MainApp({
       stopTracking();
       setIsFaceTrackingActive(false);
     };
-  }, [ratio, startTracking, stopTracking]);
+  }, [ratio, faceTrackingEnabled, startTracking, stopTracking]);
 
   const handleVideoSelect = useCallback(
     (file: File) => {
@@ -229,7 +232,7 @@ export function MainApp({
     bgRemovalReady,
     processFrame: bgProcessFrame,
     getMaskAtTime,
-    buildExportTimeline,
+    buildExportTimeline: faceTrackingEnabled ? buildExportTimeline : undefined,
   });
 
   const handleRemoveBackground = useCallback(async () => {
@@ -256,6 +259,7 @@ export function MainApp({
     // Reset face tracking
     stopTracking();
     setIsFaceTrackingActive(false);
+    setIsVideoLandscape(false);
 
     // Reset background removal
     resetBgRemoval();
@@ -727,6 +731,21 @@ export function MainApp({
                         </Button>
                       )}
                     </div>
+                    {ratio === "9:16" && isVideoLandscape && (
+                      <Button
+                        variant={faceTrackingEnabled ? "default" : "outline"}
+                        size="sm"
+                        onClick={() =>
+                          setFaceTrackingEnabled((prev) => !prev)
+                        }
+                        className="flex items-center gap-2"
+                      >
+                        <ScanFace className="h-4 w-4" />
+                        {faceTrackingEnabled
+                          ? "Person tracking on"
+                          : "Person tracking off"}
+                      </Button>
+                    )}
 
                     {/* Background Removal */}
                     {!bgRemovalReady && (
