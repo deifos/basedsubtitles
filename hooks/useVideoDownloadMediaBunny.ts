@@ -414,9 +414,17 @@ export function useVideoDownloadMediaBunny({
           );
         }
 
-        // Compute per-frame crop X (face tracking or static center)
+        // Compute per-frame crop X (face tracking or static center).
+        // Look ahead slightly to compensate for EMA smoothing lag — during
+        // preview the crop and detection run in the same rAF tick so the
+        // lag is imperceptible, but in export it manifests as a visible delay.
+        const FACE_TRACK_LOOKAHEAD = 0.15; // seconds
         const frameCropX = faceTimeline
-          ? computeCropX(interpolateCenterX(faceTimeline, time), srcW, cropW)
+          ? computeCropX(
+              interpolateCenterX(faceTimeline, time + FACE_TRACK_LOOKAHEAD),
+              srcW,
+              cropW,
+            )
           : cropX;
 
         // Clear canvas
