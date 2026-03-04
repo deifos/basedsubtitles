@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, useMemo, useState, useRef, useEffect } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import {
@@ -14,6 +14,7 @@ import {
 import { FONT_FAMILIES } from "@/components/subtitle-styling";
 import { X, RotateCcw, Type, Palette, Zap, Smile, ALargeSmall } from "lucide-react";
 import { cn, type WordStyleOverride } from "@/lib/utils";
+import { DebouncedColorInput } from "@/components/ui/debounced-color-input";
 import dynamic from "next/dynamic";
 
 const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false });
@@ -74,8 +75,8 @@ export function WordStylePopover({
     }
   };
 
-  const handleColorChange = (e: ChangeEvent<HTMLInputElement>) => {
-    onChange({ ...override, color: e.target.value });
+  const handleColorChange = (color: string) => {
+    onChange({ ...override, color });
   };
 
   const handleClearColor = () => {
@@ -213,8 +214,7 @@ export function WordStylePopover({
     <div className="space-y-1.5">
       {!compact && <label className="text-xs font-medium text-slate-600 block">Color</label>}
       <div className="flex items-center gap-2">
-        <input
-          type="color"
+        <DebouncedColorInput
           value={override.color ?? "#FFFFFF"}
           onChange={handleColorChange}
           className="w-8 h-8 rounded cursor-pointer border border-slate-200"

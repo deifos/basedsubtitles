@@ -1,6 +1,6 @@
 "use client";
 
-import { CSSProperties, ChangeEvent, useMemo } from "react";
+import { CSSProperties, useMemo } from "react";
 
 import {
   Select,
@@ -14,6 +14,7 @@ import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DebouncedColorInput } from "@/components/ui/debounced-color-input";
 
 // Helper to check if a color is effectively transparent
 function isTransparentColor(color: string): boolean {
@@ -462,20 +463,20 @@ export function SubtitleStyling({
     onChange({ ...style, fontWeight: value });
   };
 
-  const handleColorChange = (event: ChangeEvent<HTMLInputElement>) => {
-    onChange({ ...style, color: event.target.value });
+  const handleColorChange = (color: string) => {
+    onChange({ ...style, color });
   };
 
-  const handleBackgroundColorChange = (event: ChangeEvent<HTMLInputElement>) => {
-    onChange({ ...style, backgroundColor: event.target.value });
+  const handleBackgroundColorChange = (color: string) => {
+    onChange({ ...style, backgroundColor: color });
   };
 
   const handleBorderWidthChange = (value: string) => {
     onChange({ ...style, borderWidth: Number(value) });
   };
 
-  const handleBorderColorChange = (event: ChangeEvent<HTMLInputElement>) => {
-    onChange({ ...style, borderColor: event.target.value });
+  const handleBorderColorChange = (color: string) => {
+    onChange({ ...style, borderColor: color });
   };
 
   const handleDropShadowIntensityChange = (value: number) => {
@@ -806,8 +807,7 @@ export function SubtitleStyling({
         <div className="space-y-2">
           <label className="text-sm font-medium block">Text Color</label>
           <div className="flex items-center gap-2">
-            <input
-              type="color"
+            <DebouncedColorInput
               value={style.color}
               onChange={handleColorChange}
               className="w-10 h-10 rounded cursor-pointer"
@@ -835,8 +835,7 @@ export function SubtitleStyling({
             </div>
             {!isTransparentColor(style.backgroundColor) && (
               <div className="flex items-center gap-2">
-                <input
-                  type="color"
+                <DebouncedColorInput
                   value={rgbaToHex(style.backgroundColor)}
                   onChange={handleBackgroundColorChange}
                   className="w-10 h-10 rounded cursor-pointer"
@@ -869,8 +868,7 @@ export function SubtitleStyling({
           <div className="space-y-2">
             <label className="text-sm font-medium block">Border Color</label>
             <div className="flex items-center gap-2">
-              <input
-                type="color"
+              <DebouncedColorInput
                 value={style.borderColor}
                 onChange={handleBorderColorChange}
                 className="w-10 h-10 rounded cursor-pointer"
@@ -982,11 +980,10 @@ export function SubtitleStyling({
                   <div className="space-y-2">
                     <label className="text-sm font-medium block">Background Color</label>
                     <div className="flex items-center gap-2">
-                      <input
-                        type="color"
+                      <DebouncedColorInput
                         value={style.solidBackgroundColor}
-                        onChange={(e) =>
-                          onChange({ ...style, solidBackgroundColor: e.target.value })
+                        onChange={(color) =>
+                          onChange({ ...style, solidBackgroundColor: color })
                         }
                         className="w-10 h-10 rounded cursor-pointer"
                       />

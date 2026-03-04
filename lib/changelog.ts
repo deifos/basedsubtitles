@@ -8,7 +8,7 @@
  * - PATCH: Bug fixes and small improvements
  */
 
-export const APP_VERSION = "1.8.1";
+export const APP_VERSION = "1.8.2";
 
 export interface ChangelogEntry {
   version: string;
@@ -21,6 +21,16 @@ export interface ChangelogEntry {
 }
 
 export const changelog: ChangelogEntry[] = [
+  {
+    version: "1.8.2",
+    date: "2026-03-04",
+    title: "Mobile Export Quality & Color Picker Performance",
+    changes: [
+      { type: "fixed", description: "Exported video was low quality on mobile — the export pipeline creates multiple full-resolution offscreen canvases that exceeded mobile browser memory limits, causing silent quality degradation. Export resolution is now capped at 1080p on mobile to stay within canvas memory budgets" },
+      { type: "fixed", description: "Black video export on mobile browsers without WebCodecs decoding support — when canDecode() returned false, no video frames were drawn. Added a fallback that seeks the video element and draws each frame directly" },
+      { type: "fixed", description: "Color pickers caused heavy lag while dragging — all 5 color inputs (per-word color, text color, background color, border color, solid background) fired onChange on every pixel movement, triggering full state updates and canvas re-renders 10–50 times per second. Now debounced with immediate visual feedback via local state" },
+    ],
+  },
   {
     version: "1.8.1",
     date: "2026-02-27",

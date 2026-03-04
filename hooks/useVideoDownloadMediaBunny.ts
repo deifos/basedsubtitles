@@ -182,10 +182,26 @@ export function useVideoDownloadMediaBunny({
     let reusableFrameCtx: CanvasRenderingContext2D | null = null;
 
     try {
-      // Create canvas matching video dimensions
+      // Create canvas matching video dimensions, capped on mobile to prevent
+      // canvas memory overflow. Mobile browsers limit total canvas memory;
+      // the export pipeline creates multiple full-res offscreen canvases
+      // (main + frame + blur + fg + mask) which can silently degrade quality
+      // when exceeding the budget (e.g. 5× 4K canvases ≈ 165 MB).
       const canvas = document.createElement('canvas');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+      let exportWidth = video.videoWidth;
+      let exportHeight = video.videoHeight;
+
+      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+        (navigator.maxTouchPoints > 0 && window.innerWidth < 1024);
+      const MAX_MOBILE_DIMENSION = 1920; // cap at 1080p
+      if (isMobile && Math.max(exportWidth, exportHeight) > MAX_MOBILE_DIMENSION) {
+        const scale = MAX_MOBILE_DIMENSION / Math.max(exportWidth, exportHeight);
+        exportWidth = Math.round(exportWidth * scale);
+        exportHeight = Math.round(exportHeight * scale);
+      }
+
+      canvas.width = exportWidth;
+      canvas.height = exportHeight;
       const ctx = canvas.getContext('2d');
 
       if (!ctx) {
@@ -330,6 +346,24 @@ export function useVideoDownloadMediaBunny({
           } catch (error) {
             // Skip failed frames silently
           }
+        } else {
+          // Fallback: seek the video element and draw the frame directly.
+          // This is slower but prevents a black video on mobile browsers
+          // where WebCodecs decoding is unavailable (canDecode() === false).
+          video.currentTime = time;
+          await new Promise<void>((resolve) => {
+            const onSeeked = () => {
+              video.removeEventListener('seeked', onSeeked);
+              resolve();
+            };
+            video.addEventListener('seeked', onSeeked);
+            // If already at the target time, seeked won't fire
+            if (Math.abs(video.currentTime - time) < 0.01) {
+              video.removeEventListener('seeked', onSeeked);
+              resolve();
+            }
+          });
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         }
 
         // Find current subtitle chunk
