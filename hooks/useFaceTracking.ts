@@ -39,9 +39,8 @@ export function useFaceTracking(): UseFaceTrackingReturn {
 
     setIsLoading(true);
     initPromiseRef.current = (async () => {
-      const { FaceDetector, FilesetResolver } = await import(
-        "@mediapipe/tasks-vision"
-      );
+      const { FaceDetector, FilesetResolver } =
+        await import("@mediapipe/tasks-vision");
       const vision = await FilesetResolver.forVisionTasks(WASM_CDN);
       // Suppress TFLite WASM INFO log ("Created TensorFlow Lite XNNPACK delegate for CPU")
       // that emscripten routes through console.error

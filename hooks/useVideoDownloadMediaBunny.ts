@@ -228,6 +228,16 @@ export function useVideoDownloadMediaBunny({
         exportHeight = cropH;
       }
 
+      // Ensure a minimum export resolution — low-res sources (e.g. 720p webcam
+      // cropped to 9:16 → 405×720) get scaled up so the output isn't tiny.
+      const MIN_EXPORT_DIMENSION = 1080;
+      if (Math.max(exportWidth, exportHeight) < MIN_EXPORT_DIMENSION) {
+        const scale =
+          MIN_EXPORT_DIMENSION / Math.max(exportWidth, exportHeight);
+        exportWidth = Math.round(exportWidth * scale);
+        exportHeight = Math.round(exportHeight * scale);
+      }
+
       const isMobile =
         /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
         (navigator.maxTouchPoints > 0 && window.innerWidth < 1024);
