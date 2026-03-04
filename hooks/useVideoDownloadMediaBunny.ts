@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef } from "react";
 import {
   Input,
   Output,
@@ -15,51 +15,51 @@ import {
   QUALITY_MEDIUM,
   QUALITY_LOW,
   QUALITY_VERY_HIGH,
-  Conversion
-} from 'mediabunny';
-import { SubtitleStyle } from '@/components/subtitle-styling';
-import { processTranscriptChunks, type WordStyleOverride } from '@/lib/utils';
-import { estimateFaceFromMask, type FaceBounds } from '@/lib/render-subtitle';
-import type { MaskData } from '@/hooks/useBackgroundRemoval';
+  Conversion,
+} from "mediabunny";
+import { SubtitleStyle } from "@/components/subtitle-styling";
+import { processTranscriptChunks, type WordStyleOverride } from "@/lib/utils";
+import { estimateFaceFromMask, type FaceBounds } from "@/lib/render-subtitle";
+import type { MaskData } from "@/hooks/useBackgroundRemoval";
 
 // Shared font mapping — CSS custom properties to actual font names for Canvas rendering
 const FONT_MAPPINGS: Record<string, string> = {
-  'var(--font-bangers)': 'Bangers',
-  'var(--font-montserrat)': 'Montserrat',
-  'var(--font-inter)': 'Inter',
-  'var(--font-bebas-neue)': 'Bebas Neue',
-  'var(--font-poppins)': 'Poppins',
-  'var(--font-open-sans)': 'Open Sans',
-  'var(--font-oswald)': 'Oswald',
-  'var(--font-anton)': 'Anton',
-  'var(--font-fredoka)': 'Fredoka',
-  'var(--font-righteous)': 'Righteous',
-  'var(--font-nunito)': 'Nunito',
-  'var(--font-roboto)': 'Roboto',
-  'var(--font-permanent-marker)': 'Permanent Marker',
-  'var(--font-pacifico)': 'Pacifico',
-  'var(--font-lobster)': 'Lobster',
-  'var(--font-alfa-slab-one)': 'Alfa Slab One',
-  'var(--font-staatliches)': 'Staatliches',
-  'var(--font-fugaz-one)': 'Fugaz One',
-  'var(--font-chewy)': 'Chewy',
-  'var(--font-playfair-display)': 'Playfair Display',
-  'var(--font-lora)': 'Lora',
-  'var(--font-plus-jakarta-sans)': 'Plus Jakarta Sans',
-  'var(--font-outfit)': 'Outfit',
-  'var(--font-lilita-one)': 'Lilita One',
+  "var(--font-bangers)": "Bangers",
+  "var(--font-montserrat)": "Montserrat",
+  "var(--font-inter)": "Inter",
+  "var(--font-bebas-neue)": "Bebas Neue",
+  "var(--font-poppins)": "Poppins",
+  "var(--font-open-sans)": "Open Sans",
+  "var(--font-oswald)": "Oswald",
+  "var(--font-anton)": "Anton",
+  "var(--font-fredoka)": "Fredoka",
+  "var(--font-righteous)": "Righteous",
+  "var(--font-nunito)": "Nunito",
+  "var(--font-roboto)": "Roboto",
+  "var(--font-permanent-marker)": "Permanent Marker",
+  "var(--font-pacifico)": "Pacifico",
+  "var(--font-lobster)": "Lobster",
+  "var(--font-alfa-slab-one)": "Alfa Slab One",
+  "var(--font-staatliches)": "Staatliches",
+  "var(--font-fugaz-one)": "Fugaz One",
+  "var(--font-chewy)": "Chewy",
+  "var(--font-playfair-display)": "Playfair Display",
+  "var(--font-lora)": "Lora",
+  "var(--font-plus-jakarta-sans)": "Plus Jakarta Sans",
+  "var(--font-outfit)": "Outfit",
+  "var(--font-lilita-one)": "Lilita One",
 };
 
 /** Resolve CSS var(--font-*) to actual font name for Canvas */
 function resolveFontFamily(fontFamily: string): string {
-  if (!fontFamily.includes('var(')) return fontFamily;
+  if (!fontFamily.includes("var(")) return fontFamily;
   for (const [cssVar, actualFont] of Object.entries(FONT_MAPPINGS)) {
     if (fontFamily.includes(cssVar)) {
       return fontFamily.replace(cssVar, actualFont);
     }
   }
   const fallbackMatch = fontFamily.match(/,\s*(.+)$/);
-  return fallbackMatch ? fallbackMatch[1] : 'Arial, sans-serif';
+  return fallbackMatch ? fallbackMatch[1] : "Arial, sans-serif";
 }
 
 // Types
@@ -77,16 +77,17 @@ interface UseVideoDownloadMediaBunnyProps {
   video: HTMLVideoElement | null;
   transcriptChunks: TranscriptChunk[];
   subtitleStyle: SubtitleStyle;
-  mode: 'word' | 'phrase';
-  format?: 'mp4' | 'webm';
-  quality?: 'low' | 'medium' | 'high' | 'very_high';
+  mode: "word" | "phrase";
+  ratio?: "16:9" | "9:16";
+  format?: "mp4" | "webm";
+  quality?: "low" | "medium" | "high" | "very_high";
   fps?: number;
   bgRemovalReady?: boolean;
   processFrame?: (
     imageData: Uint8ClampedArray,
     width: number,
     height: number,
-    frameIndex: number
+    frameIndex: number,
   ) => Promise<MaskData>;
   getMaskAtTime?: (time: number, fps?: number) => MaskData | null;
 }
@@ -108,11 +109,18 @@ interface WordTiming {
 
 type ProcessedChunk = ReturnType<typeof processTranscriptChunks>[number];
 
-function isPhraseChunk(chunk: ProcessedChunk): chunk is ProcessedChunk & { words: WordTiming[] } {
+function isPhraseChunk(
+  chunk: ProcessedChunk,
+): chunk is ProcessedChunk & { words: WordTiming[] } {
   return Array.isArray((chunk as { words?: WordTiming[] }).words);
 }
 
-function drawBrandingWatermark(ctx: CanvasRenderingContext2D, w: number, h: number, enabled?: boolean) {
+function drawBrandingWatermark(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  enabled?: boolean,
+) {
   if (!enabled) return;
   const fontSize = Math.max(10, Math.round(h * 0.012));
   const padding = w * 0.03;
@@ -142,8 +150,9 @@ export function useVideoDownloadMediaBunny({
   transcriptChunks,
   subtitleStyle,
   mode,
-  format = 'mp4',
-  quality = 'high',
+  ratio = "16:9",
+  format = "mp4",
+  quality = "high",
   fps = 30,
   bgRemovalReady = false,
   processFrame: bgProcessFrame,
@@ -151,7 +160,7 @@ export function useVideoDownloadMediaBunny({
 }: UseVideoDownloadMediaBunnyProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [status, setStatus] = useState<string>('');
+  const [status, setStatus] = useState<string>("");
   const cancelContextRef = useRef<{
     cancelRequested: boolean;
     output: Output | null;
@@ -160,13 +169,13 @@ export function useVideoDownloadMediaBunny({
 
   const downloadVideo = useCallback(async () => {
     if (!video?.src || transcriptChunks.length === 0) {
-      console.error('Missing video or transcript data');
+      console.error("Missing video or transcript data");
       return;
     }
 
     setIsProcessing(true);
     setProgress(0);
-    setStatus('Initializing MediaBunny...');
+    setStatus("Initializing MediaBunny...");
     cancelContextRef.current.cancelRequested = false;
     cancelContextRef.current.output = null;
     cancelContextRef.current.videoSource = null;
@@ -180,6 +189,8 @@ export function useVideoDownloadMediaBunny({
     let reusableMaskImageData: ImageData | null = null;
     let reusableFrameCanvas: HTMLCanvasElement | null = null;
     let reusableFrameCtx: CanvasRenderingContext2D | null = null;
+    let decodeCanvas: HTMLCanvasElement | null = null;
+    let decodeCtx: CanvasRenderingContext2D | null = null;
 
     try {
       // Create canvas matching video dimensions, capped on mobile to prevent
@@ -187,30 +198,63 @@ export function useVideoDownloadMediaBunny({
       // the export pipeline creates multiple full-res offscreen canvases
       // (main + frame + blur + fg + mask) which can silently degrade quality
       // when exceeding the budget (e.g. 5× 4K canvases ≈ 165 MB).
-      const canvas = document.createElement('canvas');
+      const canvas = document.createElement("canvas");
       let exportWidth = video.videoWidth;
       let exportHeight = video.videoHeight;
+      const srcW = video.videoWidth;
+      const srcH = video.videoHeight;
+      const isLandscape = srcW > srcH;
 
-      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+      // When the user chose 9:16 on a landscape video, center-crop to portrait
+      let cropX = 0;
+      let cropY = 0;
+      let cropW = srcW;
+      let cropH = srcH;
+      if (ratio === "9:16" && isLandscape) {
+        // Target aspect ratio 9:16 — crop width to match, keep full height
+        const targetW = Math.round(srcH * (9 / 16));
+        cropX = Math.round((srcW - targetW) / 2);
+        cropW = targetW;
+        exportWidth = cropW;
+        exportHeight = cropH;
+      }
+
+      const isMobile =
+        /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
         (navigator.maxTouchPoints > 0 && window.innerWidth < 1024);
       const MAX_MOBILE_DIMENSION = 1920; // cap at 1080p
-      if (isMobile && Math.max(exportWidth, exportHeight) > MAX_MOBILE_DIMENSION) {
-        const scale = MAX_MOBILE_DIMENSION / Math.max(exportWidth, exportHeight);
+      if (
+        isMobile &&
+        Math.max(exportWidth, exportHeight) > MAX_MOBILE_DIMENSION
+      ) {
+        const scale =
+          MAX_MOBILE_DIMENSION / Math.max(exportWidth, exportHeight);
         exportWidth = Math.round(exportWidth * scale);
         exportHeight = Math.round(exportHeight * scale);
       }
 
       canvas.width = exportWidth;
       canvas.height = exportHeight;
-      const ctx = canvas.getContext('2d');
+      const needsCrop = ratio === "9:16" && isLandscape;
+
+      // For crop mode, sample.draw() doesn't support source crop, so decode
+      // to a full-resolution canvas first, then blit the cropped region.
+      if (needsCrop) {
+        decodeCanvas = document.createElement("canvas");
+        decodeCanvas.width = srcW;
+        decodeCanvas.height = srcH;
+        decodeCtx = decodeCanvas.getContext("2d");
+      }
+
+      const ctx = canvas.getContext("2d");
 
       if (!ctx) {
-        throw new Error('Failed to create canvas context');
+        throw new Error("Failed to create canvas context");
       }
 
       // Setup MediaBunny input
-      setStatus('Reading original video...');
-      const videoBlob = await fetch(video.src).then(r => r.blob());
+      setStatus("Reading original video...");
+      const videoBlob = await fetch(video.src).then((r) => r.blob());
       using input = new Input({
         source: new BlobSource(videoBlob),
         formats: ALL_FORMATS,
@@ -221,9 +265,10 @@ export function useVideoDownloadMediaBunny({
       const originalVideoTrack = await input.getPrimaryVideoTrack();
       const originalAudioTrack = await input.getPrimaryAudioTrack();
 
-      const outputFormat = format === 'webm' 
-        ? new WebMOutputFormat() 
-        : new Mp4OutputFormat({ fastStart: 'in-memory' });
+      const outputFormat =
+        format === "webm"
+          ? new WebMOutputFormat()
+          : new Mp4OutputFormat({ fastStart: "in-memory" });
       const output = new Output({
         format: outputFormat,
         target: new BufferTarget(),
@@ -232,7 +277,7 @@ export function useVideoDownloadMediaBunny({
 
       // Add video track
       const videoSource = new CanvasSource(canvas, {
-        codec: format === 'webm' ? 'vp9' : 'avc',
+        codec: format === "webm" ? "vp9" : "avc",
         bitrate: qualityMap[quality],
       });
       output.addVideoTrack(videoSource, { frameRate: fps });
@@ -241,16 +286,20 @@ export function useVideoDownloadMediaBunny({
       // Handle audio if present
       let audioSource: AudioBufferSource | null = null;
       if (originalAudioTrack) {
-        setStatus('Processing audio...');
+        setStatus("Processing audio...");
         let audioContext: AudioContext | null = null;
         try {
           const arrayBuffer = await videoBlob.arrayBuffer();
-          audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-          const audioBuffer = await audioContext.decodeAudioData(arrayBuffer.slice(0));
+          audioContext = new (
+            window.AudioContext || (window as any).webkitAudioContext
+          )();
+          const audioBuffer = await audioContext.decodeAudioData(
+            arrayBuffer.slice(0),
+          );
 
           audioSource = new AudioBufferSource({
-            codec: format === 'webm' ? 'opus' : 'aac',
-            bitrate: qualityMap[quality],
+            codec: format === "webm" ? "opus" : "aac",
+            bitrate: 128_000,
           });
           output.addAudioTrack(audioSource);
 
@@ -263,7 +312,9 @@ export function useVideoDownloadMediaBunny({
         } finally {
           // Always close AudioContext to free audio memory
           if (audioContext) {
-            try { await audioContext.close(); } catch {}
+            try {
+              await audioContext.close();
+            } catch {}
           }
         }
       } else {
@@ -280,17 +331,17 @@ export function useVideoDownloadMediaBunny({
       const isDynamic = subtitleStyle.dynamicEnabled;
       const processedChunks = processTranscriptChunks(
         { chunks: transcriptChunks },
-        isDynamic ? 'phrase' : mode,
+        isDynamic ? "phrase" : mode,
         subtitleStyle.maxWordsPerLine,
-        isDynamic
+        isDynamic,
       );
       const enabledChunks = processedChunks.filter((chunk) => {
-        if ((mode === 'phrase' || isDynamic) && isPhraseChunk(chunk)) {
+        if ((mode === "phrase" || isDynamic) && isPhraseChunk(chunk)) {
           return !chunk.words.some((word) => {
             const originalChunk = transcriptChunks.find(
               (candidate) =>
                 candidate.timestamp[0] === word.timestamp[0] &&
-                candidate.timestamp[1] === word.timestamp[1]
+                candidate.timestamp[1] === word.timestamp[1],
             );
             return originalChunk?.disabled || originalChunk?.subtitleHidden;
           });
@@ -299,7 +350,7 @@ export function useVideoDownloadMediaBunny({
       });
 
       const totalFrames = Math.ceil(duration * fps);
-      setStatus('Rendering video frames...');
+      setStatus("Rendering video frames...");
 
       const timestampIterator = (async function* () {
         for (let frameIndex = 0; frameIndex < totalFrames; frameIndex++) {
@@ -318,7 +369,7 @@ export function useVideoDownloadMediaBunny({
       for (let frameIndex = 0; frameIndex < totalFrames; frameIndex++) {
         if (cancelContextRef.current.cancelRequested) {
           cancelled = true;
-          setStatus('Cancelling download...');
+          setStatus("Cancelling download...");
           break;
         }
 
@@ -328,7 +379,9 @@ export function useVideoDownloadMediaBunny({
         const progressPercent = Math.min(100, (frameIndex / totalFrames) * 100);
         if (frameIndex % 3 === 0 || frameIndex === totalFrames - 1) {
           setProgress(progressPercent);
-          setStatus(`Rendering: ${Math.round(time)}s / ${Math.round(duration)}s (${Math.round(progressPercent)}%)`);
+          setStatus(
+            `Rendering: ${Math.round(time)}s / ${Math.round(duration)}s (${Math.round(progressPercent)}%)`,
+          );
         }
 
         // Clear canvas
@@ -340,7 +393,23 @@ export function useVideoDownloadMediaBunny({
             iteratorResult = await sampleIterator.next();
             const sample = iteratorResult.value ?? null;
             if (sample) {
-              sample.draw(ctx, 0, 0, canvas.width, canvas.height);
+              if (needsCrop && decodeCanvas && decodeCtx) {
+                // Decode at full resolution, then crop the center region
+                sample.draw(decodeCtx, 0, 0, srcW, srcH);
+                ctx.drawImage(
+                  decodeCanvas,
+                  cropX,
+                  cropY,
+                  cropW,
+                  cropH,
+                  0,
+                  0,
+                  canvas.width,
+                  canvas.height,
+                );
+              } else {
+                sample.draw(ctx, 0, 0, canvas.width, canvas.height);
+              }
               sample.close();
             }
           } catch (error) {
@@ -353,17 +422,31 @@ export function useVideoDownloadMediaBunny({
           video.currentTime = time;
           await new Promise<void>((resolve) => {
             const onSeeked = () => {
-              video.removeEventListener('seeked', onSeeked);
+              video.removeEventListener("seeked", onSeeked);
               resolve();
             };
-            video.addEventListener('seeked', onSeeked);
+            video.addEventListener("seeked", onSeeked);
             // If already at the target time, seeked won't fire
             if (Math.abs(video.currentTime - time) < 0.01) {
-              video.removeEventListener('seeked', onSeeked);
+              video.removeEventListener("seeked", onSeeked);
               resolve();
             }
           });
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          if (needsCrop) {
+            ctx.drawImage(
+              video,
+              cropX,
+              cropY,
+              cropW,
+              cropH,
+              0,
+              0,
+              canvas.width,
+              canvas.height,
+            );
+          } else {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          }
         }
 
         // Find current subtitle chunk
@@ -372,18 +455,22 @@ export function useVideoDownloadMediaBunny({
           return time >= start && time <= end;
         });
 
-        const isDynamicMode = subtitleStyle.dynamicEnabled && bgRemovalReady && bgProcessFrame;
-        const bgActive = bgRemovalReady && subtitleStyle.backgroundRemovalEnabled && bgProcessFrame;
+        const isDynamicMode =
+          subtitleStyle.dynamicEnabled && bgRemovalReady && bgProcessFrame;
+        const bgActive =
+          bgRemovalReady &&
+          subtitleStyle.backgroundRemovalEnabled &&
+          bgProcessFrame;
         const needsCompositing = isDynamicMode || bgActive;
 
         if (needsCompositing) {
           // Compositing at full resolution (bg removal or dynamic mode)
           // Save current frame to offscreen canvas via GPU blit (fast, no ImageData needed for restore)
           if (!reusableFrameCanvas) {
-            reusableFrameCanvas = document.createElement('canvas');
+            reusableFrameCanvas = document.createElement("canvas");
             reusableFrameCanvas.width = canvas.width;
             reusableFrameCanvas.height = canvas.height;
-            reusableFrameCtx = reusableFrameCanvas.getContext('2d');
+            reusableFrameCtx = reusableFrameCanvas.getContext("2d");
           }
           reusableFrameCtx!.drawImage(canvas, 0, 0);
 
@@ -394,20 +481,39 @@ export function useVideoDownloadMediaBunny({
           if (cachedMask) {
             mask = cachedMask;
           } else if (bgProcessFrame) {
-            const framePixels = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const framePixels = ctx.getImageData(
+              0,
+              0,
+              canvas.width,
+              canvas.height,
+            );
             mask = await bgProcessFrame(
               framePixels.data,
               canvas.width,
               canvas.height,
-              frameIndex
+              frameIndex,
             );
           } else {
             // No mask available — skip compositing for this frame
             if (currentChunk) {
-              renderSubtitle(ctx, currentChunk, subtitleStyle, canvas, mode, time);
+              renderSubtitle(
+                ctx,
+                currentChunk,
+                subtitleStyle,
+                canvas,
+                mode,
+                time,
+              );
             }
-            drawBrandingWatermark(ctx, canvas.width, canvas.height, subtitleStyle.brandingWatermark);
-            try { await videoSource.add(time, 1 / fps); } catch {}
+            drawBrandingWatermark(
+              ctx,
+              canvas.width,
+              canvas.height,
+              subtitleStyle.brandingWatermark,
+            );
+            try {
+              await videoSource.add(time, 1 / fps);
+            } catch {}
             continue;
           }
 
@@ -416,19 +522,19 @@ export function useVideoDownloadMediaBunny({
           if (isDynamicMode) {
             // Dynamic mode: keep original video as background (GPU blit)
             ctx.drawImage(reusableFrameCanvas!, 0, 0);
-          } else if (subtitleStyle.backgroundType === 'blur') {
+          } else if (subtitleStyle.backgroundType === "blur") {
             // Reuse blurCanvas across frames
             if (!reusableBlurCanvas) {
-              reusableBlurCanvas = document.createElement('canvas');
+              reusableBlurCanvas = document.createElement("canvas");
             }
             reusableBlurCanvas.width = canvas.width;
             reusableBlurCanvas.height = canvas.height;
-            const blurCtx = reusableBlurCanvas.getContext('2d');
+            const blurCtx = reusableBlurCanvas.getContext("2d");
             if (blurCtx) {
               blurCtx.drawImage(reusableFrameCanvas!, 0, 0);
-              ctx.filter = 'blur(20px)';
+              ctx.filter = "blur(20px)";
               ctx.drawImage(reusableBlurCanvas, 0, 0);
-              ctx.filter = 'none';
+              ctx.filter = "none";
             }
           } else {
             ctx.fillStyle = subtitleStyle.solidBackgroundColor;
@@ -438,29 +544,42 @@ export function useVideoDownloadMediaBunny({
           // Step 2: Render subtitle behind person
           if (isDynamicMode && currentChunk) {
             // Dynamic mode: render only "behind" words as big text
-            renderDynamicBehindInExport(ctx, currentChunk, subtitleStyle, canvas, time);
+            renderDynamicBehindInExport(
+              ctx,
+              currentChunk,
+              subtitleStyle,
+              canvas,
+              time,
+            );
           }
 
           // Step 3: Draw masked foreground (reuse canvases across frames)
           if (!reusableFgCanvas) {
-            reusableFgCanvas = document.createElement('canvas');
+            reusableFgCanvas = document.createElement("canvas");
           }
           if (!reusableMaskCanvas) {
-            reusableMaskCanvas = document.createElement('canvas');
+            reusableMaskCanvas = document.createElement("canvas");
           }
           reusableFgCanvas.width = canvas.width;
           reusableFgCanvas.height = canvas.height;
-          const fgCtx = reusableFgCanvas.getContext('2d');
+          const fgCtx = reusableFgCanvas.getContext("2d");
           if (fgCtx) {
             fgCtx.drawImage(reusableFrameCanvas!, 0, 0);
 
             reusableMaskCanvas.width = mask.width;
             reusableMaskCanvas.height = mask.height;
-            const maskCtx = reusableMaskCanvas.getContext('2d');
+            const maskCtx = reusableMaskCanvas.getContext("2d");
             if (maskCtx) {
               // Reuse ImageData if mask dimensions haven't changed
-              if (!reusableMaskImageData || reusableMaskImageData.width !== mask.width || reusableMaskImageData.height !== mask.height) {
-                reusableMaskImageData = maskCtx.createImageData(mask.width, mask.height);
+              if (
+                !reusableMaskImageData ||
+                reusableMaskImageData.width !== mask.width ||
+                reusableMaskImageData.height !== mask.height
+              ) {
+                reusableMaskImageData = maskCtx.createImageData(
+                  mask.width,
+                  mask.height,
+                );
               }
               const pixels = reusableMaskImageData.data;
               for (let i = 0; i < mask.data.length; i++) {
@@ -472,9 +591,34 @@ export function useVideoDownloadMediaBunny({
               }
               maskCtx.putImageData(reusableMaskImageData, 0, 0);
 
-              fgCtx.globalCompositeOperation = 'destination-in';
-              fgCtx.drawImage(reusableMaskCanvas, 0, 0, canvas.width, canvas.height);
-              fgCtx.globalCompositeOperation = 'source-over';
+              fgCtx.globalCompositeOperation = "destination-in";
+              if (needsCrop && cachedMask) {
+                // Cached masks cover the full video frame — crop to match
+                const msx = (cropX / srcW) * mask.width;
+                const msy = (cropY / srcH) * mask.height;
+                const msw = (cropW / srcW) * mask.width;
+                const msh = (cropH / srcH) * mask.height;
+                fgCtx.drawImage(
+                  reusableMaskCanvas,
+                  msx,
+                  msy,
+                  msw,
+                  msh,
+                  0,
+                  0,
+                  canvas.width,
+                  canvas.height,
+                );
+              } else {
+                fgCtx.drawImage(
+                  reusableMaskCanvas,
+                  0,
+                  0,
+                  canvas.width,
+                  canvas.height,
+                );
+              }
+              fgCtx.globalCompositeOperation = "source-over";
             }
 
             ctx.drawImage(reusableFgCanvas, 0, 0);
@@ -482,24 +626,71 @@ export function useVideoDownloadMediaBunny({
 
           // Step 4: Render front text (dynamic) or on-top text (non-dynamic)
           if (isDynamicMode && currentChunk) {
-            const faceBounds = estimateFaceFromMask(mask.data, mask.width, mask.height, canvas.width, canvas.height);
-            renderDynamicFrontInExport(ctx, currentChunk, subtitleStyle, canvas, faceBounds, time);
+            let faceBounds: FaceBounds | null;
+            if (needsCrop && cachedMask) {
+              // Cached mask covers full frame — compute chin in full-frame coords then translate
+              const fullFace = estimateFaceFromMask(
+                mask.data,
+                mask.width,
+                mask.height,
+                srcW,
+                srcH,
+              );
+              faceBounds = fullFace
+                ? { chinY: (fullFace.chinY - cropY) * (canvas.height / cropH) }
+                : null;
+            } else {
+              faceBounds = estimateFaceFromMask(
+                mask.data,
+                mask.width,
+                mask.height,
+                canvas.width,
+                canvas.height,
+              );
+            }
+            renderDynamicFrontInExport(
+              ctx,
+              currentChunk,
+              subtitleStyle,
+              canvas,
+              faceBounds,
+              time,
+            );
           } else if (currentChunk) {
-            renderSubtitle(ctx, currentChunk, subtitleStyle, canvas, mode, time);
+            renderSubtitle(
+              ctx,
+              currentChunk,
+              subtitleStyle,
+              canvas,
+              mode,
+              time,
+            );
           }
         } else {
           // Normal rendering (no compositing)
           if (currentChunk) {
-            renderSubtitle(ctx, currentChunk, subtitleStyle, canvas, mode, time);
+            renderSubtitle(
+              ctx,
+              currentChunk,
+              subtitleStyle,
+              canvas,
+              mode,
+              time,
+            );
           }
         }
 
         // Branding watermark — drawn on top of everything
-        drawBrandingWatermark(ctx, canvas.width, canvas.height, subtitleStyle.brandingWatermark);
+        drawBrandingWatermark(
+          ctx,
+          canvas.width,
+          canvas.height,
+          subtitleStyle.brandingWatermark,
+        );
 
         if (cancelContextRef.current.cancelRequested) {
           cancelled = true;
-          setStatus('Cancelling download...');
+          setStatus("Cancelling download...");
           break;
         }
 
@@ -508,7 +699,7 @@ export function useVideoDownloadMediaBunny({
         } catch (error) {
           if (cancelContextRef.current.cancelRequested) {
             cancelled = true;
-            setStatus('Cancelling download...');
+            setStatus("Cancelling download...");
             break;
           }
           throw error;
@@ -534,9 +725,9 @@ export function useVideoDownloadMediaBunny({
       if (cancelled) {
         await output.cancel();
         setProgress(0);
-        setStatus('Download cancelled');
+        setStatus("Download cancelled");
       } else {
-        setStatus('Finalizing video...');
+        setStatus("Finalizing video...");
         await output.finalize();
 
         // Download file
@@ -544,28 +735,29 @@ export function useVideoDownloadMediaBunny({
         const buffer = bufferTarget.buffer;
 
         if (!buffer) {
-          throw new Error('Failed to generate video buffer');
+          throw new Error("Failed to generate video buffer");
         }
 
-        const mimeType = format === 'webm' ? 'video/webm' : 'video/mp4';
+        const mimeType = format === "webm" ? "video/webm" : "video/mp4";
         const blob = new Blob([buffer], { type: mimeType });
         const url = URL.createObjectURL(blob);
 
-        const a = document.createElement('a');
+        const a = document.createElement("a");
         a.href = url;
-        a.download = `video_with_subtitles_${new Date().toISOString().replace(/[:.]/g, '-')}.${format}`;
+        a.download = `video_with_subtitles_${new Date().toISOString().replace(/[:.]/g, "-")}.${format}`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
 
-        setStatus('Export complete!');
+        setStatus("Export complete!");
         setProgress(100);
       }
-
     } catch (error) {
-      console.error('MediaBunny video processing failed:', error);
-      setStatus(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error("MediaBunny video processing failed:", error);
+      setStatus(
+        `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
     } finally {
       // Release all reusable canvases and buffers to free memory
       reusableBlurCanvas = null;
@@ -574,6 +766,8 @@ export function useVideoDownloadMediaBunny({
       reusableMaskImageData = null;
       reusableFrameCanvas = null;
       reusableFrameCtx = null;
+      decodeCanvas = null;
+      decodeCtx = null;
 
       cancelContextRef.current.output = null;
       cancelContextRef.current.videoSource = null;
@@ -586,14 +780,26 @@ export function useVideoDownloadMediaBunny({
       }
       cancelContextRef.current.cancelRequested = false;
     }
-  }, [video, transcriptChunks, subtitleStyle, mode, format, quality, fps, bgRemovalReady, bgProcessFrame, getMaskAtTime]);
+  }, [
+    video,
+    transcriptChunks,
+    subtitleStyle,
+    mode,
+    ratio,
+    format,
+    quality,
+    fps,
+    bgRemovalReady,
+    bgProcessFrame,
+    getMaskAtTime,
+  ]);
 
   const cancelDownload = useCallback(() => {
     if (!isProcessing) {
       return;
     }
     cancelContextRef.current.cancelRequested = true;
-    setStatus('Cancelling download...');
+    setStatus("Cancelling download...");
 
     if (cancelContextRef.current.videoSource) {
       try {
@@ -611,7 +817,7 @@ export function useVideoDownloadMediaBunny({
     cancelDownload,
     isProcessing,
     progress,
-    status
+    status,
   };
 }
 
@@ -621,16 +827,18 @@ function renderSubtitle(
   chunk: TranscriptChunk,
   style: SubtitleStyle,
   canvas: HTMLCanvasElement,
-  mode: 'word' | 'phrase',
-  currentTime: number
+  mode: "word" | "phrase",
+  currentTime: number,
 ) {
   // Progressive word reveal: only show words spoken so far
   let displayText = chunk.text;
   let chunkWords = chunk.words;
-  if (style.dynamicFollowWord && mode === 'phrase' && chunk.words) {
-    const visibleWords = chunk.words.filter(w => currentTime >= w.timestamp[0]);
+  if (style.dynamicFollowWord && mode === "phrase" && chunk.words) {
+    const visibleWords = chunk.words.filter(
+      (w) => currentTime >= w.timestamp[0],
+    );
     if (visibleWords.length === 0) return;
-    displayText = visibleWords.map(w => w.text).join(' ');
+    displayText = visibleWords.map((w) => w.text).join(" ");
     chunkWords = visibleWords;
   }
 
@@ -650,8 +858,8 @@ function renderSubtitle(
   // Set font properties with font loading check
   const fontString = `${style.fontWeight} ${finalFontSize}px ${fontFamily}`;
   ctx.font = fontString;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
 
   // Calculate positioning
   const x = canvas.width / 2;
@@ -667,7 +875,11 @@ function renderSubtitle(
     const midpoint = Math.ceil(wordsInText.length / 2);
     splitPoint = midpoint;
 
-    for (let i = Math.max(2, midpoint - 2); i <= Math.min(wordsInText.length - 2, midpoint + 2); i++) {
+    for (
+      let i = Math.max(2, midpoint - 2);
+      i <= Math.min(wordsInText.length - 2, midpoint + 2);
+      i++
+    ) {
       if (/[,;:.!?]$/.test(wordsInText[i])) {
         splitPoint = i + 1;
         break;
@@ -676,7 +888,7 @@ function renderSubtitle(
 
     lines = [
       wordsInText.slice(0, splitPoint).join(" "),
-      wordsInText.slice(splitPoint).join(" ")
+      wordsInText.slice(splitPoint).join(" "),
     ].filter(Boolean);
   }
 
@@ -697,7 +909,7 @@ function renderSubtitle(
       break;
     case "bottom":
     default:
-      baseY = canvas.height - (canvas.height * (isVerticalVideo ? 0.08 : 0.16));
+      baseY = canvas.height - canvas.height * (isVerticalVideo ? 0.08 : 0.16);
       break;
   }
 
@@ -708,10 +920,10 @@ function renderSubtitle(
     const borderRadius = 8 * videoScale;
     const paddingX = 12 * videoScale;
     const paddingY = 8 * videoScale;
-    
+
     // Measure maximum line width
     let maxWidth = 0;
-    lines.forEach(line => {
+    lines.forEach((line) => {
       const metrics = ctx.measureText(line.toUpperCase());
       maxWidth = Math.max(maxWidth, metrics.width);
     });
@@ -731,16 +943,16 @@ function renderSubtitle(
   const phraseWords = Array.isArray(chunkWords) ? chunkWords : undefined;
   const canEmphasize =
     (style.wordEmphasisEnabled || style.textFadeIn) &&
-    mode === 'phrase' &&
+    mode === "phrase" &&
     phraseWords &&
     phraseWords.length > 0 &&
     Number.isFinite(currentTime);
 
   if (canEmphasize) {
     // Build line groups based on actual pixel width (accounts for per-word font overrides)
-    const maxLineWidth = canvas.width * (isVerticalVideo ? 0.85 : 0.90);
+    const maxLineWidth = canvas.width * (isVerticalVideo ? 0.85 : 0.9);
     const emphSpaceWidth = 0.35 * finalFontSize;
-    const lineWordGroups: typeof phraseWords[] = [];
+    const lineWordGroups: (typeof phraseWords)[] = [];
     let currentLineWords: typeof phraseWords = [];
     let currentLineWidth = 0;
 
@@ -749,20 +961,35 @@ function renderSubtitle(
     for (let i = 0; i < phraseWords.length; i++) {
       const word = phraseWords[i];
       // Use emoji as display text for measurement when set
-      const wordText = word.styleOverride?.emoji ? word.styleOverride.emoji : word.text.toUpperCase();
+      const wordText = word.styleOverride?.emoji
+        ? word.styleOverride.emoji
+        : word.text.toUpperCase();
 
       // Measure with per-word font if needed
       if (word.styleOverride?.fontFamily || word.styleOverride?.fontSize) {
-        ctx.font = buildWordFont(style, finalFontSize, globalFontFamily, word.styleOverride);
+        ctx.font = buildWordFont(
+          style,
+          finalFontSize,
+          globalFontFamily,
+          word.styleOverride,
+        );
       }
       const wordWidth = ctx.measureText(wordText).width;
       if (word.styleOverride?.fontFamily || word.styleOverride?.fontSize) {
         ctx.font = fontString;
       }
 
-      const scale = (currentTime >= word.timestamp[0] && currentTime <= word.timestamp[1] && style.wordEmphasisEnabled) ? 1.18 : 1;
+      const scale =
+        currentTime >= word.timestamp[0] &&
+        currentTime <= word.timestamp[1] &&
+        style.wordEmphasisEnabled
+          ? 1.18
+          : 1;
       const scaledWordWidth = wordWidth * scale;
-      const widthIfAdded = currentLineWidth + (currentLineWords.length > 0 ? emphSpaceWidth : 0) + scaledWordWidth;
+      const widthIfAdded =
+        currentLineWidth +
+        (currentLineWords.length > 0 ? emphSpaceWidth : 0) +
+        scaledWordWidth;
 
       if (currentLineWords.length > 0 && widthIfAdded > maxLineWidth) {
         lineWordGroups.push(currentLineWords);
@@ -778,7 +1005,9 @@ function renderSubtitle(
     }
 
     // Recalculate vertical layout with the actual number of lines
-    const emphTotalHeight = lineWordGroups.length * lineHeight + Math.max(0, lineWordGroups.length - 1) * lineGap;
+    const emphTotalHeight =
+      lineWordGroups.length * lineHeight +
+      Math.max(0, lineWordGroups.length - 1) * lineGap;
     const emphStartY = baseY - emphTotalHeight / 2 + lineHeight / 2;
 
     const chunkEndTime = chunk.timestamp[1];
@@ -793,7 +1022,7 @@ function renderSubtitle(
         videoScale,
         currentTime,
         finalFontSize,
-        chunkEndTime
+        chunkEndTime,
       );
     });
     return;
@@ -806,8 +1035,14 @@ function renderSubtitle(
     const chunkFadeOutDuration = 0.25;
     const timeSinceChunkStart = currentTime - chunk.timestamp[0];
     const timeToChunkEnd = chunk.timestamp[1] - currentTime;
-    const chunkFadeIn = Math.min(1, Math.max(0, timeSinceChunkStart / chunkFadeInDuration));
-    const chunkFadeOut = Math.min(1, Math.max(0, timeToChunkEnd / chunkFadeOutDuration));
+    const chunkFadeIn = Math.min(
+      1,
+      Math.max(0, timeSinceChunkStart / chunkFadeInDuration),
+    );
+    const chunkFadeOut = Math.min(
+      1,
+      Math.max(0, timeToChunkEnd / chunkFadeOutDuration),
+    );
     ctx.save();
     ctx.globalAlpha = chunkFadeIn * chunkFadeOut;
   }
@@ -829,7 +1064,7 @@ function renderTextLine(
   x: number,
   y: number,
   style: SubtitleStyle,
-  baseScale: number = 1
+  baseScale: number = 1,
 ) {
   const upperText = text.toUpperCase();
   if (style.borderWidth > 0) {
@@ -837,25 +1072,25 @@ function renderTextLine(
     ctx.strokeStyle = style.borderColor;
     const strokeWidth = Math.max(0.5, style.borderWidth * baseScale);
     ctx.lineWidth = strokeWidth;
-    ctx.lineJoin = 'round';
+    ctx.lineJoin = "round";
     ctx.miterLimit = 2;
     ctx.strokeText(upperText, x, y);
     ctx.restore();
   }
 
   let fillStyle: string | CanvasGradient = style.color;
-  if (style.color === '#CCCCCC' || style.color === '#C0C0C0') {
+  if (style.color === "#CCCCCC" || style.color === "#C0C0C0") {
     const textWidth = ctx.measureText(upperText).width;
     const gradientHeight = 20 * baseScale;
     const gradient = ctx.createLinearGradient(
       x - textWidth / 2,
       y - gradientHeight,
       x + textWidth / 2,
-      y + gradientHeight
+      y + gradientHeight,
     );
-    gradient.addColorStop(0, '#FFFFFF');
-    gradient.addColorStop(0.5, '#CCCCCC');
-    gradient.addColorStop(1, '#999999');
+    gradient.addColorStop(0, "#FFFFFF");
+    gradient.addColorStop(0.5, "#CCCCCC");
+    gradient.addColorStop(1, "#999999");
     fillStyle = gradient;
   }
 
@@ -868,7 +1103,7 @@ function renderTextLine(
     ctx.shadowOffsetX = shadowOffset;
     ctx.shadowOffsetY = shadowOffset;
   } else {
-    ctx.shadowColor = 'transparent';
+    ctx.shadowColor = "transparent";
     ctx.shadowBlur = 0;
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 0;
@@ -880,7 +1115,7 @@ function renderTextLine(
 
 // Helper to determine if a color is light or dark (matches video-caption.tsx logic)
 function isLightColor(color: string): boolean {
-  if (color.startsWith('#')) {
+  if (color.startsWith("#")) {
     const hex = color.slice(1);
     const r = parseInt(hex.slice(0, 2), 16);
     const g = parseInt(hex.slice(2, 4), 16);
@@ -896,7 +1131,7 @@ function buildWordFont(
   style: SubtitleStyle,
   finalFontSize: number,
   fontFamily: string,
-  override?: WordStyleOverride
+  override?: WordStyleOverride,
 ): string {
   const family = override?.fontFamily
     ? resolveFontFamily(override.fontFamily)
@@ -916,7 +1151,7 @@ function renderPhraseLineWithEmphasis(
   baseScale: number,
   currentTime: number,
   finalFontSize: number,
-  chunkEndTime?: number
+  chunkEndTime?: number,
 ) {
   if (words.length === 0) {
     return;
@@ -927,21 +1162,30 @@ function renderPhraseLineWithEmphasis(
 
   // Build display texts: emoji replaces word text when set
   const displayTexts = words.map((word) =>
-    word.styleOverride?.emoji ? word.styleOverride.emoji : word.text.toUpperCase()
+    word.styleOverride?.emoji
+      ? word.styleOverride.emoji
+      : word.text.toUpperCase(),
   );
   // Match preview spacer span width: 0.35em
   const spaceWidth = 0.35 * finalFontSize;
   const scales = words.map((word) =>
-    currentTime >= word.timestamp[0] && currentTime <= word.timestamp[1] && style.wordEmphasisEnabled
+    currentTime >= word.timestamp[0] &&
+    currentTime <= word.timestamp[1] &&
+    style.wordEmphasisEnabled
       ? 1.18
-      : 1
+      : 1,
   );
 
   // Measure each word with its own font (per-word override support)
   const baseWidths = displayTexts.map((value, index) => {
     const word = words[index];
     if (word.styleOverride?.fontFamily || word.styleOverride?.fontSize) {
-      ctx.font = buildWordFont(style, finalFontSize, globalFontFamily, word.styleOverride);
+      ctx.font = buildWordFont(
+        style,
+        finalFontSize,
+        globalFontFamily,
+        word.styleOverride,
+      );
       const w = ctx.measureText(value).width;
       ctx.font = globalFont;
       return w;
@@ -950,7 +1194,9 @@ function renderPhraseLineWithEmphasis(
   });
 
   const scaledWidths = baseWidths.map((width, index) => width * scales[index]);
-  const totalWidth = scaledWidths.reduce((total, width) => total + width, 0) + spaceWidth * Math.max(0, words.length - 1);
+  const totalWidth =
+    scaledWidths.reduce((total, width) => total + width, 0) +
+    spaceWidth * Math.max(0, words.length - 1);
   let cursor = centerX - totalWidth / 2;
 
   // Match inline span padding: ~0.15em horizontally, minimal vertical padding
@@ -960,8 +1206,10 @@ function renderPhraseLineWithEmphasis(
 
   // Determine emphasis colors based on text color (matches preview logic)
   const textIsLight = isLightColor(style.color);
-  const emphasisBgColor = textIsLight ? 'rgba(0, 0, 0, 0.65)' : 'rgba(255, 255, 255, 0.85)';
-  const emphasisTextColor = textIsLight ? '#FFFFFF' : '#000000';
+  const emphasisBgColor = textIsLight
+    ? "rgba(0, 0, 0, 0.65)"
+    : "rgba(255, 255, 255, 0.85)";
+  const emphasisTextColor = textIsLight ? "#FFFFFF" : "#000000";
 
   // Fade constants
   const fadeOutDuration = 0.25; // 250ms chunk fade-out
@@ -979,9 +1227,13 @@ function renderPhraseLineWithEmphasis(
 
     // Per-word fade
     const timeSinceWordStart = currentTime - word.timestamp[0];
-    const chunkFadeOut = (useTextFade && chunkEndTime != null)
-      ? Math.min(1, Math.max(0, (chunkEndTime - currentTime) / fadeOutDuration))
-      : 1;
+    const chunkFadeOut =
+      useTextFade && chunkEndTime != null
+        ? Math.min(
+            1,
+            Math.max(0, (chunkEndTime - currentTime) / fadeOutDuration),
+          )
+        : 1;
     const wordAlpha = chunkFadeOut;
 
     ctx.save();
@@ -989,7 +1241,9 @@ function renderPhraseLineWithEmphasis(
 
     if (isActive) {
       const boxWidth = scaledWidth + highlightPaddingX * 2;
-      const wordFontSize = word.styleOverride?.fontSize ? Math.round(finalFontSize * word.styleOverride.fontSize) : finalFontSize;
+      const wordFontSize = word.styleOverride?.fontSize
+        ? Math.round(finalFontSize * word.styleOverride.fontSize)
+        : finalFontSize;
       const boxHeight = wordFontSize * scale + highlightPaddingY * 2;
 
       ctx.fillStyle = emphasisBgColor;
@@ -999,7 +1253,7 @@ function renderPhraseLineWithEmphasis(
         centerY - boxHeight / 2,
         boxWidth,
         boxHeight,
-        highlightRadius
+        highlightRadius,
       );
       ctx.fill();
     }
@@ -1009,7 +1263,12 @@ function renderPhraseLineWithEmphasis(
 
     // Set per-word font if override exists
     if (word.styleOverride?.fontFamily || word.styleOverride?.fontSize) {
-      ctx.font = buildWordFont(style, finalFontSize, globalFontFamily, word.styleOverride);
+      ctx.font = buildWordFont(
+        style,
+        finalFontSize,
+        globalFontFamily,
+        word.styleOverride,
+      );
     }
 
     // Compute effective font size for this word
@@ -1026,7 +1285,12 @@ function renderPhraseLineWithEmphasis(
       const letterStagger = charCount > 0 ? revealDuration / charCount : 0;
       charAlphas = [];
       for (let ci = 0; ci < charCount; ci++) {
-        charAlphas.push(Math.min(1, Math.max(0, (timeSinceWordStart - ci * letterStagger) / 0.06)));
+        charAlphas.push(
+          Math.min(
+            1,
+            Math.max(0, (timeSinceWordStart - ci * letterStagger) / 0.06),
+          ),
+        );
       }
     }
 
@@ -1041,7 +1305,7 @@ function renderPhraseLineWithEmphasis(
       baseWidth,
       fillColor,
       word.styleOverride?.effect,
-      charAlphas
+      charAlphas,
     );
 
     // Draw emoji overlay above the word
@@ -1059,7 +1323,11 @@ function renderPhraseLineWithEmphasis(
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillStyle = "#000000";
-      ctx.fillText(word.styleOverride.emojiOverlay, wordCenterX, centerY - effectiveFontSize * 1.2 * emojiScale);
+      ctx.fillText(
+        word.styleOverride.emojiOverlay,
+        wordCenterX,
+        centerY - effectiveFontSize * 1.2 * emojiScale,
+      );
       ctx.restore();
     }
 
@@ -1085,7 +1353,7 @@ function drawWordText(
   baseWidth: number,
   fillColor: string,
   effect?: "knockout",
-  charAlphas?: number[]
+  charAlphas?: number[],
 ) {
   const uppercase = text.toUpperCase();
   const isKnockout = effect === "knockout";
@@ -1094,7 +1362,7 @@ function drawWordText(
   if (charAlphas && charAlphas.length > 0 && !isKnockout) {
     const savedAlpha = ctx.globalAlpha;
     const chars = uppercase.split("");
-    const charWidths = chars.map(c => ctx.measureText(c).width);
+    const charWidths = chars.map((c) => ctx.measureText(c).width);
     const totalCharWidth = charWidths.reduce((a, b) => a + b, 0);
     let charX = -totalCharWidth / 2;
 
@@ -1107,27 +1375,35 @@ function drawWordText(
       if (style.borderWidth > 0) {
         ctx.save();
         ctx.strokeStyle = style.borderColor;
-        const scaledBorderWidth = Math.max(0.5, (style.borderWidth * baseScale) / Math.max(scale, 0.001));
+        const scaledBorderWidth = Math.max(
+          0.5,
+          (style.borderWidth * baseScale) / Math.max(scale, 0.001),
+        );
         ctx.lineWidth = scaledBorderWidth;
         ctx.translate(centerX, centerY);
         ctx.scale(scale, scale);
-        ctx.lineJoin = 'round';
+        ctx.lineJoin = "round";
         ctx.miterLimit = 2;
         ctx.strokeText(chars[ci], charCenterX, 0);
         ctx.restore();
       }
 
       let charFillStyle: string | CanvasGradient = fillColor;
-      if (fillColor === style.color && (style.color === '#CCCCCC' || style.color === '#C0C0C0')) {
+      if (
+        fillColor === style.color &&
+        (style.color === "#CCCCCC" || style.color === "#C0C0C0")
+      ) {
         const scaledWidth = baseWidth * scale;
         const gradientHeight = 20 * baseScale;
         const gradient = ctx.createLinearGradient(
-          centerX - scaledWidth / 2, centerY - gradientHeight,
-          centerX + scaledWidth / 2, centerY + gradientHeight
+          centerX - scaledWidth / 2,
+          centerY - gradientHeight,
+          centerX + scaledWidth / 2,
+          centerY + gradientHeight,
         );
-        gradient.addColorStop(0, '#FFFFFF');
-        gradient.addColorStop(0.5, '#CCCCCC');
-        gradient.addColorStop(1, '#999999');
+        gradient.addColorStop(0, "#FFFFFF");
+        gradient.addColorStop(0.5, "#CCCCCC");
+        gradient.addColorStop(1, "#999999");
         charFillStyle = gradient;
       }
 
@@ -1160,11 +1436,14 @@ function drawWordText(
   if (style.borderWidth > 0 && !isKnockout) {
     ctx.save();
     ctx.strokeStyle = style.borderColor;
-    const scaledBorderWidth = Math.max(0.5, (style.borderWidth * baseScale) / Math.max(scale, 0.001));
+    const scaledBorderWidth = Math.max(
+      0.5,
+      (style.borderWidth * baseScale) / Math.max(scale, 0.001),
+    );
     ctx.lineWidth = scaledBorderWidth;
     ctx.translate(centerX, centerY);
     ctx.scale(scale, scale);
-    ctx.lineJoin = 'round';
+    ctx.lineJoin = "round";
     ctx.miterLimit = 2;
     ctx.strokeText(uppercase, 0, 0);
     ctx.restore();
@@ -1182,18 +1461,21 @@ function drawWordText(
   }
 
   let fillStyle: string | CanvasGradient = fillColor;
-  if (fillColor === style.color && (style.color === '#CCCCCC' || style.color === '#C0C0C0')) {
+  if (
+    fillColor === style.color &&
+    (style.color === "#CCCCCC" || style.color === "#C0C0C0")
+  ) {
     const scaledWidth = baseWidth * scale;
     const gradientHeight = 20 * baseScale;
     const gradient = ctx.createLinearGradient(
       centerX - scaledWidth / 2,
       centerY - gradientHeight,
       centerX + scaledWidth / 2,
-      centerY + gradientHeight
+      centerY + gradientHeight,
     );
-    gradient.addColorStop(0, '#FFFFFF');
-    gradient.addColorStop(0.5, '#CCCCCC');
-    gradient.addColorStop(1, '#999999');
+    gradient.addColorStop(0, "#FFFFFF");
+    gradient.addColorStop(0.5, "#CCCCCC");
+    gradient.addColorStop(1, "#999999");
     fillStyle = gradient;
   }
 
@@ -1223,7 +1505,7 @@ function renderDynamicWord(
   ctx: CanvasRenderingContext2D,
   text: string,
   style: SubtitleStyle,
-  canvas: HTMLCanvasElement
+  canvas: HTMLCanvasElement,
 ) {
   const upperText = text.toUpperCase();
   const videoScale = canvas.height / 500;
@@ -1233,13 +1515,13 @@ function renderDynamicWord(
   const fontFamily = resolveFontFamily(style.fontFamily);
 
   ctx.font = `${style.fontWeight} ${fontSize}px ${fontFamily}`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
 
   // Word-wrap the text
-  const words = upperText.split(' ');
+  const words = upperText.split(" ");
   const lines: string[] = [];
-  let currentLine = '';
+  let currentLine = "";
   for (const word of words) {
     const testLine = currentLine ? `${currentLine} ${word}` : word;
     if (ctx.measureText(testLine).width > maxWidth && currentLine) {
@@ -1265,24 +1547,26 @@ function renderDynamicWord(
     // Stroke
     const strokeWidth = Math.max(2, fontSize * 0.03);
     ctx.save();
-    ctx.strokeStyle = style.borderColor || '#000000';
+    ctx.strokeStyle = style.borderColor || "#000000";
     ctx.lineWidth = strokeWidth;
-    ctx.lineJoin = 'round';
+    ctx.lineJoin = "round";
     ctx.miterLimit = 2;
     ctx.strokeText(lineText, x, lineY);
     ctx.restore();
 
     // Fill
     let fillStyle: string | CanvasGradient = style.color;
-    if (style.color === '#CCCCCC' || style.color === '#C0C0C0') {
+    if (style.color === "#CCCCCC" || style.color === "#C0C0C0") {
       const textWidth = ctx.measureText(lineText).width;
       const gradient = ctx.createLinearGradient(
-        x - textWidth / 2, lineY - fontSize / 2,
-        x + textWidth / 2, lineY + fontSize / 2
+        x - textWidth / 2,
+        lineY - fontSize / 2,
+        x + textWidth / 2,
+        lineY + fontSize / 2,
       );
-      gradient.addColorStop(0, '#FFFFFF');
-      gradient.addColorStop(0.5, '#CCCCCC');
-      gradient.addColorStop(1, '#999999');
+      gradient.addColorStop(0, "#FFFFFF");
+      gradient.addColorStop(0.5, "#CCCCCC");
+      gradient.addColorStop(1, "#999999");
       fillStyle = gradient;
     }
 
@@ -1304,7 +1588,7 @@ function renderDynamicBehindInExport(
   chunk: TranscriptChunk,
   style: SubtitleStyle,
   canvas: HTMLCanvasElement,
-  currentTime: number
+  currentTime: number,
 ) {
   if (!chunk.words) {
     // Fallback: render entire text as behind
@@ -1312,17 +1596,26 @@ function renderDynamicBehindInExport(
     return;
   }
 
-  let behindWords = chunk.words.filter((w) => w.dynamicPosition === 'behind');
+  let behindWords = chunk.words.filter((w) => w.dynamicPosition === "behind");
   if (style.dynamicFollowWord) {
-    behindWords = behindWords.filter(w => currentTime >= w.timestamp[0]);
+    behindWords = behindWords.filter((w) => currentTime >= w.timestamp[0]);
   }
   if (behindWords.length === 0) return;
 
-  const behindText = behindWords.map((w) => w.text).join(' ');
-  renderDynamicWordWithOptions(ctx, behindText, style, canvas, {
-    fontSize: style.dynamicFontSize ?? 80,
-    yPosition: style.dynamicYPosition ?? 35,
-  }, behindWords, currentTime, chunk.timestamp[1]);
+  const behindText = behindWords.map((w) => w.text).join(" ");
+  renderDynamicWordWithOptions(
+    ctx,
+    behindText,
+    style,
+    canvas,
+    {
+      fontSize: style.dynamicFontSize ?? 80,
+      yPosition: style.dynamicYPosition ?? 35,
+    },
+    behindWords,
+    currentTime,
+    chunk.timestamp[1],
+  );
 }
 
 // Render only "front" words from a dynamic chunk
@@ -1332,17 +1625,17 @@ function renderDynamicFrontInExport(
   style: SubtitleStyle,
   canvas: HTMLCanvasElement,
   faceBounds: FaceBounds | null,
-  currentTime: number
+  currentTime: number,
 ) {
   if (!chunk.words) return;
 
-  let frontWords = chunk.words.filter((w) => w.dynamicPosition === 'front');
+  let frontWords = chunk.words.filter((w) => w.dynamicPosition === "front");
   if (style.dynamicFollowWord) {
-    frontWords = frontWords.filter(w => currentTime >= w.timestamp[0]);
+    frontWords = frontWords.filter((w) => currentTime >= w.timestamp[0]);
   }
   if (frontWords.length === 0) return;
 
-  const frontText = frontWords.map((w) => w.text).join(' ');
+  const frontText = frontWords.map((w) => w.text).join(" ");
 
   const fallbackY = style.dynamicFrontYPosition ?? 75;
   let yPosition = fallbackY;
@@ -1353,10 +1646,19 @@ function renderDynamicFrontInExport(
     yPosition = Math.max(fallbackY, faceBasedY);
   }
 
-  renderDynamicWordWithOptions(ctx, frontText, style, canvas, {
-    fontSize: style.dynamicFrontFontSize ?? 40,
-    yPosition,
-  }, frontWords, currentTime, chunk.timestamp[1]);
+  renderDynamicWordWithOptions(
+    ctx,
+    frontText,
+    style,
+    canvas,
+    {
+      fontSize: style.dynamicFrontFontSize ?? 40,
+      yPosition,
+    },
+    frontWords,
+    currentTime,
+    chunk.timestamp[1],
+  );
 }
 
 // Shared dynamic text renderer with configurable size and position
@@ -1369,7 +1671,7 @@ function renderDynamicWordWithOptions(
   options: { fontSize: number; yPosition: number },
   wordTimings?: WordTiming[],
   currentTime?: number,
-  chunkEndTime?: number
+  chunkEndTime?: number,
 ) {
   const videoScale = canvas.height / 500;
   const fontSize = Math.round(options.fontSize * videoScale);
@@ -1379,20 +1681,22 @@ function renderDynamicWordWithOptions(
 
   const globalFont = `${style.fontWeight} ${fontSize}px ${fontFamily}`;
   ctx.font = globalFont;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
 
   const hasOverrides = wordTimings?.some((w) => w.styleOverride);
 
   // Word-wrap into lines, tracking word indices
   // Use emoji as display text when set
-  const rawUpperWords = text.toUpperCase().split(' ');
+  const rawUpperWords = text.toUpperCase().split(" ");
   const upperWords = rawUpperWords.map((w, i) =>
-    wordTimings?.[i]?.styleOverride?.emoji ? wordTimings[i].styleOverride!.emoji! : w
+    wordTimings?.[i]?.styleOverride?.emoji
+      ? wordTimings[i].styleOverride!.emoji!
+      : w,
   );
   const lines: string[] = [];
   const lineWordIndices: number[][] = [];
-  let currentLine = '';
+  let currentLine = "";
   let currentIndices: number[] = [];
 
   for (let wi = 0; wi < upperWords.length; wi++) {
@@ -1419,11 +1723,16 @@ function renderDynamicWordWithOptions(
   const yCenter = canvas.height * (options.yPosition / 100);
   const startY = yCenter - totalHeight / 2 + lineHeight / 2;
 
-  const useTextFade = (style.textFadeIn ?? false) && wordTimings && currentTime != null;
+  const useTextFade =
+    (style.textFadeIn ?? false) && wordTimings && currentTime != null;
   const fadeOutDuration = 0.25;
-  const chunkFadeOut = (useTextFade && chunkEndTime != null)
-    ? Math.min(1, Math.max(0, (chunkEndTime - currentTime!) / fadeOutDuration))
-    : 1;
+  const chunkFadeOut =
+    useTextFade && chunkEndTime != null
+      ? Math.min(
+          1,
+          Math.max(0, (chunkEndTime - currentTime!) / fadeOutDuration),
+        )
+      : 1;
 
   const needsWordByWord = (hasOverrides || useTextFade) && wordTimings;
 
@@ -1434,12 +1743,14 @@ function renderDynamicWordWithOptions(
     if (needsWordByWord) {
       const indices = lineWordIndices[i];
       const lineWords = indices.map((idx) => ({
-        text: wordTimings[idx]?.styleOverride?.emoji ? wordTimings[idx].styleOverride!.emoji! : upperWords[idx],
+        text: wordTimings[idx]?.styleOverride?.emoji
+          ? wordTimings[idx].styleOverride!.emoji!
+          : upperWords[idx],
         override: wordTimings[idx]?.styleOverride,
         timing: wordTimings[idx],
       }));
 
-      const spaceWidth = ctx.measureText(' ').width;
+      const spaceWidth = ctx.measureText(" ").width;
       const wordWidths = lineWords.map((w) => {
         if (w.override?.fontFamily || w.override?.fontSize) {
           ctx.font = buildWordFont(style, fontSize, fontFamily, w.override);
@@ -1476,18 +1787,36 @@ function renderDynamicWordWithOptions(
           const letterStagger = charCount > 0 ? revealDuration / charCount : 0;
           charAlphas = [];
           for (let ci = 0; ci < charCount; ci++) {
-            charAlphas.push(Math.min(1, Math.max(0, (timeSinceWordStart - ci * letterStagger) / 0.06)) * chunkFadeOut);
+            charAlphas.push(
+              Math.min(
+                1,
+                Math.max(0, (timeSinceWordStart - ci * letterStagger) / 0.06),
+              ) * chunkFadeOut,
+            );
           }
         }
 
         ctx.save();
         if (!charAlphas) ctx.globalAlpha = chunkFadeOut;
-        renderDynamicSingleWord(ctx, w.text, wordX, lineY, style, wordColor, fontSize, videoScale, w.override?.effect, charAlphas);
+        renderDynamicSingleWord(
+          ctx,
+          w.text,
+          wordX,
+          lineY,
+          style,
+          wordColor,
+          fontSize,
+          videoScale,
+          w.override?.effect,
+          charAlphas,
+        );
         ctx.restore();
 
         // Draw emoji overlay above the word
         if (w.override?.emojiOverlay) {
-          const effectiveFontSize = w.override?.fontSize ? Math.round(fontSize * w.override.fontSize) : fontSize;
+          const effectiveFontSize = w.override?.fontSize
+            ? Math.round(fontSize * w.override.fontSize)
+            : fontSize;
           const emojiScale = w.override?.emojiScale ?? 1;
           ctx.save();
           ctx.shadowColor = "transparent";
@@ -1501,7 +1830,11 @@ function renderDynamicWordWithOptions(
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
           ctx.fillStyle = "#000000";
-          ctx.fillText(w.override.emojiOverlay, wordX, lineY - effectiveFontSize * 1.2 * emojiScale);
+          ctx.fillText(
+            w.override.emojiOverlay,
+            wordX,
+            lineY - effectiveFontSize * 1.2 * emojiScale,
+          );
           ctx.restore();
         }
 
@@ -1513,7 +1846,16 @@ function renderDynamicWordWithOptions(
       }
     } else {
       // Fast path: no overrides and no textFadeIn, render full line
-      renderDynamicSingleWord(ctx, lineText, x, lineY, style, style.color, fontSize, videoScale);
+      renderDynamicSingleWord(
+        ctx,
+        lineText,
+        x,
+        lineY,
+        style,
+        style.color,
+        fontSize,
+        videoScale,
+      );
     }
   }
 }
@@ -1529,7 +1871,7 @@ function renderDynamicSingleWord(
   fontSize: number,
   videoScale: number,
   effect?: "knockout",
-  charAlphas?: number[]
+  charAlphas?: number[],
 ) {
   const upperText = text.toUpperCase();
   const isKnockout = effect === "knockout";
@@ -1538,7 +1880,7 @@ function renderDynamicSingleWord(
   if (charAlphas && charAlphas.length > 0 && !isKnockout) {
     const savedAlpha = ctx.globalAlpha;
     const chars = upperText.split("");
-    const charWidths = chars.map(c => ctx.measureText(c).width);
+    const charWidths = chars.map((c) => ctx.measureText(c).width);
     const totalCharWidth = charWidths.reduce((a, b) => a + b, 0);
     let charX = x - totalCharWidth / 2;
 
@@ -1549,20 +1891,28 @@ function renderDynamicSingleWord(
 
       const strokeWidth = Math.max(2, fontSize * 0.03);
       ctx.save();
-      ctx.strokeStyle = style.borderColor || '#000000';
+      ctx.strokeStyle = style.borderColor || "#000000";
       ctx.lineWidth = strokeWidth;
-      ctx.lineJoin = 'round';
+      ctx.lineJoin = "round";
       ctx.miterLimit = 2;
       ctx.strokeText(chars[ci], cx, y);
       ctx.restore();
 
       let charFillStyle: string | CanvasGradient = fillColor;
-      if (fillColor === style.color && (style.color === '#CCCCCC' || style.color === '#C0C0C0')) {
+      if (
+        fillColor === style.color &&
+        (style.color === "#CCCCCC" || style.color === "#C0C0C0")
+      ) {
         const tw = ctx.measureText(upperText).width;
-        const gradient = ctx.createLinearGradient(x - tw / 2, y - fontSize / 2, x + tw / 2, y + fontSize / 2);
-        gradient.addColorStop(0, '#FFFFFF');
-        gradient.addColorStop(0.5, '#CCCCCC');
-        gradient.addColorStop(1, '#999999');
+        const gradient = ctx.createLinearGradient(
+          x - tw / 2,
+          y - fontSize / 2,
+          x + tw / 2,
+          y + fontSize / 2,
+        );
+        gradient.addColorStop(0, "#FFFFFF");
+        gradient.addColorStop(0.5, "#CCCCCC");
+        gradient.addColorStop(1, "#999999");
         charFillStyle = gradient;
       }
 
@@ -1585,9 +1935,9 @@ function renderDynamicSingleWord(
   if (!isKnockout) {
     const strokeWidth = Math.max(2, fontSize * 0.03);
     ctx.save();
-    ctx.strokeStyle = style.borderColor || '#000000';
+    ctx.strokeStyle = style.borderColor || "#000000";
     ctx.lineWidth = strokeWidth;
-    ctx.lineJoin = 'round';
+    ctx.lineJoin = "round";
     ctx.miterLimit = 2;
     ctx.strokeText(upperText, x, y);
     ctx.restore();
@@ -1605,16 +1955,18 @@ function renderDynamicSingleWord(
   let fillStyle: string | CanvasGradient = fillColor;
   if (
     fillColor === style.color &&
-    (style.color === '#CCCCCC' || style.color === '#C0C0C0')
+    (style.color === "#CCCCCC" || style.color === "#C0C0C0")
   ) {
     const textWidth = ctx.measureText(upperText).width;
     const gradient = ctx.createLinearGradient(
-      x - textWidth / 2, y - fontSize / 2,
-      x + textWidth / 2, y + fontSize / 2
+      x - textWidth / 2,
+      y - fontSize / 2,
+      x + textWidth / 2,
+      y + fontSize / 2,
     );
-    gradient.addColorStop(0, '#FFFFFF');
-    gradient.addColorStop(0.5, '#CCCCCC');
-    gradient.addColorStop(1, '#999999');
+    gradient.addColorStop(0, "#FFFFFF");
+    gradient.addColorStop(0.5, "#CCCCCC");
+    gradient.addColorStop(1, "#999999");
     fillStyle = gradient;
   }
 

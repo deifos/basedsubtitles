@@ -143,7 +143,7 @@ export function useCameraRecording(): UseCameraRecordingReturn {
         throw err;
       }
     },
-    []
+    [],
   );
 
   const openCamera = useCallback(async () => {
@@ -167,7 +167,8 @@ export function useCameraRecording(): UseCameraRecordingReturn {
   }, [facingMode, requestStream, attachStream]);
 
   const startRecording = useCallback(async () => {
-    if (state !== "previewing" || !streamRef.current || !previewRef.current) return;
+    if (state !== "previewing" || !streamRef.current || !previewRef.current)
+      return;
 
     const video = previewRef.current;
     let width = video.videoWidth || 1280;
@@ -219,7 +220,7 @@ export function useCameraRecording(): UseCameraRecordingReturn {
             bitrate: 192_000,
           });
           audioSource.errorPromise.catch((e: unknown) =>
-            console.warn("Camera audio source error:", e)
+            console.warn("Camera audio source error:", e),
           );
           audioSources.push(audioSource);
           output.addAudioTrack(audioSource);
@@ -277,7 +278,9 @@ export function useCameraRecording(): UseCameraRecordingReturn {
       clearFrameInterval();
       outputRef.current?.cancel();
       outputRef.current = null;
-      setError("Failed to start recording. Your browser may not support MP4 encoding.");
+      setError(
+        "Failed to start recording. Your browser may not support MP4 encoding.",
+      );
       setState("error");
     }
   }, [state, clearFrameInterval]);

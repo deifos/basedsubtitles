@@ -18,7 +18,7 @@ interface UseBackgroundRemovalReturn {
     imageData: Uint8ClampedArray,
     width: number,
     height: number,
-    frameIndex: number
+    frameIndex: number,
   ) => Promise<MaskData>;
 }
 
@@ -45,7 +45,7 @@ export function useBackgroundRemoval(): UseBackgroundRemovalReturn {
     if (!workerRef.current) {
       workerRef.current = new Worker(
         new URL("../app/bg-removal-worker.ts", import.meta.url),
-        { type: "module" }
+        { type: "module" },
       );
 
       workerRef.current.addEventListener("message", (e: MessageEvent) => {
@@ -133,7 +133,7 @@ export function useBackgroundRemoval(): UseBackgroundRemovalReturn {
       imageData: Uint8ClampedArray,
       width: number,
       height: number,
-      frameIndex: number
+      frameIndex: number,
     ): Promise<MaskData> => {
       const worker = getWorker();
 
@@ -145,7 +145,7 @@ export function useBackgroundRemoval(): UseBackgroundRemovalReturn {
         });
       });
     },
-    [getWorker]
+    [getWorker],
   );
 
   // Process entire video for preview masks
@@ -234,7 +234,7 @@ export function useBackgroundRemoval(): UseBackgroundRemovalReturn {
         setIsProcessing(false);
       }
     },
-    [ensureModelLoaded, processFrame]
+    [ensureModelLoaded, processFrame],
   );
 
   // Get the nearest cached mask for a given video time
@@ -265,7 +265,7 @@ export function useBackgroundRemoval(): UseBackgroundRemovalReturn {
 
       return closest !== null ? currentMasks.get(closest)! : null;
     },
-    []
+    [],
   );
 
   // Reset all state

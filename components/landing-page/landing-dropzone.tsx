@@ -26,7 +26,7 @@ export function LandingDropzone({
 
       onVideoSelect?.(file);
     },
-    [onVideoSelect]
+    [onVideoSelect],
   );
 
   const handleInputChange = useCallback(
@@ -36,7 +36,7 @@ export function LandingDropzone({
       // allow selecting same file again
       event.target.value = "";
     },
-    [handleFile]
+    [handleFile],
   );
 
   const handleDrop = useCallback(
@@ -48,7 +48,7 @@ export function LandingDropzone({
       const file = event.dataTransfer.files?.[0] ?? null;
       handleFile(file);
     },
-    [handleFile]
+    [handleFile],
   );
 
   const handleDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
@@ -88,7 +88,9 @@ export function LandingDropzone({
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
     >
-      <div className={`absolute inset-0 -z-10 rounded-xl transition-colors ${isDragOver ? "bg-amber-50/40" : "bg-slate-50"}`} />
+      <div
+        className={`absolute inset-0 -z-10 rounded-xl transition-colors ${isDragOver ? "bg-amber-50/40" : "bg-slate-50"}`}
+      />
 
       {showCamera ? (
         <CameraRecorder

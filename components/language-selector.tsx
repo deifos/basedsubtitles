@@ -154,7 +154,11 @@ export function LanguageSelector({
         <SelectContent className="max-h-[300px]">
           <SelectGroup>
             {languageOptions.map((option) => (
-              <SelectItem key={option.value} value={option.value} className="text-sm">
+              <SelectItem
+                key={option.value}
+                value={option.value}
+                className="text-sm"
+              >
                 {option.label}
               </SelectItem>
             ))}

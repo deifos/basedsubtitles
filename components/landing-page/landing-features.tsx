@@ -51,7 +51,10 @@ export function LandingFeatures(): JSX.Element {
                     <div className="h-1.5 bg-blue-300/50 rounded-full w-5/6" />
                     <div className="h-1.5 bg-blue-300/50 rounded-full w-2/3" />
                   </div>
-                  <Captions className="h-14 w-14 text-blue-500 relative z-10" strokeWidth={1.2} />
+                  <Captions
+                    className="h-14 w-14 text-blue-500 relative z-10"
+                    strokeWidth={1.2}
+                  />
                 </div>
               </div>
               <div className="text-center sm:text-left">
@@ -65,11 +68,15 @@ export function LandingFeatures(): JSX.Element {
                   className="mt-2 text-sm text-slate-500 leading-relaxed max-w-sm"
                   style={{ fontFamily: "var(--font-outfit), sans-serif" }}
                 >
-                  Powered by Whisper.js running entirely in your browser. State-of-the-art speech recognition, zero cloud dependency.
+                  Powered by Whisper.js running entirely in your browser.
+                  State-of-the-art speech recognition, zero cloud dependency.
                 </p>
                 <div className="mt-3 flex items-center gap-1.5">
                   <Sparkles className="h-3 w-3 text-blue-500" />
-                  <span className="text-xs font-semibold text-blue-600" style={{ fontFamily: "var(--font-outfit), sans-serif" }}>
+                  <span
+                    className="text-xs font-semibold text-blue-600"
+                    style={{ fontFamily: "var(--font-outfit), sans-serif" }}
+                  >
                     WebGPU accelerated
                   </span>
                 </div>
@@ -82,8 +89,14 @@ export function LandingFeatures(): JSX.Element {
             <div className="relative w-full h-28 rounded-xl bg-rose-100/50 flex items-center justify-center mb-4">
               {/* Person in front, background fading */}
               <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-rose-200/30 via-transparent to-rose-200/30" />
-              <Camera className="h-12 w-12 text-rose-400 relative z-10" strokeWidth={1.2} />
-              <Eraser className="absolute bottom-2 right-2 h-6 w-6 text-rose-500" strokeWidth={1.5} />
+              <Camera
+                className="h-12 w-12 text-rose-400 relative z-10"
+                strokeWidth={1.2}
+              />
+              <Eraser
+                className="absolute bottom-2 right-2 h-6 w-6 text-rose-500"
+                strokeWidth={1.5}
+              />
             </div>
             <h3
               className="text-sm font-bold text-slate-900"
@@ -95,7 +108,8 @@ export function LandingFeatures(): JSX.Element {
               className="mt-1.5 text-xs text-slate-500 leading-relaxed"
               style={{ fontFamily: "var(--font-outfit), sans-serif" }}
             >
-              AI person segmentation that runs locally. Remove backgrounds without uploading a frame.
+              AI person segmentation that runs locally. Remove backgrounds
+              without uploading a frame.
             </p>
           </div>
 
@@ -109,7 +123,10 @@ export function LandingFeatures(): JSX.Element {
               >
                 HELLO
               </span>
-              <Layers3 className="h-14 w-14 text-amber-500 relative z-10" strokeWidth={1.2} />
+              <Layers3
+                className="h-14 w-14 text-amber-500 relative z-10"
+                strokeWidth={1.2}
+              />
               <span
                 className="absolute text-lg font-black text-amber-600/80 rotate-2 bottom-3 right-4 select-none z-20"
                 style={{ fontFamily: "var(--font-bangers), cursive" }}
@@ -127,16 +144,32 @@ export function LandingFeatures(): JSX.Element {
               className="mt-1.5 text-xs text-slate-500 leading-relaxed"
               style={{ fontFamily: "var(--font-outfit), sans-serif" }}
             >
-              Place text behind or in front of people. Cinematic depth effects that pop.
+              Place text behind or in front of people. Cinematic depth effects
+              that pop.
             </p>
           </div>
 
           {/* 25+ Fonts — Visual: font samples */}
           <div className="group relative rounded-2xl border border-slate-200/80 bg-gradient-to-br from-emerald-50 to-white p-6 shadow-sm transition-all hover:shadow-lg hover:shadow-emerald-100/60 hover:-translate-y-0.5 overflow-hidden">
             <div className="relative w-full h-28 rounded-xl bg-emerald-100/40 flex flex-col items-center justify-center mb-4 gap-1">
-              <span className="text-xl font-bold text-emerald-700/70 select-none" style={{ fontFamily: "var(--font-bangers), cursive" }}>Bangers</span>
-              <span className="text-lg text-emerald-600/60 select-none" style={{ fontFamily: "var(--font-playfair-display), serif" }}>Playfair</span>
-              <span className="text-base font-bold text-emerald-500/50 select-none" style={{ fontFamily: "var(--font-permanent-marker), cursive" }}>Marker</span>
+              <span
+                className="text-xl font-bold text-emerald-700/70 select-none"
+                style={{ fontFamily: "var(--font-bangers), cursive" }}
+              >
+                Bangers
+              </span>
+              <span
+                className="text-lg text-emerald-600/60 select-none"
+                style={{ fontFamily: "var(--font-playfair-display), serif" }}
+              >
+                Playfair
+              </span>
+              <span
+                className="text-base font-bold text-emerald-500/50 select-none"
+                style={{ fontFamily: "var(--font-permanent-marker), cursive" }}
+              >
+                Marker
+              </span>
             </div>
             <h3
               className="text-sm font-bold text-slate-900"
@@ -157,15 +190,19 @@ export function LandingFeatures(): JSX.Element {
             <div className="relative w-full h-28 rounded-xl bg-sky-100/40 flex items-center justify-center mb-4">
               <Globe className="h-16 w-16 text-sky-400" strokeWidth={0.8} />
               <div className="absolute inset-0 flex flex-wrap items-center justify-center gap-1.5 p-3">
-                {["EN", "ES", "FR", "DE", "JP", "KO", "ZH", "AR", "PT"].map((lang) => (
-                  <span
-                    key={lang}
-                    className="text-[10px] font-bold text-sky-600/50 select-none"
-                    style={{ fontFamily: "var(--font-geist-mono), monospace" }}
-                  >
-                    {lang}
-                  </span>
-                ))}
+                {["EN", "ES", "FR", "DE", "JP", "KO", "ZH", "AR", "PT"].map(
+                  (lang) => (
+                    <span
+                      key={lang}
+                      className="text-[10px] font-bold text-sky-600/50 select-none"
+                      style={{
+                        fontFamily: "var(--font-geist-mono), monospace",
+                      }}
+                    >
+                      {lang}
+                    </span>
+                  ),
+                )}
               </div>
             </div>
             <h3
@@ -178,7 +215,8 @@ export function LandingFeatures(): JSX.Element {
               className="mt-1.5 text-xs text-slate-500 leading-relaxed"
               style={{ fontFamily: "var(--font-outfit), sans-serif" }}
             >
-              Whisper AI understands speech in over 100 languages out of the box.
+              Whisper AI understands speech in over 100 languages out of the
+              box.
             </p>
           </div>
 
@@ -217,7 +255,8 @@ export function LandingFeatures(): JSX.Element {
               className="mt-1.5 text-xs text-slate-500 leading-relaxed"
               style={{ fontFamily: "var(--font-outfit), sans-serif" }}
             >
-              After the first load, everything is cached. Process videos anywhere.
+              After the first load, everything is cached. Process videos
+              anywhere.
             </p>
           </div>
 
@@ -236,7 +275,8 @@ export function LandingFeatures(): JSX.Element {
               className="mt-1.5 text-xs text-slate-500 leading-relaxed"
               style={{ fontFamily: "var(--font-outfit), sans-serif" }}
             >
-              No accounts, no paywalls, no limitations. Your videos, your subtitles.
+              No accounts, no paywalls, no limitations. Your videos, your
+              subtitles.
             </p>
           </div>
         </div>

@@ -51,7 +51,8 @@ export function TranscriptSidebar({
   const [editText, setEditText] = useState("");
   const transcriptContainerRef = useRef<HTMLDivElement>(null);
   const activeChunkRef = useRef<HTMLDivElement>(null);
-  const [currentActiveElement, setCurrentActiveElement] = useState<HTMLDivElement | null>(null);
+  const [currentActiveElement, setCurrentActiveElement] =
+    useState<HTMLDivElement | null>(null);
 
   // State for adding new subtitles
   const [isAddingNew, setIsAddingNew] = useState(false);
@@ -61,25 +62,30 @@ export function TranscriptSidebar({
 
   // Process transcript chunks based on the current mode
   const displayChunks: ProcessedChunk[] = useMemo(() => {
-    const processed = processTranscriptChunks(transcript, mode, maxWordsPerLine, dynamicEnabled);
+    const processed = processTranscriptChunks(
+      transcript,
+      mode,
+      maxWordsPerLine,
+      dynamicEnabled,
+    );
 
     return processed.map((chunk, index) => {
-      if ((mode === "phrase") && chunk.words) {
+      if (mode === "phrase" && chunk.words) {
         const everyWordDisabled = chunk.words.every((word) =>
           transcript.chunks.some(
             (originalChunk) =>
               originalChunk.timestamp[0] === word.timestamp[0] &&
               originalChunk.timestamp[1] === word.timestamp[1] &&
-              originalChunk.disabled
-          )
+              originalChunk.disabled,
+          ),
         );
         const everyWordHidden = chunk.words.every((word) =>
           transcript.chunks.some(
             (originalChunk) =>
               originalChunk.timestamp[0] === word.timestamp[0] &&
               originalChunk.timestamp[1] === word.timestamp[1] &&
-              originalChunk.subtitleHidden
-          )
+              originalChunk.subtitleHidden,
+          ),
         );
 
         return {
@@ -104,30 +110,32 @@ export function TranscriptSidebar({
       if (currentActiveElement && transcriptContainerRef.current) {
         const container = transcriptContainerRef.current;
         const activeElement = currentActiveElement;
-        
-        
+
         // Use scrollTop and clientHeight to determine the actual visible scroll area
         const scrollTop = container.scrollTop;
         const clientHeight = container.clientHeight;
         const scrollBottom = scrollTop + clientHeight;
-        
+
         // Get element position within the scrollable content
         const elementOffsetTop = activeElement.offsetTop;
-        const elementOffsetBottom = elementOffsetTop + activeElement.offsetHeight;
-        
+        const elementOffsetBottom =
+          elementOffsetTop + activeElement.offsetHeight;
+
         // Calculate if element is visible within the scrollable viewport
         const isElementAboveViewport = elementOffsetTop < scrollTop;
         const isElementBelowViewport = elementOffsetBottom > scrollBottom;
-        
-        
+
         if (isElementAboveViewport || isElementBelowViewport) {
           // Calculate the scroll position to center the element in the container
-          const newScrollTop = elementOffsetTop - clientHeight / 2 + activeElement.offsetHeight / 2;
-          
+          const newScrollTop =
+            elementOffsetTop -
+            clientHeight / 2 +
+            activeElement.offsetHeight / 2;
+
           // Smooth scroll within the container only
           container.scrollTo({
             top: Math.max(0, newScrollTop),
-            behavior: "smooth"
+            behavior: "smooth",
           });
         }
       }
@@ -139,7 +147,7 @@ export function TranscriptSidebar({
   const jsonTranscript = useMemo(() => {
     return JSON.stringify(transcript, null, 2).replace(
       /( {4}"timestamp": )\[\s+(\S+)\s+(\S+)\s+\]/gm,
-      "$1[$2 $3]"
+      "$1[$2 $3]",
     );
   }, [transcript]);
 
@@ -206,7 +214,7 @@ export function TranscriptSidebar({
           const originalChunkIndex = transcript.chunks.findIndex(
             (chunk) =>
               chunk.timestamp[0] === originalWord.timestamp[0] &&
-              chunk.timestamp[1] === originalWord.timestamp[1]
+              chunk.timestamp[1] === originalWord.timestamp[1],
           );
 
           if (originalChunkIndex !== -1) {
@@ -274,19 +282,27 @@ export function TranscriptSidebar({
       const phraseToToggle = displayChunks[index];
       if (phraseToToggle.words) {
         const updatedChunks = transcript.chunks.map((originalChunk) => {
-          const isPartOfPhrase = phraseToToggle.words!.some((phraseWord) =>
-            phraseWord.timestamp[0] === originalChunk.timestamp[0] &&
-            phraseWord.timestamp[1] === originalChunk.timestamp[1]
+          const isPartOfPhrase = phraseToToggle.words!.some(
+            (phraseWord) =>
+              phraseWord.timestamp[0] === originalChunk.timestamp[0] &&
+              phraseWord.timestamp[1] === originalChunk.timestamp[1],
           );
 
           if (isPartOfPhrase) {
-            return { ...originalChunk, disabled: nextDisabled, subtitleHidden: nextHidden };
+            return {
+              ...originalChunk,
+              disabled: nextDisabled,
+              subtitleHidden: nextHidden,
+            };
           }
           return originalChunk;
         });
 
         const updatedTranscript = {
-          text: updatedChunks.filter(c => !c.disabled).map((c) => c.text).join(" "),
+          text: updatedChunks
+            .filter((c) => !c.disabled)
+            .map((c) => c.text)
+            .join(" "),
           chunks: updatedChunks,
         };
 
@@ -296,11 +312,16 @@ export function TranscriptSidebar({
       }
     } else {
       const updatedChunks = transcript.chunks.map((c, i) =>
-        i === index ? { ...c, disabled: nextDisabled, subtitleHidden: nextHidden } : c
+        i === index
+          ? { ...c, disabled: nextDisabled, subtitleHidden: nextHidden }
+          : c,
       );
 
       const updatedTranscript = {
-        text: updatedChunks.filter(c => !c.disabled).map((c) => c.text).join(" "),
+        text: updatedChunks
+          .filter((c) => !c.disabled)
+          .map((c) => c.text)
+          .join(" "),
         chunks: updatedChunks,
       };
 
@@ -321,7 +342,9 @@ export function TranscriptSidebar({
         const currentPos = chunk.dynamicPosition || "front";
         return {
           ...chunk,
-          dynamicPosition: (currentPos === "behind" ? "front" : "behind") as "behind" | "front",
+          dynamicPosition: (currentPos === "behind" ? "front" : "behind") as
+            | "behind"
+            | "front",
         };
       }
       return chunk;
@@ -372,7 +395,7 @@ export function TranscriptSidebar({
     const formatTimeInput = (seconds: number): string => {
       const mins = Math.floor(seconds / 60);
       const secs = (seconds % 60).toFixed(2);
-      return `${mins}:${parseFloat(secs) < 10 ? '0' : ''}${secs}`;
+      return `${mins}:${parseFloat(secs) < 10 ? "0" : ""}${secs}`;
     };
 
     setNewStartTime(formatTimeInput(startSeconds));
@@ -393,7 +416,9 @@ export function TranscriptSidebar({
     const endSeconds = parseTimeInput(newEndTime);
 
     if (startSeconds === null || endSeconds === null) {
-      alert("Please enter valid start and end times (e.g., '21' for 21 seconds or '0:21' for 0:21)");
+      alert(
+        "Please enter valid start and end times (e.g., '21' for 21 seconds or '0:21' for 0:21)",
+      );
       return;
     }
 
@@ -415,7 +440,7 @@ export function TranscriptSidebar({
 
     // Insert into the chunks array at the correct position (sorted by start time)
     const updatedChunks = [...transcript.chunks, newChunk].sort(
-      (a, b) => a.timestamp[0] - b.timestamp[0]
+      (a, b) => a.timestamp[0] - b.timestamp[0],
     );
 
     const updatedTranscript = {
@@ -449,7 +474,9 @@ export function TranscriptSidebar({
             <div className="text-sm font-medium">Add New Subtitle</div>
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="text-xs text-muted-foreground">Start Time</label>
+                <label className="text-xs text-muted-foreground">
+                  Start Time
+                </label>
                 <input
                   type="text"
                   value={newStartTime}
@@ -459,7 +486,9 @@ export function TranscriptSidebar({
                 />
               </div>
               <div>
-                <label className="text-xs text-muted-foreground">End Time</label>
+                <label className="text-xs text-muted-foreground">
+                  End Time
+                </label>
                 <input
                   type="text"
                   value={newEndTime}
@@ -470,7 +499,9 @@ export function TranscriptSidebar({
               </div>
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Subtitle Text</label>
+              <label className="text-xs text-muted-foreground">
+                Subtitle Text
+              </label>
               <textarea
                 value={newSubtitleText}
                 onChange={(e) => setNewSubtitleText(e.target.value)}
@@ -491,7 +522,10 @@ export function TranscriptSidebar({
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto lg:max-h-96" ref={transcriptContainerRef}>
+      <div
+        className="flex-1 overflow-y-auto lg:max-h-96"
+        ref={transcriptContainerRef}
+      >
         <div className="space-y-2 p-2">
           {displayChunks.map((chunk, i) => {
             const [start, end] = chunk.timestamp;
@@ -504,12 +538,16 @@ export function TranscriptSidebar({
             return (
               <div
                 key={`${mode}-${i}-${start}`}
-                ref={isActive && !isDisabled ? (el) => {
-                  if (el) {
-                    setCurrentActiveElement(el);
-                    activeChunkRef.current = el;
-                  }
-                } : null}
+                ref={
+                  isActive && !isDisabled
+                    ? (el) => {
+                        if (el) {
+                          setCurrentActiveElement(el);
+                          activeChunkRef.current = el;
+                        }
+                      }
+                    : null
+                }
                 className={`p-2 rounded ${
                   isEditing ? "bg-muted" : "hover:bg-muted cursor-pointer"
                 } transition-colors ${
@@ -517,9 +555,13 @@ export function TranscriptSidebar({
                     ? "bg-muted border-l-4 border-black"
                     : ""
                 } ${
-                  isDisabled ? "opacity-50 bg-gray-100 border-l-4 border-red-400" : ""
+                  isDisabled
+                    ? "opacity-50 bg-gray-100 border-l-4 border-red-400"
+                    : ""
                 } ${
-                  isHidden && !isDisabled ? "opacity-70 bg-yellow-50 border-l-4 border-yellow-400" : ""
+                  isHidden && !isDisabled
+                    ? "opacity-70 bg-yellow-50 border-l-4 border-yellow-400"
+                    : ""
                 }`}
                 onClick={() => {
                   if (!isEditing) {
@@ -566,7 +608,9 @@ export function TranscriptSidebar({
                 ) : (
                   <div>
                     <div className="flex justify-between items-start">
-                      <p className={`${isActive ? "font-medium" : ""} ${isDisabled ? "line-through text-gray-500" : ""} ${isHidden && !isDisabled ? "italic text-yellow-700" : ""}`}>
+                      <p
+                        className={`${isActive ? "font-medium" : ""} ${isDisabled ? "line-through text-gray-500" : ""} ${isHidden && !isDisabled ? "italic text-yellow-700" : ""}`}
+                      >
                         {chunk.text}
                       </p>
                       <div className="flex gap-1 shrink-0 ml-1">
@@ -588,7 +632,13 @@ export function TranscriptSidebar({
                             cycleChunkState(i);
                           }}
                           className="p-1"
-                          title={isDisabled ? "Skipped (click to enable)" : isHidden ? "Subs hidden (click to skip)" : "Click to hide subs"}
+                          title={
+                            isDisabled
+                              ? "Skipped (click to enable)"
+                              : isHidden
+                                ? "Subs hidden (click to skip)"
+                                : "Click to hide subs"
+                          }
                           size="icon"
                           variant="default"
                         >
@@ -603,34 +653,45 @@ export function TranscriptSidebar({
                       </div>
                     </div>
                     {/* Word pills for dynamic behind/front toggling */}
-                    {dynamicEnabled && chunk.words && chunk.words.length > 0 && !isDisabled && (
-                      <div className="flex flex-wrap gap-1 mt-1.5">
-                        {chunk.words.map((word: ProcessedWord, wordIdx: number) => {
-                          const pos = word.dynamicPosition || "front";
-                          const isBehind = pos === "behind";
-                          return (
-                            <button
-                              key={`${word.timestamp[0]}-${wordIdx}`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleWordDynamicPosition(word.timestamp);
-                              }}
-                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
-                                isBehind
-                                  ? "bg-purple-100 text-purple-800 hover:bg-purple-200 border border-purple-300"
-                                  : "bg-blue-100 text-blue-700 hover:bg-blue-200 border border-blue-300"
-                              }`}
-                              title={isBehind ? "Behind person (click to move to front)" : "In front of person (click to move behind)"}
-                            >
-                              <span className={`text-[10px] font-bold ${isBehind ? "text-purple-600" : "text-blue-500"}`}>
-                                {isBehind ? "B" : "F"}
-                              </span>
-                              {word.text}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
+                    {dynamicEnabled &&
+                      chunk.words &&
+                      chunk.words.length > 0 &&
+                      !isDisabled && (
+                        <div className="flex flex-wrap gap-1 mt-1.5">
+                          {chunk.words.map(
+                            (word: ProcessedWord, wordIdx: number) => {
+                              const pos = word.dynamicPosition || "front";
+                              const isBehind = pos === "behind";
+                              return (
+                                <button
+                                  key={`${word.timestamp[0]}-${wordIdx}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleWordDynamicPosition(word.timestamp);
+                                  }}
+                                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
+                                    isBehind
+                                      ? "bg-purple-100 text-purple-800 hover:bg-purple-200 border border-purple-300"
+                                      : "bg-blue-100 text-blue-700 hover:bg-blue-200 border border-blue-300"
+                                  }`}
+                                  title={
+                                    isBehind
+                                      ? "Behind person (click to move to front)"
+                                      : "In front of person (click to move behind)"
+                                  }
+                                >
+                                  <span
+                                    className={`text-[10px] font-bold ${isBehind ? "text-purple-600" : "text-blue-500"}`}
+                                  >
+                                    {isBehind ? "B" : "F"}
+                                  </span>
+                                  {word.text}
+                                </button>
+                              );
+                            },
+                          )}
+                        </div>
+                      )}
                   </div>
                 )}
               </div>

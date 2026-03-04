@@ -9,7 +9,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { LanguageSelector, type LanguageCode } from "@/components/language-selector";
+import {
+  LanguageSelector,
+  type LanguageCode,
+} from "@/components/language-selector";
 import { Video, Loader2 } from "lucide-react";
 import type { ModelSize } from "@/hooks/useTranscription";
 
@@ -21,10 +24,26 @@ interface LanguageSelectionModalProps {
   defaultModelSize?: ModelSize;
 }
 
-const MODEL_SIZE_OPTIONS: { value: ModelSize; label: string; description: string }[] = [
-  { value: "tiny", label: "Tiny (~75MB)", description: "Fastest, lower accuracy" },
-  { value: "base", label: "Base (~150MB)", description: "Balanced speed & accuracy" },
-  { value: "small", label: "Small (~500MB)", description: "Most accurate, slower" },
+const MODEL_SIZE_OPTIONS: {
+  value: ModelSize;
+  label: string;
+  description: string;
+}[] = [
+  {
+    value: "tiny",
+    label: "Tiny (~75MB)",
+    description: "Fastest, lower accuracy",
+  },
+  {
+    value: "base",
+    label: "Base (~150MB)",
+    description: "Balanced speed & accuracy",
+  },
+  {
+    value: "small",
+    label: "Small (~500MB)",
+    description: "Most accurate, slower",
+  },
 ];
 
 export function LanguageSelectionModal({
@@ -34,8 +53,10 @@ export function LanguageSelectionModal({
   defaultLanguage = "en",
   defaultModelSize = "base",
 }: LanguageSelectionModalProps) {
-  const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>(defaultLanguage);
-  const [selectedModelSize, setSelectedModelSize] = useState<ModelSize>(defaultModelSize);
+  const [selectedLanguage, setSelectedLanguage] =
+    useState<LanguageCode>(defaultLanguage);
+  const [selectedModelSize, setSelectedModelSize] =
+    useState<ModelSize>(defaultModelSize);
   const [isProcessing, setIsProcessing] = useState(false);
 
   // Sync with defaults when modal opens
@@ -84,7 +105,9 @@ export function LanguageSelectionModal({
                     }`}
                   >
                     <div className="text-xs font-medium">{option.label}</div>
-                    <div className="text-[10px] opacity-70">{option.description}</div>
+                    <div className="text-[10px] opacity-70">
+                      {option.description}
+                    </div>
                   </button>
                 );
               })}
@@ -94,10 +117,13 @@ export function LanguageSelectionModal({
           <div className="rounded-md bg-muted/50 p-3 text-sm text-muted-foreground">
             <p className="font-medium mb-1">💡 Translation Feature</p>
             <p>
-              Select a different language to translate your video&apos;s speech. For example, if your video is in Spanish but you select English, the transcription will be translated to English.
+              Select a different language to translate your video&apos;s speech.
+              For example, if your video is in Spanish but you select English,
+              the transcription will be translated to English.
             </p>
             <p className="mt-2 text-xs">
-              <strong>Note:</strong> Translation will take longer to process than matching the video&apos;s original language.
+              <strong>Note:</strong> Translation will take longer to process
+              than matching the video&apos;s original language.
             </p>
           </div>
         </div>

@@ -18,7 +18,9 @@ import { DebouncedColorInput } from "@/components/ui/debounced-color-input";
 
 // Helper to check if a color is effectively transparent
 function isTransparentColor(color: string): boolean {
-  return color === "transparent" || color === "rgba(0, 0, 0, 0)" || color === "";
+  return (
+    color === "transparent" || color === "rgba(0, 0, 0, 0)" || color === ""
+  );
 }
 
 // Helper to convert rgba to hex (for display in color input)
@@ -255,11 +257,7 @@ const borderWidthOptions = [
   { value: 4, label: "Thick" },
 ];
 
-type SubtitlePresetName =
-  | "green"
-  | "gold"
-  | "subtitle"
-  | "gamer";
+type SubtitlePresetName = "green" | "gold" | "subtitle" | "gamer";
 
 interface SubtitlePreset {
   name: SubtitlePresetName;
@@ -425,14 +423,42 @@ function isPresetActive(style: SubtitleStyle, preset: SubtitlePreset) {
   });
 }
 
-function PositionIcon({ position, isActive }: { position: "top" | "middle" | "bottom"; isActive: boolean }) {
+function PositionIcon({
+  position,
+  isActive,
+}: {
+  position: "top" | "middle" | "bottom";
+  isActive: boolean;
+}) {
   const lineColor = isActive ? "currentColor" : "currentColor";
   return (
-    <svg width="20" height="24" viewBox="0 0 20 24" fill="none" className="shrink-0">
-      <rect x="1" y="1" width="18" height="22" rx="2" stroke={lineColor} strokeWidth="1.5" fill="none" opacity={0.4} />
-      {position === "top" && <rect x="5" y="4" width="10" height="2.5" rx="1" fill={lineColor} />}
-      {position === "middle" && <rect x="5" y="10.75" width="10" height="2.5" rx="1" fill={lineColor} />}
-      {position === "bottom" && <rect x="5" y="17.5" width="10" height="2.5" rx="1" fill={lineColor} />}
+    <svg
+      width="20"
+      height="24"
+      viewBox="0 0 20 24"
+      fill="none"
+      className="shrink-0"
+    >
+      <rect
+        x="1"
+        y="1"
+        width="18"
+        height="22"
+        rx="2"
+        stroke={lineColor}
+        strokeWidth="1.5"
+        fill="none"
+        opacity={0.4}
+      />
+      {position === "top" && (
+        <rect x="5" y="4" width="10" height="2.5" rx="1" fill={lineColor} />
+      )}
+      {position === "middle" && (
+        <rect x="5" y="10.75" width="10" height="2.5" rx="1" fill={lineColor} />
+      )}
+      {position === "bottom" && (
+        <rect x="5" y="17.5" width="10" height="2.5" rx="1" fill={lineColor} />
+      )}
     </svg>
   );
 }
@@ -504,7 +530,9 @@ export function SubtitleStyling({
       fontWeight: style.fontWeight,
       color: style.color,
       WebkitTextStroke:
-        style.borderWidth > 0 ? `${Math.max(0.5, style.borderWidth)}px ${style.borderColor}` : "none",
+        style.borderWidth > 0
+          ? `${Math.max(0.5, style.borderWidth)}px ${style.borderColor}`
+          : "none",
       letterSpacing: "0.05em",
       filter: `drop-shadow(2px 2px ${Math.max(2, style.dropShadowIntensity * 4)}px rgba(0, 0, 0, ${style.dropShadowIntensity}))`,
       borderRadius: "0.5rem",
@@ -521,7 +549,10 @@ export function SubtitleStyling({
   const fontSizeSliderIndex = fontSizeToSliderIndex(style.fontSize);
 
   return (
-    <div className={`flex flex-col h-full overflow-hidden ${className}`} style={{ fontFamily: "var(--font-outfit), sans-serif" }}>
+    <div
+      className={`flex flex-col h-full overflow-hidden ${className}`}
+      style={{ fontFamily: "var(--font-outfit), sans-serif" }}
+    >
       {/* Mode Toggle at top */}
       {onModeChange && (
         <div className="px-4 mb-3">
@@ -538,12 +569,17 @@ export function SubtitleStyling({
       )}
 
       <div className="px-4 mb-2">
-        <h3 className="font-semibold text-base tracking-tight">Subtitle Styling</h3>
+        <h3 className="font-semibold text-base tracking-tight">
+          Subtitle Styling
+        </h3>
       </div>
 
       {/* Preview — pinned above scroll area */}
       <div className="px-4 pb-3">
-        <div className="p-3 rounded-lg text-center border border-border/40 bg-muted/30" style={previewStyles}>
+        <div
+          className="p-3 rounded-lg text-center border border-border/40 bg-muted/30"
+          style={previewStyles}
+        >
           {previewText}
         </div>
       </div>
@@ -566,7 +602,10 @@ export function SubtitleStyling({
 
         {/* Font Family with preview */}
         <div className="space-y-2 rounded-lg border border-border/40 bg-muted/40 p-3">
-          <Select value={style.fontFamily} onValueChange={handleFontFamilyChange}>
+          <Select
+            value={style.fontFamily}
+            onValueChange={handleFontFamilyChange}
+          >
             <SelectTrigger
               className="w-full rounded-md border-none bg-background px-3 py-2 text-sm shadow-sm"
               style={{ fontFamily: currentFontCss }}
@@ -597,7 +636,10 @@ export function SubtitleStyling({
             <Slider
               value={[fontSizeSliderIndex]}
               onValueChange={(values) => {
-                onChange({ ...style, fontSize: sliderIndexToFontSize(values[0]) });
+                onChange({
+                  ...style,
+                  fontSize: sliderIndexToFontSize(values[0]),
+                });
               }}
               min={0}
               max={2}
@@ -623,7 +665,10 @@ export function SubtitleStyling({
 
         <div className="space-y-2">
           <label className="text-sm font-medium block">Font Weight</label>
-          <Select value={style.fontWeight} onValueChange={handleFontWeightChange}>
+          <Select
+            value={style.fontWeight}
+            onValueChange={handleFontWeightChange}
+          >
             <SelectTrigger className="w-full p-2 border rounded-md bg-background">
               <SelectValue placeholder="Select a weight" />
             </SelectTrigger>
@@ -645,7 +690,9 @@ export function SubtitleStyling({
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium">Behind Text Size</label>
-                <span className="text-sm text-muted-foreground tabular-nums">{style.dynamicFontSize}px</span>
+                <span className="text-sm text-muted-foreground tabular-nums">
+                  {style.dynamicFontSize}px
+                </span>
               </div>
               <Slider
                 value={[style.dynamicFontSize]}
@@ -666,7 +713,9 @@ export function SubtitleStyling({
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium">Vertical Position</label>
-                <span className="text-sm text-muted-foreground tabular-nums">{style.dynamicYPosition}%</span>
+                <span className="text-sm text-muted-foreground tabular-nums">
+                  {style.dynamicYPosition}%
+                </span>
               </div>
               <Slider
                 value={[style.dynamicYPosition]}
@@ -693,7 +742,9 @@ export function SubtitleStyling({
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-sm font-medium">Front Text Size</label>
-                  <span className="text-sm text-muted-foreground tabular-nums">{style.dynamicFrontFontSize}px</span>
+                  <span className="text-sm text-muted-foreground tabular-nums">
+                    {style.dynamicFrontFontSize}px
+                  </span>
                 </div>
                 <Slider
                   value={[style.dynamicFrontFontSize]}
@@ -713,8 +764,12 @@ export function SubtitleStyling({
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium">Front Text Position</label>
-                  <span className="text-sm text-muted-foreground tabular-nums">{style.dynamicFrontYPosition}%</span>
+                  <label className="text-sm font-medium">
+                    Front Text Position
+                  </label>
+                  <span className="text-sm text-muted-foreground tabular-nums">
+                    {style.dynamicFrontYPosition}%
+                  </span>
                 </div>
                 <Slider
                   value={[style.dynamicFrontYPosition]}
@@ -785,7 +840,9 @@ export function SubtitleStyling({
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <label className="text-sm font-medium">Max Words/Line</label>
-              <span className="text-sm text-muted-foreground tabular-nums">{style.maxWordsPerLine}</span>
+              <span className="text-sm text-muted-foreground tabular-nums">
+                {style.maxWordsPerLine}
+              </span>
             </div>
             <Slider
               value={[style.maxWordsPerLine]}
@@ -819,7 +876,9 @@ export function SubtitleStyling({
         {/* Background color - hidden when dynamic is active */}
         {!style.dynamicEnabled && (
           <div className="space-y-2">
-            <label className="text-sm font-medium block">Background Color</label>
+            <label className="text-sm font-medium block">
+              Background Color
+            </label>
             <div className="flex items-center justify-between">
               <span className="text-sm">No background</span>
               <Switch
@@ -840,7 +899,9 @@ export function SubtitleStyling({
                   onChange={handleBackgroundColorChange}
                   className="w-10 h-10 rounded cursor-pointer"
                 />
-                <span className="text-sm uppercase">{rgbaToHex(style.backgroundColor)}</span>
+                <span className="text-sm uppercase">
+                  {rgbaToHex(style.backgroundColor)}
+                </span>
               </div>
             )}
           </div>
@@ -848,14 +909,20 @@ export function SubtitleStyling({
 
         <div className="space-y-2">
           <label className="text-sm font-medium block">Border Width</label>
-          <Select value={style.borderWidth.toString()} onValueChange={handleBorderWidthChange}>
+          <Select
+            value={style.borderWidth.toString()}
+            onValueChange={handleBorderWidthChange}
+          >
             <SelectTrigger className="w-full p-2 border rounded-md bg-background">
               <SelectValue placeholder="Select a border width" />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
                 {borderWidthOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value.toString()}>
+                  <SelectItem
+                    key={option.value}
+                    value={option.value.toString()}
+                  >
                     {option.label}
                   </SelectItem>
                 ))}
@@ -879,10 +946,14 @@ export function SubtitleStyling({
         )}
 
         <div className="space-y-2">
-          <label className="text-sm font-medium block">Drop Shadow Intensity</label>
+          <label className="text-sm font-medium block">
+            Drop Shadow Intensity
+          </label>
           <Slider
             value={[Math.round(style.dropShadowIntensity * 100)]}
-            onValueChange={(values) => handleDropShadowIntensityChange(values[0] / 100)}
+            onValueChange={(values) =>
+              handleDropShadowIntensityChange(values[0] / 100)
+            }
             min={0}
             max={100}
             step={1}
@@ -902,8 +973,7 @@ export function SubtitleStyling({
               <p className="text-xs text-muted-foreground">
                 {mode === "word"
                   ? "Only available in phrase mode"
-                  : "Scale the spoken word and add a subtle dark backdrop."
-                }
+                  : "Scale the spoken word and add a subtle dark backdrop."}
               </p>
             </div>
             <Switch
@@ -925,7 +995,9 @@ export function SubtitleStyling({
           </div>
           <Switch
             checked={style.textFadeIn ?? false}
-            onCheckedChange={(value) => onChange({ ...style, textFadeIn: value })}
+            onCheckedChange={(value) =>
+              onChange({ ...style, textFadeIn: value })
+            }
             aria-label="Toggle text fade in"
           />
         </div>
@@ -955,14 +1027,18 @@ export function SubtitleStyling({
             {!style.dynamicEnabled && (
               <>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium block">Background Type</label>
+                  <label className="text-sm font-medium block">
+                    Background Type
+                  </label>
                   <div className="grid grid-cols-2 gap-2">
                     {(["solid", "blur"] as const).map((bgType) => {
                       const isActive = style.backgroundType === bgType;
                       return (
                         <button
                           key={bgType}
-                          onClick={() => onChange({ ...style, backgroundType: bgType })}
+                          onClick={() =>
+                            onChange({ ...style, backgroundType: bgType })
+                          }
                           className={`rounded-lg border px-3 py-2 text-xs font-medium transition-all ${
                             isActive
                               ? "border-amber-500/70 bg-amber-50 text-amber-700"
@@ -978,7 +1054,9 @@ export function SubtitleStyling({
 
                 {style.backgroundType === "solid" && (
                   <div className="space-y-2">
-                    <label className="text-sm font-medium block">Background Color</label>
+                    <label className="text-sm font-medium block">
+                      Background Color
+                    </label>
                     <div className="flex items-center gap-2">
                       <DebouncedColorInput
                         value={style.solidBackgroundColor}
@@ -987,11 +1065,12 @@ export function SubtitleStyling({
                         }
                         className="w-10 h-10 rounded cursor-pointer"
                       />
-                      <span className="text-sm uppercase">{style.solidBackgroundColor}</span>
+                      <span className="text-sm uppercase">
+                        {style.solidBackgroundColor}
+                      </span>
                     </div>
                   </div>
                 )}
-
               </>
             )}
           </div>
@@ -1010,7 +1089,10 @@ export function SubtitleStyling({
             className="mt-0.5 flex-shrink-0"
           />
           <div className="space-y-1 min-w-0">
-            <label htmlFor="branding-watermark" className="text-xs font-bold uppercase tracking-wider leading-tight block cursor-pointer">
+            <label
+              htmlFor="branding-watermark"
+              className="text-xs font-bold uppercase tracking-wider leading-tight block cursor-pointer"
+            >
               basedsubs.getbasedapps.com
             </label>
             <p className="text-[11px] text-black/60 leading-snug">
@@ -1019,7 +1101,6 @@ export function SubtitleStyling({
           </div>
         </div>
       </div>
-
     </div>
   );
 }

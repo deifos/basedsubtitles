@@ -23,7 +23,7 @@ class PipelineSingleton {
       total?: number;
       progress?: number;
     }) => void,
-    device: DeviceType = "webgpu"
+    device: DeviceType = "webgpu",
   ) {
     if (!this.instance) {
       this.instance = pipeline("background-removal", this.model_id, {
@@ -70,12 +70,9 @@ async function handleLoad({ device = "webgpu" }: { device?: DeviceType }) {
 
     loadPromise = (async () => {
       try {
-        const pipe = await PipelineSingleton.getInstance(
-          (progressInfo) => {
-            self.postMessage(progressInfo);
-          },
-          device
-        );
+        const pipe = await PipelineSingleton.getInstance((progressInfo) => {
+          self.postMessage(progressInfo);
+        }, device);
 
         activeDevice = device;
 
@@ -122,11 +119,16 @@ async function handleProcessFrame({
 
     const pipe = await PipelineSingleton.getInstance(
       undefined,
-      activeDevice ?? "webgpu"
+      activeDevice ?? "webgpu",
     );
 
     // Create RawImage from the pixel data
-    const rawImage = new RawImage(new Uint8ClampedArray(imageData), width, height, 4);
+    const rawImage = new RawImage(
+      new Uint8ClampedArray(imageData),
+      width,
+      height,
+      4,
+    );
 
     // Run the background removal pipeline
     const output = await pipe(rawImage);
@@ -169,12 +171,12 @@ async function handleProcessFrame({
       },
       // Transfer the buffer for zero-copy
       // @ts-expect-error - transferable list
-      [mask.buffer]
+      [mask.buffer],
     );
   } catch (error) {
     console.error(
       `[bg-removal-worker] Error processing frame ${frameIndex}:`,
-      error
+      error,
     );
     self.postMessage({
       status: "error",

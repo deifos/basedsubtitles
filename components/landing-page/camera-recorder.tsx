@@ -62,7 +62,10 @@ export function CameraRecorder({
   if (state === "requesting") {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
-        <Loader2 className="h-8 w-8 animate-spin text-slate-400" strokeWidth={1.5} />
+        <Loader2
+          className="h-8 w-8 animate-spin text-slate-400"
+          strokeWidth={1.5}
+        />
         <p className="mt-4 text-sm text-slate-600">Requesting camera access…</p>
       </div>
     );
@@ -100,7 +103,10 @@ export function CameraRecorder({
   if (state === "finalizing") {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
-        <Loader2 className="h-8 w-8 animate-spin text-slate-400" strokeWidth={1.5} />
+        <Loader2
+          className="h-8 w-8 animate-spin text-slate-400"
+          strokeWidth={1.5}
+        />
         <p className="mt-4 text-sm text-slate-600">Processing video…</p>
       </div>
     );

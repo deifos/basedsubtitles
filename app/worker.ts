@@ -41,8 +41,14 @@ class PipelineSingleton {
 
   static async getInstance(
     modelSize: ModelSize = "base",
-    progress_callback?: (progress: { status?: string; data?: unknown; loaded?: number; total?: number; progress?: number }) => void,
-    device: DeviceType = "webgpu"
+    progress_callback?: (progress: {
+      status?: string;
+      data?: unknown;
+      loaded?: number;
+      total?: number;
+      progress?: number;
+    }) => void,
+    device: DeviceType = "webgpu",
   ): Promise<AutomaticSpeechRecognitionPipeline> {
     const modelId = MODEL_IDS[modelSize];
 
@@ -54,14 +60,10 @@ class PipelineSingleton {
     if (!this.instance) {
       this.currentModelId = modelId;
       // @ts-expect-error - Transformers.js pipeline types produce complex union that TS cannot resolve
-      this.instance = pipeline(
-        "automatic-speech-recognition",
-        modelId,
-        {
-          ...PER_DEVICE_CONFIG[device],
-          ...(progress_callback && { progress_callback }),
-        }
-      );
+      this.instance = pipeline("automatic-speech-recognition", modelId, {
+        ...PER_DEVICE_CONFIG[device],
+        ...(progress_callback && { progress_callback }),
+      });
     }
     return this.instance;
   }
@@ -70,7 +72,9 @@ class PipelineSingleton {
 let activeDevice: DeviceType | null = null;
 let activeModelSize: ModelSize | null = null;
 let loadPromise: Promise<void> | null = null;
-type TranscriptionResult = Awaited<ReturnType<AutomaticSpeechRecognitionPipeline>>;
+type TranscriptionResult = Awaited<
+  ReturnType<AutomaticSpeechRecognitionPipeline>
+>;
 
 let transcriptionPromise: Promise<TranscriptionResult> | null = null;
 
@@ -93,8 +97,18 @@ self.addEventListener("message", async (e: MessageEvent) => {
 });
 
 // Handle model loading - simplified like sample app
-async function handleLoad({ device = "wasm", modelSize = "base" as ModelSize }: { device?: DeviceType; modelSize?: ModelSize }) {
-  if (!loadPromise || device !== activeDevice || modelSize !== activeModelSize) {
+async function handleLoad({
+  device = "wasm",
+  modelSize = "base" as ModelSize,
+}: {
+  device?: DeviceType;
+  modelSize?: ModelSize;
+}) {
+  if (
+    !loadPromise ||
+    device !== activeDevice ||
+    modelSize !== activeModelSize
+  ) {
     if (transcriptionPromise) {
       try {
         await transcriptionPromise;
@@ -121,7 +135,7 @@ async function handleLoad({ device = "wasm", modelSize = "base" as ModelSize }: 
           (progressInfo) => {
             self.postMessage(progressInfo);
           },
-          device
+          device,
         );
 
         activeDevice = device;
@@ -179,7 +193,11 @@ async function handleRun({
 
     const targetDevice = device ?? activeDevice ?? "wasm";
     const targetModelSize = modelSize ?? activeModelSize ?? "base";
-    const transcriber = await PipelineSingleton.getInstance(targetModelSize, undefined, targetDevice);
+    const transcriber = await PipelineSingleton.getInstance(
+      targetModelSize,
+      undefined,
+      targetDevice,
+    );
 
     if (transcriptionPromise) {
       await transcriptionPromise;

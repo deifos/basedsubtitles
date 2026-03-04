@@ -1,18 +1,18 @@
-import { MetadataRoute } from 'next'
+import { MetadataRoute } from "next";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   return [
     {
-      url: 'https://basedsubs.getbasedapps.com',
+      url: "https://basedsubs.getbasedapps.com",
       lastModified: new Date(),
-      changeFrequency: 'weekly',
+      changeFrequency: "weekly",
       priority: 1,
     },
     {
-      url: 'https://basedsubs.getbasedapps.com/changelog',
+      url: "https://basedsubs.getbasedapps.com/changelog",
       lastModified: new Date(),
-      changeFrequency: 'weekly',
+      changeFrequency: "weekly",
       priority: 0.5,
     },
-  ]
+  ];
 }

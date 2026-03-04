@@ -12,7 +12,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { FONT_FAMILIES } from "@/components/subtitle-styling";
-import { X, RotateCcw, Type, Palette, Zap, Smile, ALargeSmall } from "lucide-react";
+import {
+  X,
+  RotateCcw,
+  Type,
+  Palette,
+  Zap,
+  Smile,
+  ALargeSmall,
+} from "lucide-react";
 import { cn, type WordStyleOverride } from "@/lib/utils";
 import { DebouncedColorInput } from "@/components/ui/debounced-color-input";
 import dynamic from "next/dynamic";
@@ -42,7 +50,9 @@ export function WordStylePopover({
   className,
   compact = false,
 }: WordStylePopoverProps) {
-  const [showEmojiPicker, setShowEmojiPicker] = useState<"replace" | "overlay" | null>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState<
+    "replace" | "overlay" | null
+  >(null);
   const [activeSection, setActiveSection] = useState<Section | null>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
 
@@ -57,7 +67,6 @@ export function WordStylePopover({
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [showEmojiPicker]);
-
 
   const currentFontCss = useMemo(() => {
     if (!override.fontFamily) return undefined;
@@ -156,7 +165,9 @@ export function WordStylePopover({
 
   const renderFontSection = () => (
     <div className="space-y-1.5">
-      {!compact && <label className="text-xs font-medium text-slate-600 block">Font</label>}
+      {!compact && (
+        <label className="text-xs font-medium text-slate-600 block">Font</label>
+      )}
       <Select
         value={override.fontFamily ?? "__none__"}
         onValueChange={handleFontFamilyChange}
@@ -191,8 +202,12 @@ export function WordStylePopover({
   const renderSizeSection = () => (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        {!compact && <label className="text-xs font-medium text-slate-600">Size</label>}
-        <span className="text-xs text-slate-400 tabular-nums">{sizePercent}%</span>
+        {!compact && (
+          <label className="text-xs font-medium text-slate-600">Size</label>
+        )}
+        <span className="text-xs text-slate-400 tabular-nums">
+          {sizePercent}%
+        </span>
       </div>
       <Slider
         value={[sizePercent]}
@@ -212,7 +227,11 @@ export function WordStylePopover({
 
   const renderColorSection = () => (
     <div className="space-y-1.5">
-      {!compact && <label className="text-xs font-medium text-slate-600 block">Color</label>}
+      {!compact && (
+        <label className="text-xs font-medium text-slate-600 block">
+          Color
+        </label>
+      )}
       <div className="flex items-center gap-2">
         <DebouncedColorInput
           value={override.color ?? "#FFFFFF"}
@@ -221,7 +240,9 @@ export function WordStylePopover({
         />
         {override.color ? (
           <div className="flex items-center gap-1.5 flex-1">
-            <span className="text-xs uppercase text-slate-500">{override.color}</span>
+            <span className="text-xs uppercase text-slate-500">
+              {override.color}
+            </span>
             <button
               onClick={handleClearColor}
               className="text-xs text-slate-400 hover:text-slate-600 underline"
@@ -238,14 +259,18 @@ export function WordStylePopover({
 
   const renderEffectSection = () => (
     <div className="space-y-1.5">
-      {!compact && <label className="text-xs font-medium text-slate-600 block">Effect</label>}
+      {!compact && (
+        <label className="text-xs font-medium text-slate-600 block">
+          Effect
+        </label>
+      )}
       <button
         onClick={handleToggleKnockout}
         className={cn(
           "w-full text-xs px-3 py-1.5 rounded-md border transition-colors text-left",
           override.effect === "knockout"
             ? "bg-slate-900 text-white border-slate-900"
-            : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+            : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50",
         )}
       >
         Knockout
@@ -257,19 +282,30 @@ export function WordStylePopover({
     <div className="space-y-2">
       {/* Emoji Replace */}
       <div className="space-y-1.5">
-        {!compact && <label className="text-xs font-medium text-slate-600 block">Emoji Replace</label>}
+        {!compact && (
+          <label className="text-xs font-medium text-slate-600 block">
+            Emoji Replace
+          </label>
+        )}
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setShowEmojiPicker(showEmojiPicker === "replace" ? null : "replace")}
+            onClick={() =>
+              setShowEmojiPicker(
+                showEmojiPicker === "replace" ? null : "replace",
+              )
+            }
             className={cn(
               "flex-1 text-xs px-3 py-1.5 rounded-md border transition-colors text-left",
               override.emoji
                 ? "bg-slate-50 border-slate-300"
-                : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50",
             )}
           >
             {override.emoji ? (
-              <span className="text-base">{override.emoji} <span className="text-xs text-slate-500">replacing text</span></span>
+              <span className="text-base">
+                {override.emoji}{" "}
+                <span className="text-xs text-slate-500">replacing text</span>
+              </span>
             ) : (
               "Replace with emoji..."
             )}
@@ -287,19 +323,30 @@ export function WordStylePopover({
 
       {/* Emoji Overlay */}
       <div className="space-y-1.5">
-        {!compact && <label className="text-xs font-medium text-slate-600 block">Emoji Overlay</label>}
+        {!compact && (
+          <label className="text-xs font-medium text-slate-600 block">
+            Emoji Overlay
+          </label>
+        )}
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setShowEmojiPicker(showEmojiPicker === "overlay" ? null : "overlay")}
+            onClick={() =>
+              setShowEmojiPicker(
+                showEmojiPicker === "overlay" ? null : "overlay",
+              )
+            }
             className={cn(
               "flex-1 text-xs px-3 py-1.5 rounded-md border transition-colors text-left",
               override.emojiOverlay
                 ? "bg-slate-50 border-slate-300"
-                : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50",
             )}
           >
             {override.emojiOverlay ? (
-              <span className="text-base">{override.emojiOverlay} <span className="text-xs text-slate-500">above word</span></span>
+              <span className="text-base">
+                {override.emojiOverlay}{" "}
+                <span className="text-xs text-slate-500">above word</span>
+              </span>
             ) : (
               "Add emoji above..."
             )}
@@ -319,8 +366,12 @@ export function WordStylePopover({
       {hasEmoji && (
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <label className="text-xs font-medium text-slate-600">Emoji Size</label>
-            <span className="text-xs text-slate-400 tabular-nums">{emojiScalePercent}%</span>
+            <label className="text-xs font-medium text-slate-600">
+              Emoji Size
+            </label>
+            <span className="text-xs text-slate-400 tabular-nums">
+              {emojiScalePercent}%
+            </span>
           </div>
           <Slider
             value={[emojiScalePercent]}
@@ -357,16 +408,46 @@ export function WordStylePopover({
   // --- Compact (mobile) layout ---
 
   if (compact) {
-    const sections: { key: Section; icon: React.ReactNode; label: string; hasValue: boolean }[] = [
-      { key: "font", icon: <Type className="h-3.5 w-3.5" />, label: "Font", hasValue: !!override.fontFamily },
-      { key: "size", icon: <ALargeSmall className="h-3.5 w-3.5" />, label: "Size", hasValue: !!override.fontSize },
-      { key: "color", icon: <Palette className="h-3.5 w-3.5" />, label: "Color", hasValue: !!override.color },
-      { key: "effect", icon: <Zap className="h-3.5 w-3.5" />, label: "FX", hasValue: !!override.effect },
-      { key: "emoji", icon: <Smile className="h-3.5 w-3.5" />, label: "Emoji", hasValue: !!(override.emoji || override.emojiOverlay) },
+    const sections: {
+      key: Section;
+      icon: React.ReactNode;
+      label: string;
+      hasValue: boolean;
+    }[] = [
+      {
+        key: "font",
+        icon: <Type className="h-3.5 w-3.5" />,
+        label: "Font",
+        hasValue: !!override.fontFamily,
+      },
+      {
+        key: "size",
+        icon: <ALargeSmall className="h-3.5 w-3.5" />,
+        label: "Size",
+        hasValue: !!override.fontSize,
+      },
+      {
+        key: "color",
+        icon: <Palette className="h-3.5 w-3.5" />,
+        label: "Color",
+        hasValue: !!override.color,
+      },
+      {
+        key: "effect",
+        icon: <Zap className="h-3.5 w-3.5" />,
+        label: "FX",
+        hasValue: !!override.effect,
+      },
+      {
+        key: "emoji",
+        icon: <Smile className="h-3.5 w-3.5" />,
+        label: "Emoji",
+        hasValue: !!(override.emoji || override.emojiOverlay),
+      },
     ];
 
     const toggleSection = (key: Section) => {
-      setActiveSection(prev => prev === key ? null : key);
+      setActiveSection((prev) => (prev === key ? null : key));
       if (key !== "emoji") setShowEmojiPicker(null);
     };
 
@@ -374,7 +455,7 @@ export function WordStylePopover({
       <div
         className={cn(
           "bg-white border border-slate-200 rounded-xl shadow-xl p-3",
-          className
+          className,
         )}
         style={{ fontFamily: "var(--font-outfit), sans-serif" }}
         onClick={(e) => e.stopPropagation()}
@@ -415,7 +496,7 @@ export function WordStylePopover({
                   ? "bg-slate-900 text-white border-slate-900"
                   : s.hasValue
                     ? "bg-amber-50 text-amber-700 border-amber-300 hover:bg-amber-100"
-                    : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                    : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100",
               )}
             >
               {s.icon}
@@ -440,7 +521,7 @@ export function WordStylePopover({
     <div
       className={cn(
         "bg-white border border-slate-200 rounded-xl shadow-xl p-4 w-72",
-        className
+        className,
       )}
       style={{
         fontFamily: "var(--font-outfit), sans-serif",

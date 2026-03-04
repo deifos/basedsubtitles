@@ -6,24 +6,20 @@ import { SiteFooter } from "@/components/site-footer";
 import { BuyMeCoffee } from "@/components/buy-me-coffee";
 import { VideoUpload } from "@/components/video-upload";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  Upload,
-  Download,
-  Video,
-  ZoomIn,
-  ZoomOut,
-} from "lucide-react";
+import { Upload, Download, Video, ZoomIn, ZoomOut } from "lucide-react";
 import { TranscriptSidebar } from "@/components/transcript-sidebar";
-import {
-  SubtitleStyling,
-  SubtitleStyle,
-} from "@/components/subtitle-styling";
+import { SubtitleStyling, SubtitleStyle } from "@/components/subtitle-styling";
 import { WordStylePopover } from "@/components/word-style-popover";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { processTranscriptChunks, type WordStyleOverride } from "@/lib/utils";
 import { ProcessingOverlay } from "@/components/processing-overlay";
-import { useTranscription, STATUS_MESSAGES, type TranscriptionResult, type ModelSize } from "@/hooks/useTranscription";
+import {
+  useTranscription,
+  STATUS_MESSAGES,
+  type TranscriptionResult,
+  type ModelSize,
+} from "@/hooks/useTranscription";
 import { useVideoDownloadMediaBunny } from "@/hooks/useVideoDownloadMediaBunny";
 import { useBackgroundRemoval } from "@/hooks/useBackgroundRemoval";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -69,10 +65,13 @@ const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
   brandingWatermark: true,
 };
 
-export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps): JSX.Element {
+export function MainApp({
+  initialFile = null,
+  onReturnToLanding,
+}: MainAppProps): JSX.Element {
   const [currentTime, setCurrentTime] = useState(0);
   const [subtitleStyle, setSubtitleStyle] = useState<SubtitleStyle>(
-    DEFAULT_SUBTITLE_STYLE
+    DEFAULT_SUBTITLE_STYLE,
   );
   const [uploadKey, setUploadKey] = useState(0);
   const [mode, setMode] = useState<"word" | "phrase">("phrase");
@@ -84,7 +83,9 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [showStylingDrawer, setShowStylingDrawer] = useState(false);
   const [showEditingDrawer, setShowEditingDrawer] = useState(false);
-  const [selectedWordTimestamp, setSelectedWordTimestamp] = useState<[number, number] | null>(null);
+  const [selectedWordTimestamp, setSelectedWordTimestamp] = useState<
+    [number, number] | null
+  >(null);
   const previousResultRef = useRef<TranscriptionResult | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -119,25 +120,31 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
       // Show language selection modal after video loads
       setShowLanguageModal(true);
     },
-    [handleVideoSelectBase]
+    [handleVideoSelectBase],
   );
 
-  const handleAspectRatioDetected = useCallback((detectedRatio: "16:9" | "9:16") => {
-    setRatio(detectedRatio);
-    // Reset zoom when aspect ratio changes
-    if (detectedRatio === "16:9") {
-      setZoomPortrait(false);
-    }
-  }, []);
+  const handleAspectRatioDetected = useCallback(
+    (detectedRatio: "16:9" | "9:16") => {
+      setRatio(detectedRatio);
+      // Reset zoom when aspect ratio changes
+      if (detectedRatio === "16:9") {
+        setZoomPortrait(false);
+      }
+    },
+    [],
+  );
 
-  const handleLanguageConfirm = useCallback((selectedLanguage: LanguageCode, selectedModelSize: ModelSize) => {
-    setLanguage(selectedLanguage);
-    setModelSize(selectedModelSize);
-    if (uploadedFile) {
-      startTranscription(uploadedFile, selectedLanguage, selectedModelSize);
-    }
-    // Don't close modal here - let useEffect handle it when status changes
-  }, [uploadedFile, startTranscription]);
+  const handleLanguageConfirm = useCallback(
+    (selectedLanguage: LanguageCode, selectedModelSize: ModelSize) => {
+      setLanguage(selectedLanguage);
+      setModelSize(selectedModelSize);
+      if (uploadedFile) {
+        startTranscription(uploadedFile, selectedLanguage, selectedModelSize);
+      }
+      // Don't close modal here - let useEffect handle it when status changes
+    },
+    [uploadedFile, startTranscription],
+  );
 
   const handleChangeLanguage = useCallback(() => {
     // Store current result before clearing
@@ -149,7 +156,12 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
 
   // Auto-close modal when transcription actually starts (not during model loading)
   useEffect(() => {
-    if (showLanguageModal && (status === 'processing' || status === 'extracting' || status === 'transcribing')) {
+    if (
+      showLanguageModal &&
+      (status === "processing" ||
+        status === "extracting" ||
+        status === "transcribing")
+    ) {
       setShowLanguageModal(false);
     }
   }, [status, showLanguageModal]);
@@ -165,8 +177,9 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
     transcriptChunks: result?.chunks || [],
     subtitleStyle,
     mode,
-    format: 'mp4',
-    quality: 'high',
+    ratio,
+    format: "mp4",
+    quality: "high",
     fps: 30,
     bgRemovalReady,
     processFrame: bgProcessFrame,
@@ -175,11 +188,17 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
 
   const handleRemoveBackground = useCallback(async () => {
     if (!videoRef.current) return;
-    setSubtitleStyle((prev) => ({ ...prev, backgroundRemovalEnabled: true, dynamicEnabled: true }));
+    setSubtitleStyle((prev) => ({
+      ...prev,
+      backgroundRemovalEnabled: true,
+      dynamicEnabled: true,
+    }));
     try {
       await processBgRemoval(videoRef.current);
     } catch {
-      toast.error("Background removal failed. This feature requires WebGPU or WASM support, which may not be available on your device.");
+      toast.error(
+        "Background removal failed. This feature requires WebGPU or WASM support, which may not be available on your device.",
+      );
     }
   }, [processBgRemoval]);
 
@@ -259,26 +278,33 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
     setSelectedWordTimestamp((prev) =>
       prev && prev[0] === timestamp[0] && prev[1] === timestamp[1]
         ? null // deselect if clicking the same word
-        : timestamp
+        : timestamp,
     );
   }, []);
 
-  const handleWordStyleChange = useCallback((override: WordStyleOverride) => {
-    if (!result || !selectedWordTimestamp) return;
-    setResult((prev) => {
-      if (!prev) return prev;
-      const updatedChunks = prev.chunks.map((chunk) => {
-        if (
-          chunk.timestamp[0] === selectedWordTimestamp[0] &&
-          chunk.timestamp[1] === selectedWordTimestamp[1]
-        ) {
-          return { ...chunk, styleOverride: Object.keys(override).length > 0 ? override : undefined };
-        }
-        return chunk;
+  const handleWordStyleChange = useCallback(
+    (override: WordStyleOverride) => {
+      if (!result || !selectedWordTimestamp) return;
+      setResult((prev) => {
+        if (!prev) return prev;
+        const updatedChunks = prev.chunks.map((chunk) => {
+          if (
+            chunk.timestamp[0] === selectedWordTimestamp[0] &&
+            chunk.timestamp[1] === selectedWordTimestamp[1]
+          ) {
+            return {
+              ...chunk,
+              styleOverride:
+                Object.keys(override).length > 0 ? override : undefined,
+            };
+          }
+          return chunk;
+        });
+        return { ...prev, chunks: updatedChunks };
       });
-      return { ...prev, chunks: updatedChunks };
-    });
-  }, [result, selectedWordTimestamp, setResult]);
+    },
+    [result, selectedWordTimestamp, setResult],
+  );
 
   const handleWordStyleReset = useCallback(() => {
     handleWordStyleChange({});
@@ -294,7 +320,7 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
     const chunk = result.chunks.find(
       (c) =>
         c.timestamp[0] === selectedWordTimestamp[0] &&
-        c.timestamp[1] === selectedWordTimestamp[1]
+        c.timestamp[1] === selectedWordTimestamp[1],
     );
     if (!chunk) return null;
     return { text: chunk.text, override: chunk.styleOverride ?? {} };
@@ -303,18 +329,31 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
   // Get current phrase words for the word chip bar
   const currentPhraseWords = useMemo(() => {
     if (!result || mode !== "phrase") return [];
-    const chunks = processTranscriptChunks(result, "phrase", subtitleStyle.maxWordsPerLine, subtitleStyle.dynamicEnabled);
+    const chunks = processTranscriptChunks(
+      result,
+      "phrase",
+      subtitleStyle.maxWordsPerLine,
+      subtitleStyle.dynamicEnabled,
+    );
     const activeChunk = chunks.find(
-      (c) => currentTime >= c.timestamp[0] && currentTime <= c.timestamp[1]
+      (c) => currentTime >= c.timestamp[0] && currentTime <= c.timestamp[1],
     );
     if (!activeChunk?.words) return [];
-    return activeChunk.words.filter(w => {
+    return activeChunk.words.filter((w) => {
       const original = result.chunks.find(
-        oc => oc.timestamp[0] === w.timestamp[0] && oc.timestamp[1] === w.timestamp[1]
+        (oc) =>
+          oc.timestamp[0] === w.timestamp[0] &&
+          oc.timestamp[1] === w.timestamp[1],
       );
       return !original?.disabled && !original?.subtitleHidden;
     });
-  }, [result, mode, subtitleStyle.maxWordsPerLine, subtitleStyle.dynamicEnabled, currentTime]);
+  }, [
+    result,
+    mode,
+    subtitleStyle.maxWordsPerLine,
+    subtitleStyle.dynamicEnabled,
+    currentTime,
+  ]);
 
   // Determine if we should show the loading overlay
   // Don't show overlay when status is 'ready' and we're just waiting for user to transcribe
@@ -426,8 +465,16 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
             {/* Mobile Drawers */}
             {result && (
               <>
-                <Sheet open={showStylingDrawer} onOpenChange={setShowStylingDrawer} modal={false}>
-                  <SheetContent side="left" className="w-full sm:w-96 p-0 gap-0" overlay={false}>
+                <Sheet
+                  open={showStylingDrawer}
+                  onOpenChange={setShowStylingDrawer}
+                  modal={false}
+                >
+                  <SheetContent
+                    side="left"
+                    className="w-full sm:w-96 p-0 gap-0"
+                    overlay={false}
+                  >
                     <SheetHeader className="p-4 border-b shrink-0">
                       <SheetTitle>Subtitle Styling</SheetTitle>
                     </SheetHeader>
@@ -447,8 +494,16 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
                   </SheetContent>
                 </Sheet>
 
-                <Sheet open={showEditingDrawer} onOpenChange={setShowEditingDrawer} modal={false}>
-                  <SheetContent side="right" className="w-full sm:w-96 p-0 gap-0" overlay={false}>
+                <Sheet
+                  open={showEditingDrawer}
+                  onOpenChange={setShowEditingDrawer}
+                  modal={false}
+                >
+                  <SheetContent
+                    side="right"
+                    className="w-full sm:w-96 p-0 gap-0"
+                    overlay={false}
+                  >
                     <SheetHeader className="p-4 border-b shrink-0">
                       <SheetTitle>Edit Transcript</SheetTitle>
                     </SheetHeader>
@@ -465,7 +520,11 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
                               }
                             }}
                             onTranscriptUpdate={(updatedTranscript) => {
-                              setResult((prev) => prev ? { ...prev, ...updatedTranscript } : updatedTranscript);
+                              setResult((prev) =>
+                                prev
+                                  ? { ...prev, ...updatedTranscript }
+                                  : updatedTranscript,
+                              );
                             }}
                             mode={mode}
                             maxWordsPerLine={subtitleStyle.maxWordsPerLine}
@@ -501,50 +560,48 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
               <div className="flex-1 flex flex-col">
                 {/* Video Upload Component */}
                 <div className="relative">
-                <VideoUpload
-                  key={uploadKey}
-                  className="w-full"
-                  onVideoSelect={handleVideoSelect}
-                  onAspectRatioDetected={handleAspectRatioDetected}
-                  ref={videoRef}
-                  onTimeUpdate={handleTimeUpdate}
-                  transcript={result}
-                  currentTime={currentTime}
-                  subtitleStyle={subtitleStyle}
-                  mode={mode}
-                  ratio={ratio}
-                  zoomPortrait={zoomPortrait}
-                  initialFile={initialFile}
-                  bgRemovalReady={bgRemovalReady}
-                  getMaskAtTime={getMaskAtTime}
-
-
-                />
-                {/* Desktop: full overlay popover on video */}
-                {selectedWordInfo && selectedWordTimestamp && (
-                  <WordStylePopover
-                    key={`desktop-${selectedWordTimestamp[0]}-${selectedWordTimestamp[1]}`}
-                    wordText={selectedWordInfo.text}
-                    override={selectedWordInfo.override}
-                    onChange={handleWordStyleChange}
-                    onReset={handleWordStyleReset}
-                    onClose={handleWordStyleClose}
-                    className="hidden lg:block absolute z-50 top-2 right-2"
+                  <VideoUpload
+                    key={uploadKey}
+                    className="w-full"
+                    onVideoSelect={handleVideoSelect}
+                    onAspectRatioDetected={handleAspectRatioDetected}
+                    ref={videoRef}
+                    onTimeUpdate={handleTimeUpdate}
+                    transcript={result}
+                    currentTime={currentTime}
+                    subtitleStyle={subtitleStyle}
+                    mode={mode}
+                    ratio={ratio}
+                    zoomPortrait={zoomPortrait}
+                    initialFile={initialFile}
+                    bgRemovalReady={bgRemovalReady}
+                    getMaskAtTime={getMaskAtTime}
                   />
-                )}
-                {/* Mobile: compact overlay popover on video */}
-                {selectedWordInfo && selectedWordTimestamp && (
-                  <WordStylePopover
-                    key={`mobile-${selectedWordTimestamp[0]}-${selectedWordTimestamp[1]}`}
-                    wordText={selectedWordInfo.text}
-                    override={selectedWordInfo.override}
-                    onChange={handleWordStyleChange}
-                    onReset={handleWordStyleReset}
-                    onClose={handleWordStyleClose}
-                    className="lg:hidden absolute z-50 top-2 left-2 right-2"
-                    compact
-                  />
-                )}
+                  {/* Desktop: full overlay popover on video */}
+                  {selectedWordInfo && selectedWordTimestamp && (
+                    <WordStylePopover
+                      key={`desktop-${selectedWordTimestamp[0]}-${selectedWordTimestamp[1]}`}
+                      wordText={selectedWordInfo.text}
+                      override={selectedWordInfo.override}
+                      onChange={handleWordStyleChange}
+                      onReset={handleWordStyleReset}
+                      onClose={handleWordStyleClose}
+                      className="hidden lg:block absolute z-50 top-2 right-2"
+                    />
+                  )}
+                  {/* Mobile: compact overlay popover on video */}
+                  {selectedWordInfo && selectedWordTimestamp && (
+                    <WordStylePopover
+                      key={`mobile-${selectedWordTimestamp[0]}-${selectedWordTimestamp[1]}`}
+                      wordText={selectedWordInfo.text}
+                      override={selectedWordInfo.override}
+                      onChange={handleWordStyleChange}
+                      onReset={handleWordStyleReset}
+                      onClose={handleWordStyleClose}
+                      className="lg:hidden absolute z-50 top-2 left-2 right-2"
+                      compact
+                    />
+                  )}
                 </div>
 
                 {/* Word chip bar for per-word editing in phrase mode */}
@@ -552,14 +609,18 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
                   <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5 px-2 min-h-[28px]">
                     {currentPhraseWords.length > 1 && (
                       <>
-                        <span className="text-xs text-muted-foreground mr-1 font-medium">Edit word:</span>
+                        <span className="text-xs text-muted-foreground mr-1 font-medium">
+                          Edit word:
+                        </span>
                         {currentPhraseWords.map((word, i) => {
                           const isSelected =
                             selectedWordTimestamp &&
                             word.timestamp[0] === selectedWordTimestamp[0] &&
                             word.timestamp[1] === selectedWordTimestamp[1];
                           const hasOverride = result?.chunks.find(
-                            c => c.timestamp[0] === word.timestamp[0] && c.timestamp[1] === word.timestamp[1]
+                            (c) =>
+                              c.timestamp[0] === word.timestamp[0] &&
+                              c.timestamp[1] === word.timestamp[1],
                           )?.styleOverride;
                           return (
                             <button
@@ -586,24 +647,31 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
                   <div className="mt-3 flex flex-col items-center gap-3">
                     {/* Aspect Ratio + Zoom Controls */}
                     <div className="flex items-center gap-3">
-                      <Tabs
-                        value={ratio}
-                        onValueChange={handleRatioChange}
-                      >
+                      <Tabs value={ratio} onValueChange={handleRatioChange}>
                         <TabsList className="grid w-[260px] grid-cols-2">
-                          <TabsTrigger value="16:9">Landscape (16:9)</TabsTrigger>
-                          <TabsTrigger value="9:16">Portrait (9:16)</TabsTrigger>
+                          <TabsTrigger value="16:9">
+                            Landscape (16:9)
+                          </TabsTrigger>
+                          <TabsTrigger value="9:16">
+                            Portrait (9:16)
+                          </TabsTrigger>
                         </TabsList>
                       </Tabs>
                       {ratio === "9:16" && (
                         <Button
                           variant={zoomPortrait ? "default" : "outline"}
                           size="sm"
-                          onClick={() => handleZoomPortraitChange(!zoomPortrait)}
+                          onClick={() =>
+                            handleZoomPortraitChange(!zoomPortrait)
+                          }
                           className="flex items-center gap-2"
                         >
-                          {zoomPortrait ? <ZoomOut className="h-4 w-4" /> : <ZoomIn className="h-4 w-4" />}
-                          {zoomPortrait ? "Fit" : "Zoom"}
+                          {zoomPortrait ? (
+                            <ZoomIn className="h-4 w-4" />
+                          ) : (
+                            <ZoomOut className="h-4 w-4" />
+                          )}
+                          {zoomPortrait ? "Zoom" : "Fit"}
                         </Button>
                       )}
                     </div>
@@ -625,48 +693,61 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
                             : "Remove Background"}
                       </Button>
                     )}
-                    {bgRemovalReady && subtitleStyle.backgroundRemovalEnabled && (
-                      <Button
-                        onClick={() => {
-                          setSubtitleStyle((prev) => ({
-                            ...prev,
-                            backgroundRemovalEnabled: false,
-                          }));
-                        }}
-                        variant="outline"
-                        size="sm"
-                        className="flex items-center gap-2"
-                      >
-                        <Eraser className="h-4 w-4" />
-                        Disable Background Removal
-                      </Button>
-                    )}
-                    {bgRemovalReady && !subtitleStyle.backgroundRemovalEnabled && (
-                      <Button
-                        onClick={() => {
-                          setSubtitleStyle((prev) => ({
-                            ...prev,
-                            backgroundRemovalEnabled: true,
-                          }));
-                        }}
-                        variant="outline"
-                        size="sm"
-                        className="flex items-center gap-2"
-                      >
-                        <Eraser className="h-4 w-4" />
-                        Enable Background Removal
-                      </Button>
-                    )}
+                    {bgRemovalReady &&
+                      subtitleStyle.backgroundRemovalEnabled && (
+                        <Button
+                          onClick={() => {
+                            setSubtitleStyle((prev) => ({
+                              ...prev,
+                              backgroundRemovalEnabled: false,
+                            }));
+                          }}
+                          variant="outline"
+                          size="sm"
+                          className="flex items-center gap-2"
+                        >
+                          <Eraser className="h-4 w-4" />
+                          Disable Background Removal
+                        </Button>
+                      )}
+                    {bgRemovalReady &&
+                      !subtitleStyle.backgroundRemovalEnabled && (
+                        <Button
+                          onClick={() => {
+                            setSubtitleStyle((prev) => ({
+                              ...prev,
+                              backgroundRemovalEnabled: true,
+                            }));
+                          }}
+                          variant="outline"
+                          size="sm"
+                          className="flex items-center gap-2"
+                        >
+                          <Eraser className="h-4 w-4" />
+                          Enable Background Removal
+                        </Button>
+                      )}
                     {(isBgModelLoading || isBgProcessing) && (
                       <div className="w-full max-w-md space-y-1">
-                        <div className="flex justify-between text-xs text-slate-500" style={{ fontFamily: "var(--font-outfit), sans-serif" }}>
-                          <span>{isBgModelLoading ? "Loading model..." : "Processing frames..."}</span>
+                        <div
+                          className="flex justify-between text-xs text-slate-500"
+                          style={{
+                            fontFamily: "var(--font-outfit), sans-serif",
+                          }}
+                        >
+                          <span>
+                            {isBgModelLoading
+                              ? "Loading model..."
+                              : "Processing frames..."}
+                          </span>
                           <span>{Math.round(bgProgress)}%</span>
                         </div>
                         <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
                           <div
                             className="bg-amber-500 h-1.5 rounded-full transition-all duration-300"
-                            style={{ width: `${Math.max(0, Math.min(100, bgProgress))}%` }}
+                            style={{
+                              width: `${Math.max(0, Math.min(100, bgProgress))}%`,
+                            }}
                           />
                         </div>
                       </div>
@@ -677,7 +758,9 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
                         className="text-xs text-slate-400"
                         style={{ fontFamily: "var(--font-outfit), sans-serif" }}
                       >
-                        Generation time: {(result.generationTime / 1000).toFixed(2)}s ({device === "webgpu" ? "WebGPU" : "WASM"})
+                        Generation time:{" "}
+                        {(result.generationTime / 1000).toFixed(2)}s (
+                        {device === "webgpu" ? "WebGPU" : "WASM"})
                       </div>
                     )}
                     <Button
@@ -687,26 +770,37 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
                       disabled={isDownloadProcessing}
                     >
                       <Download className="w-4 h-4" />
-                      {isDownloadProcessing ? 'Processing...' : 'Download Video with Subtitles'}
+                      {isDownloadProcessing
+                        ? "Processing..."
+                        : "Download Video with Subtitles"}
                     </Button>
 
                     {isDownloadProcessing && (
                       <div className="w-full max-w-md space-y-2">
-                        <div className="flex justify-between text-xs text-slate-500" style={{ fontFamily: "var(--font-outfit), sans-serif" }}>
+                        <div
+                          className="flex justify-between text-xs text-slate-500"
+                          style={{
+                            fontFamily: "var(--font-outfit), sans-serif",
+                          }}
+                        >
                           <span>{downloadStatus}</span>
                           <span>{Math.round(downloadProgress)}%</span>
                         </div>
                         <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
                           <div
                             className="bg-sky-500 h-2 rounded-full transition-all duration-300"
-                            style={{ width: `${Math.max(0, Math.min(100, downloadProgress))}%` }}
+                            style={{
+                              width: `${Math.max(0, Math.min(100, downloadProgress))}%`,
+                            }}
                           />
                         </div>
                         <Button
                           variant="outline"
                           size="sm"
                           className="w-full rounded-lg border-slate-200 text-slate-700 font-semibold"
-                          style={{ fontFamily: "var(--font-outfit), sans-serif" }}
+                          style={{
+                            fontFamily: "var(--font-outfit), sans-serif",
+                          }}
                           onClick={cancelDownload}
                         >
                           Stop download
@@ -745,7 +839,11 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
                         }
                       }}
                       onTranscriptUpdate={(updatedTranscript) => {
-                        setResult((prev) => prev ? { ...prev, ...updatedTranscript } : updatedTranscript);
+                        setResult((prev) =>
+                          prev
+                            ? { ...prev, ...updatedTranscript }
+                            : updatedTranscript,
+                        );
                       }}
                       mode={mode}
                       maxWordsPerLine={subtitleStyle.maxWordsPerLine}
@@ -780,8 +878,14 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
               className={`flex flex-col items-center justify-center py-3 px-4 transition-colors active:bg-slate-100 ${showStylingDrawer ? "bg-slate-100" : "hover:bg-slate-50"}`}
               style={{ fontFamily: "var(--font-outfit), sans-serif" }}
             >
-              <Settings className={`h-5 w-5 mb-1 ${showStylingDrawer ? "text-slate-900" : "text-slate-600"}`} />
-              <span className={`text-xs font-semibold ${showStylingDrawer ? "text-slate-900" : "text-slate-700"}`}>Styling</span>
+              <Settings
+                className={`h-5 w-5 mb-1 ${showStylingDrawer ? "text-slate-900" : "text-slate-600"}`}
+              />
+              <span
+                className={`text-xs font-semibold ${showStylingDrawer ? "text-slate-900" : "text-slate-700"}`}
+              >
+                Styling
+              </span>
             </button>
             <button
               onClick={() => {
@@ -791,8 +895,14 @@ export function MainApp({ initialFile = null, onReturnToLanding }: MainAppProps)
               className={`flex flex-col items-center justify-center py-3 px-4 transition-colors border-l border-slate-200 active:bg-slate-100 ${showEditingDrawer ? "bg-slate-100" : "hover:bg-slate-50"}`}
               style={{ fontFamily: "var(--font-outfit), sans-serif" }}
             >
-              <FileText className={`h-5 w-5 mb-1 ${showEditingDrawer ? "text-slate-900" : "text-slate-600"}`} />
-              <span className={`text-xs font-semibold ${showEditingDrawer ? "text-slate-900" : "text-slate-700"}`}>Edit</span>
+              <FileText
+                className={`h-5 w-5 mb-1 ${showEditingDrawer ? "text-slate-900" : "text-slate-600"}`}
+              />
+              <span
+                className={`text-xs font-semibold ${showEditingDrawer ? "text-slate-900" : "text-slate-700"}`}
+              >
+                Edit
+              </span>
             </button>
           </div>
         </div>

@@ -5,10 +5,15 @@ import { BuyMeCoffee } from "@/components/buy-me-coffee";
 
 export const metadata = {
   title: "Changelog | Based Subtitles",
-  description: "See what's new in Based Subtitles - version history and release notes",
+  description:
+    "See what's new in Based Subtitles - version history and release notes",
 };
 
-function ChangeTypeBadge({ type }: { type: ChangelogEntry["changes"][0]["type"] }) {
+function ChangeTypeBadge({
+  type,
+}: {
+  type: ChangelogEntry["changes"][0]["type"];
+}) {
   const styles = {
     added: "bg-black text-white",
     changed: "bg-black/80 text-white",
@@ -25,7 +30,13 @@ function ChangeTypeBadge({ type }: { type: ChangelogEntry["changes"][0]["type"] 
   );
 }
 
-function VersionBlock({ entry, isLatest }: { entry: ChangelogEntry; isLatest: boolean }) {
+function VersionBlock({
+  entry,
+  isLatest,
+}: {
+  entry: ChangelogEntry;
+  isLatest: boolean;
+}) {
   return (
     <article className="relative">
       {/* Timeline connector */}
@@ -119,7 +130,9 @@ export default function ChangelogPage() {
           <div className="flex items-center justify-between">
             <Link href="/" className="flex items-center gap-2 group">
               <div className="w-8 h-8 bg-black flex items-center justify-center group-hover:bg-black/80 transition-colors rounded-lg">
-                <span className="text-xs font-bold text-white tracking-tight">BS</span>
+                <span className="text-xs font-bold text-white tracking-tight">
+                  BS
+                </span>
               </div>
               <span className="text-sm font-black uppercase tracking-tight">
                 basedsubtitles

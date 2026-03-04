@@ -12,7 +12,8 @@ export function LandingCTA(): JSX.Element {
           <div
             className="pointer-events-none absolute inset-0 opacity-[0.07]"
             style={{
-              backgroundImage: "radial-gradient(circle, #ffffff 1px, transparent 1px)",
+              backgroundImage:
+                "radial-gradient(circle, #ffffff 1px, transparent 1px)",
               backgroundSize: "20px 20px",
             }}
           />
@@ -33,8 +34,8 @@ export function LandingCTA(): JSX.Element {
               className="mt-3 text-sm sm:text-base text-slate-400 max-w-md mx-auto"
               style={{ fontFamily: "var(--font-outfit), sans-serif" }}
             >
-              Drop your video above and get started in seconds.
-              No account needed.
+              Drop your video above and get started in seconds. No account
+              needed.
             </p>
             <a
               href="#dropzone"

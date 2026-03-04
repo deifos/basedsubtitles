@@ -41,7 +41,8 @@ export function LandingLocal(): JSX.Element {
       <div
         className="pointer-events-none absolute inset-0 -z-10"
         style={{
-          backgroundImage: "radial-gradient(circle, #b0b8c4 1px, transparent 1px)",
+          backgroundImage:
+            "radial-gradient(circle, #b0b8c4 1px, transparent 1px)",
           backgroundSize: "20px 20px",
         }}
       />
@@ -65,7 +66,11 @@ export function LandingLocal(): JSX.Element {
                 <div className="flex-1 mx-3">
                   <div className="flex items-center gap-2 rounded-md bg-white border border-slate-100 px-3 py-1 text-xs text-slate-400">
                     <Lock className="h-3 w-3" strokeWidth={2} />
-                    <span style={{ fontFamily: "var(--font-geist-mono), monospace" }}>
+                    <span
+                      style={{
+                        fontFamily: "var(--font-geist-mono), monospace",
+                      }}
+                    >
                       basedsubs.getbasedapps.com
                     </span>
                   </div>
@@ -79,7 +84,10 @@ export function LandingLocal(): JSX.Element {
                   <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white shadow-md">
                     <Monitor className="h-5 w-5" />
                     <div className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-emerald-500 ring-2 ring-white flex items-center justify-center">
-                      <ShieldCheck className="h-2.5 w-2.5 text-white" strokeWidth={3} />
+                      <ShieldCheck
+                        className="h-2.5 w-2.5 text-white"
+                        strokeWidth={3}
+                      />
                     </div>
                   </div>
                   <div>
@@ -109,13 +117,17 @@ export function LandingLocal(): JSX.Element {
                       <div className="flex items-center justify-between">
                         <span
                           className="text-xs font-medium text-slate-600"
-                          style={{ fontFamily: "var(--font-outfit), sans-serif" }}
+                          style={{
+                            fontFamily: "var(--font-outfit), sans-serif",
+                          }}
                         >
                           {step.label}
                         </span>
                         <span
                           className="text-[10px] text-slate-400 font-medium uppercase tracking-wider"
-                          style={{ fontFamily: "var(--font-geist-mono), monospace" }}
+                          style={{
+                            fontFamily: "var(--font-geist-mono), monospace",
+                          }}
                         >
                           local
                         </span>
@@ -135,13 +147,16 @@ export function LandingLocal(): JSX.Element {
 
                 {/* Network indicator */}
                 <div className="flex items-center gap-2.5 rounded-lg border border-dashed border-emerald-200 bg-emerald-50/50 px-3 py-2.5">
-                  <ServerOff className="h-3.5 w-3.5 text-emerald-600 shrink-0" strokeWidth={1.5} />
+                  <ServerOff
+                    className="h-3.5 w-3.5 text-emerald-600 shrink-0"
+                    strokeWidth={1.5}
+                  />
                   <p
                     className="text-xs text-emerald-700"
                     style={{ fontFamily: "var(--font-outfit), sans-serif" }}
                   >
-                    <span className="font-semibold">0 network requests</span>{" "}
-                    — all processing happens on your device
+                    <span className="font-semibold">0 network requests</span> —
+                    all processing happens on your device
                   </p>
                 </div>
               </div>

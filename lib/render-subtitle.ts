@@ -87,9 +87,13 @@ export function renderSubtitleToCanvas(
   style: SubtitleStyle,
   mode: "word" | "phrase",
   canvasWidth: number,
-  canvasHeight: number
+  canvasHeight: number,
 ) {
-  const processedChunks = processTranscriptChunks(transcript, mode, style.maxWordsPerLine);
+  const processedChunks = processTranscriptChunks(
+    transcript,
+    mode,
+    style.maxWordsPerLine,
+  );
 
   // Filter enabled chunks (exclude disabled and subtitleHidden)
   const enabledChunks = processedChunks.filter((chunk) => {
@@ -98,7 +102,7 @@ export function renderSubtitleToCanvas(
         const original = transcript.chunks.find(
           (c) =>
             c.timestamp[0] === word.timestamp[0] &&
-            c.timestamp[1] === word.timestamp[1]
+            c.timestamp[1] === word.timestamp[1],
         );
         return original?.disabled || original?.subtitleHidden;
       });
@@ -106,14 +110,14 @@ export function renderSubtitleToCanvas(
     const original = transcript.chunks.find(
       (c) =>
         c.timestamp[0] === chunk.timestamp[0] &&
-        c.timestamp[1] === chunk.timestamp[1]
+        c.timestamp[1] === chunk.timestamp[1],
     );
     return !original?.disabled && !original?.subtitleHidden;
   });
 
   const currentChunk = enabledChunks.find(
     (chunk) =>
-      currentTime >= chunk.timestamp[0] && currentTime <= chunk.timestamp[1]
+      currentTime >= chunk.timestamp[0] && currentTime <= chunk.timestamp[1],
   );
 
   if (!currentChunk) return;
@@ -125,7 +129,7 @@ export function renderSubtitleToCanvas(
     canvasWidth,
     canvasHeight,
     mode,
-    currentTime
+    currentTime,
   );
 }
 
@@ -138,7 +142,7 @@ export function estimateFaceFromMask(
   maskWidth: number,
   maskHeight: number,
   canvasWidth: number,
-  canvasHeight: number
+  canvasHeight: number,
 ): FaceBounds | null {
   let minY = maskHeight;
   let maxY = 0;
@@ -159,7 +163,7 @@ export function estimateFaceFromMask(
   const personHeight = maxY - minY;
   // Face/head is approximately the top 30% of the visible person
   // The chin sits at roughly 30% down from the top of the person bounding box
-  const chinMaskY = minY + personHeight * 0.30;
+  const chinMaskY = minY + personHeight * 0.3;
   // Scale from mask coordinates to canvas coordinates
   const chinY = (chinMaskY / maskHeight) * canvasHeight;
 
@@ -176,9 +180,14 @@ export function renderDynamicBehindText(
   currentTime: number,
   style: SubtitleStyle,
   canvasWidth: number,
-  canvasHeight: number
+  canvasHeight: number,
 ) {
-  const processedChunks = processTranscriptChunks(transcript, "phrase", style.maxWordsPerLine, true);
+  const processedChunks = processTranscriptChunks(
+    transcript,
+    "phrase",
+    style.maxWordsPerLine,
+    true,
+  );
 
   const enabledChunks = processedChunks.filter((chunk) => {
     if (chunk.words) {
@@ -186,7 +195,7 @@ export function renderDynamicBehindText(
         const original = transcript.chunks.find(
           (c) =>
             c.timestamp[0] === word.timestamp[0] &&
-            c.timestamp[1] === word.timestamp[1]
+            c.timestamp[1] === word.timestamp[1],
         );
         return original?.disabled || original?.subtitleHidden;
       });
@@ -196,25 +205,35 @@ export function renderDynamicBehindText(
 
   const currentChunk = enabledChunks.find(
     (chunk) =>
-      currentTime >= chunk.timestamp[0] && currentTime <= chunk.timestamp[1]
+      currentTime >= chunk.timestamp[0] && currentTime <= chunk.timestamp[1],
   );
 
   if (!currentChunk || !currentChunk.words) return;
 
   // Filter only "behind" words, with progressive reveal if enabled
   let behindWords = currentChunk.words.filter(
-    (w) => w.dynamicPosition === "behind"
+    (w) => w.dynamicPosition === "behind",
   );
   if (style.dynamicFollowWord) {
-    behindWords = behindWords.filter(w => currentTime >= w.timestamp[0]);
+    behindWords = behindWords.filter((w) => currentTime >= w.timestamp[0]);
   }
   if (behindWords.length === 0) return;
 
   const behindText = behindWords.map((w) => w.text).join(" ");
-  renderDynamicTextBlock(ctx, behindText, style, canvasWidth, canvasHeight, {
-    fontSize: style.dynamicFontSize ?? 80,
-    yPosition: style.dynamicYPosition ?? 35,
-  }, behindWords, currentTime, currentChunk.timestamp[1]);
+  renderDynamicTextBlock(
+    ctx,
+    behindText,
+    style,
+    canvasWidth,
+    canvasHeight,
+    {
+      fontSize: style.dynamicFontSize ?? 80,
+      yPosition: style.dynamicYPosition ?? 35,
+    },
+    behindWords,
+    currentTime,
+    currentChunk.timestamp[1],
+  );
 }
 
 /**
@@ -228,9 +247,14 @@ export function renderDynamicFrontText(
   style: SubtitleStyle,
   canvasWidth: number,
   canvasHeight: number,
-  faceBounds?: FaceBounds | null
+  faceBounds?: FaceBounds | null,
 ) {
-  const processedChunks = processTranscriptChunks(transcript, "phrase", style.maxWordsPerLine, true);
+  const processedChunks = processTranscriptChunks(
+    transcript,
+    "phrase",
+    style.maxWordsPerLine,
+    true,
+  );
 
   const enabledChunks = processedChunks.filter((chunk) => {
     if (chunk.words) {
@@ -238,7 +262,7 @@ export function renderDynamicFrontText(
         const original = transcript.chunks.find(
           (c) =>
             c.timestamp[0] === word.timestamp[0] &&
-            c.timestamp[1] === word.timestamp[1]
+            c.timestamp[1] === word.timestamp[1],
         );
         return original?.disabled || original?.subtitleHidden;
       });
@@ -248,17 +272,17 @@ export function renderDynamicFrontText(
 
   const currentChunk = enabledChunks.find(
     (chunk) =>
-      currentTime >= chunk.timestamp[0] && currentTime <= chunk.timestamp[1]
+      currentTime >= chunk.timestamp[0] && currentTime <= chunk.timestamp[1],
   );
 
   if (!currentChunk || !currentChunk.words) return;
 
   // Filter only "front" words, with progressive reveal if enabled
   let frontWords = currentChunk.words.filter(
-    (w) => w.dynamicPosition === "front"
+    (w) => w.dynamicPosition === "front",
   );
   if (style.dynamicFollowWord) {
-    frontWords = frontWords.filter(w => currentTime >= w.timestamp[0]);
+    frontWords = frontWords.filter((w) => currentTime >= w.timestamp[0]);
   }
   if (frontWords.length === 0) return;
 
@@ -275,10 +299,20 @@ export function renderDynamicFrontText(
     yPosition = Math.max(fallbackY, faceBasedY);
   }
 
-  renderDynamicTextBlock(ctx, frontText, style, canvasWidth, canvasHeight, {
-    fontSize: style.dynamicFrontFontSize ?? 40,
-    yPosition,
-  }, frontWords, currentTime, currentChunk.timestamp[1]);
+  renderDynamicTextBlock(
+    ctx,
+    frontText,
+    style,
+    canvasWidth,
+    canvasHeight,
+    {
+      fontSize: style.dynamicFrontFontSize ?? 40,
+      yPosition,
+    },
+    frontWords,
+    currentTime,
+    currentChunk.timestamp[1],
+  );
 }
 
 /**
@@ -294,7 +328,7 @@ function renderDynamicTextBlock(
   options: { fontSize: number; yPosition: number },
   wordTimings?: WordTiming[],
   currentTime?: number,
-  chunkEndTime?: number
+  chunkEndTime?: number,
 ) {
   const fontFamily = resolveFontFamily(style.fontFamily);
   const videoScale = canvasHeight / 500;
@@ -312,7 +346,9 @@ function renderDynamicTextBlock(
   // Use emoji as display text when set
   const rawUpperWords = text.toUpperCase().split(" ");
   const upperWords = rawUpperWords.map((w, i) =>
-    wordTimings?.[i]?.styleOverride?.emoji ? wordTimings[i].styleOverride!.emoji! : w
+    wordTimings?.[i]?.styleOverride?.emoji
+      ? wordTimings[i].styleOverride!.emoji!
+      : w,
   );
   const lines: string[] = [];
   const lineWordIndices: number[][] = []; // per-line array of wordTimings indices
@@ -351,11 +387,16 @@ function renderDynamicTextBlock(
   const yCenter = canvasHeight * (options.yPosition / 100);
   const startY = yCenter - totalHeight / 2 + lineHeight / 2;
 
-  const useTextFade = (style.textFadeIn ?? false) && wordTimings && currentTime != null;
+  const useTextFade =
+    (style.textFadeIn ?? false) && wordTimings && currentTime != null;
   const fadeOutDuration = 0.25;
-  const chunkFadeOut = (useTextFade && chunkEndTime != null)
-    ? Math.min(1, Math.max(0, (chunkEndTime - currentTime!) / fadeOutDuration))
-    : 1;
+  const chunkFadeOut =
+    useTextFade && chunkEndTime != null
+      ? Math.min(
+          1,
+          Math.max(0, (chunkEndTime - currentTime!) / fadeOutDuration),
+        )
+      : 1;
 
   // Need word-by-word rendering when we have overrides OR textFadeIn
   const needsWordByWord = (hasOverrides || useTextFade) && wordTimings;
@@ -367,7 +408,9 @@ function renderDynamicTextBlock(
     if (needsWordByWord) {
       const indices = lineWordIndices[i];
       const lineWords = indices.map((idx) => ({
-        text: wordTimings[idx]?.styleOverride?.emoji ? wordTimings[idx].styleOverride!.emoji! : upperWords[idx],
+        text: wordTimings[idx]?.styleOverride?.emoji
+          ? wordTimings[idx].styleOverride!.emoji!
+          : upperWords[idx],
         override: wordTimings[idx]?.styleOverride,
         timing: wordTimings[idx],
       }));
@@ -411,18 +454,36 @@ function renderDynamicTextBlock(
           const letterStagger = charCount > 0 ? revealDuration / charCount : 0;
           charAlphas = [];
           for (let ci = 0; ci < charCount; ci++) {
-            charAlphas.push(Math.min(1, Math.max(0, (timeSinceWordStart - ci * letterStagger) / 0.06)) * chunkFadeOut);
+            charAlphas.push(
+              Math.min(
+                1,
+                Math.max(0, (timeSinceWordStart - ci * letterStagger) / 0.06),
+              ) * chunkFadeOut,
+            );
           }
         }
 
         ctx.save();
         if (!charAlphas) ctx.globalAlpha = chunkFadeOut;
-        renderDynamicWord(ctx, w.text, wordX, lineY, style, wordColor, fontSize, videoScale, w.override?.effect, charAlphas);
+        renderDynamicWord(
+          ctx,
+          w.text,
+          wordX,
+          lineY,
+          style,
+          wordColor,
+          fontSize,
+          videoScale,
+          w.override?.effect,
+          charAlphas,
+        );
         ctx.restore();
 
         // Draw emoji overlay above the word
         if (w.override?.emojiOverlay) {
-          const effectiveFontSize = w.override?.fontSize ? Math.round(fontSize * w.override.fontSize) : fontSize;
+          const effectiveFontSize = w.override?.fontSize
+            ? Math.round(fontSize * w.override.fontSize)
+            : fontSize;
           const emojiScale = w.override?.emojiScale ?? 1;
           ctx.save();
           ctx.shadowColor = "transparent";
@@ -436,7 +497,11 @@ function renderDynamicTextBlock(
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
           ctx.fillStyle = "#000000";
-          ctx.fillText(w.override.emojiOverlay, wordX, lineY - effectiveFontSize * 1.2 * emojiScale);
+          ctx.fillText(
+            w.override.emojiOverlay,
+            wordX,
+            lineY - effectiveFontSize * 1.2 * emojiScale,
+          );
           ctx.restore();
         }
 
@@ -449,7 +514,16 @@ function renderDynamicTextBlock(
       }
     } else {
       // Fast path: no overrides and no textFadeIn, render full line at once
-      renderDynamicWord(ctx, lineText, x, lineY, style, style.color, fontSize, videoScale);
+      renderDynamicWord(
+        ctx,
+        lineText,
+        x,
+        lineY,
+        style,
+        style.color,
+        fontSize,
+        videoScale,
+      );
     }
   }
 }
@@ -465,7 +539,7 @@ function renderDynamicWord(
   fontSize: number,
   videoScale: number,
   effect?: "knockout",
-  charAlphas?: number[]
+  charAlphas?: number[],
 ) {
   const upperText = text.toUpperCase();
   const isKnockout = effect === "knockout";
@@ -474,7 +548,7 @@ function renderDynamicWord(
   if (charAlphas && charAlphas.length > 0 && !isKnockout) {
     const savedAlpha = ctx.globalAlpha;
     const chars = upperText.split("");
-    const charWidths = chars.map(c => ctx.measureText(c).width);
+    const charWidths = chars.map((c) => ctx.measureText(c).width);
     const totalCharWidth = charWidths.reduce((a, b) => a + b, 0);
     let charX = x - totalCharWidth / 2;
 
@@ -495,9 +569,17 @@ function renderDynamicWord(
 
       // Fill
       let charFillStyle: string | CanvasGradient = fillColor;
-      if (fillColor === style.color && (style.color === "#CCCCCC" || style.color === "#C0C0C0")) {
+      if (
+        fillColor === style.color &&
+        (style.color === "#CCCCCC" || style.color === "#C0C0C0")
+      ) {
         const tw = ctx.measureText(upperText).width;
-        const gradient = ctx.createLinearGradient(x - tw / 2, y - fontSize / 2, x + tw / 2, y + fontSize / 2);
+        const gradient = ctx.createLinearGradient(
+          x - tw / 2,
+          y - fontSize / 2,
+          x + tw / 2,
+          y + fontSize / 2,
+        );
         gradient.addColorStop(0, "#FFFFFF");
         gradient.addColorStop(0.5, "#CCCCCC");
         gradient.addColorStop(1, "#999999");
@@ -552,7 +634,7 @@ function renderDynamicWord(
       x - textWidth / 2,
       y - fontSize / 2,
       x + textWidth / 2,
-      y + fontSize / 2
+      y + fontSize / 2,
     );
     gradient.addColorStop(0, "#FFFFFF");
     gradient.addColorStop(0.5, "#CCCCCC");
@@ -571,7 +653,6 @@ function renderDynamicWord(
   ctx.restore();
 }
 
-
 function renderChunkToCanvas(
   ctx: CanvasRenderingContext2D,
   chunk: { text: string; timestamp: [number, number]; words?: WordTiming[] },
@@ -579,15 +660,17 @@ function renderChunkToCanvas(
   canvasWidth: number,
   canvasHeight: number,
   mode: "word" | "phrase",
-  currentTime: number
+  currentTime: number,
 ) {
   // Progressive word reveal: only show words spoken so far
   let displayText = chunk.text;
   let chunkWords = chunk.words;
   if (style.dynamicFollowWord && mode === "phrase" && chunk.words) {
-    const visibleWords = chunk.words.filter(w => currentTime >= w.timestamp[0]);
+    const visibleWords = chunk.words.filter(
+      (w) => currentTime >= w.timestamp[0],
+    );
     if (visibleWords.length === 0) return;
-    displayText = visibleWords.map(w => w.text).join(" ");
+    displayText = visibleWords.map((w) => w.text).join(" ");
     chunkWords = visibleWords;
   }
 
@@ -607,8 +690,7 @@ function renderChunkToCanvas(
 
   // Text wrapping
   const wordsInText = displayText.split(" ");
-  const maxWordsPerLine =
-    style.maxWordsPerLine ?? (isVerticalVideo ? 4 : 6);
+  const maxWordsPerLine = style.maxWordsPerLine ?? (isVerticalVideo ? 4 : 6);
   const shouldSplitText = wordsInText.length > maxWordsPerLine;
 
   let lines = [displayText];
@@ -643,17 +725,14 @@ function renderChunkToCanvas(
   let baseY: number;
   switch (position) {
     case "top":
-      baseY =
-        canvasHeight * (isVerticalVideo ? 0.06 : 0.12) + totalHeight / 2;
+      baseY = canvasHeight * (isVerticalVideo ? 0.06 : 0.12) + totalHeight / 2;
       break;
     case "middle":
       baseY = canvasHeight / 2;
       break;
     case "bottom":
     default:
-      baseY =
-        canvasHeight -
-        canvasHeight * (isVerticalVideo ? 0.08 : 0.16);
+      baseY = canvasHeight - canvasHeight * (isVerticalVideo ? 0.08 : 0.16);
       break;
   }
 
@@ -692,16 +771,18 @@ function renderChunkToCanvas(
 
   if (canEmphasize) {
     // Build line groups based on actual pixel width (accounts for per-word font overrides)
-    const maxLineWidth = canvasWidth * (isVerticalVideo ? 0.85 : 0.90);
+    const maxLineWidth = canvasWidth * (isVerticalVideo ? 0.85 : 0.9);
     const spaceWidth = 0.35 * finalFontSize;
-    const lineWordGroups: typeof phraseWords[] = [];
+    const lineWordGroups: (typeof phraseWords)[] = [];
     let currentLineWords: typeof phraseWords = [];
     let currentLineWidth = 0;
 
     for (let i = 0; i < phraseWords.length; i++) {
       const word = phraseWords[i];
       // Use emoji as display text for measurement when set
-      const wordText = word.styleOverride?.emoji ? word.styleOverride.emoji : word.text.toUpperCase();
+      const wordText = word.styleOverride?.emoji
+        ? word.styleOverride.emoji
+        : word.text.toUpperCase();
 
       // Measure with per-word font if needed
       if (word.styleOverride?.fontFamily || word.styleOverride?.fontSize) {
@@ -712,9 +793,17 @@ function renderChunkToCanvas(
         ctx.font = fontString;
       }
 
-      const scale = (currentTime >= word.timestamp[0] && currentTime <= word.timestamp[1] && style.wordEmphasisEnabled) ? 1.18 : 1;
+      const scale =
+        currentTime >= word.timestamp[0] &&
+        currentTime <= word.timestamp[1] &&
+        style.wordEmphasisEnabled
+          ? 1.18
+          : 1;
       const scaledWordWidth = wordWidth * scale;
-      const widthIfAdded = currentLineWidth + (currentLineWords.length > 0 ? spaceWidth : 0) + scaledWordWidth;
+      const widthIfAdded =
+        currentLineWidth +
+        (currentLineWords.length > 0 ? spaceWidth : 0) +
+        scaledWordWidth;
 
       if (currentLineWords.length > 0 && widthIfAdded > maxLineWidth) {
         lineWordGroups.push(currentLineWords);
@@ -730,7 +819,9 @@ function renderChunkToCanvas(
     }
 
     // Recalculate vertical layout with the actual number of lines
-    const emphTotalHeight = lineWordGroups.length * lineHeight + Math.max(0, lineWordGroups.length - 1) * lineGap;
+    const emphTotalHeight =
+      lineWordGroups.length * lineHeight +
+      Math.max(0, lineWordGroups.length - 1) * lineGap;
     const emphStartY = baseY - emphTotalHeight / 2 + lineHeight / 2;
 
     const chunkEndTime = chunk.timestamp[1];
@@ -745,7 +836,7 @@ function renderChunkToCanvas(
         videoScale,
         currentTime,
         finalFontSize,
-        chunkEndTime
+        chunkEndTime,
       );
     });
     return;
@@ -758,8 +849,14 @@ function renderChunkToCanvas(
     const chunkFadeOutDuration = 0.25;
     const timeSinceChunkStart = currentTime - chunk.timestamp[0];
     const timeToChunkEnd = chunk.timestamp[1] - currentTime;
-    const chunkFadeIn = Math.min(1, Math.max(0, timeSinceChunkStart / chunkFadeInDuration));
-    const chunkFadeOut = Math.min(1, Math.max(0, timeToChunkEnd / chunkFadeOutDuration));
+    const chunkFadeIn = Math.min(
+      1,
+      Math.max(0, timeSinceChunkStart / chunkFadeInDuration),
+    );
+    const chunkFadeOut = Math.min(
+      1,
+      Math.max(0, timeToChunkEnd / chunkFadeOutDuration),
+    );
     ctx.save();
     ctx.globalAlpha = chunkFadeIn * chunkFadeOut;
   }
@@ -780,7 +877,7 @@ function renderTextLine(
   x: number,
   y: number,
   style: SubtitleStyle,
-  baseScale: number = 1
+  baseScale: number = 1,
 ) {
   const upperText = text.toUpperCase();
   if (style.borderWidth > 0) {
@@ -802,7 +899,7 @@ function renderTextLine(
       x - textWidth / 2,
       y - gradientHeight,
       x + textWidth / 2,
-      y + gradientHeight
+      y + gradientHeight,
     );
     gradient.addColorStop(0, "#FFFFFF");
     gradient.addColorStop(0.5, "#CCCCCC");
@@ -814,10 +911,7 @@ function renderTextLine(
   if (style.dropShadowIntensity > 0) {
     const shadowOpacity = Math.min(1, style.dropShadowIntensity);
     ctx.shadowColor = `rgba(0,0,0,${shadowOpacity})`;
-    ctx.shadowBlur = Math.max(
-      2,
-      style.dropShadowIntensity * 4 * baseScale
-    );
+    ctx.shadowBlur = Math.max(2, style.dropShadowIntensity * 4 * baseScale);
     const shadowOffset = 2 * baseScale;
     ctx.shadowOffsetX = shadowOffset;
     ctx.shadowOffsetY = shadowOffset;
@@ -836,7 +930,7 @@ function renderTextLine(
 function buildWordFont(
   style: SubtitleStyle,
   finalFontSize: number,
-  override?: WordStyleOverride
+  override?: WordStyleOverride,
 ): string {
   const family = override?.fontFamily
     ? resolveFontFamily(override.fontFamily)
@@ -856,14 +950,16 @@ function renderPhraseLineWithEmphasis(
   baseScale: number,
   currentTime: number,
   finalFontSize: number,
-  chunkEndTime?: number
+  chunkEndTime?: number,
 ) {
   if (words.length === 0) return;
 
   const globalFont = `${style.fontWeight} ${finalFontSize}px ${resolveFontFamily(style.fontFamily)}`;
   // Build display texts: emoji replaces word text when set
   const displayTexts = words.map((word) =>
-    word.styleOverride?.emoji ? word.styleOverride.emoji : word.text.toUpperCase()
+    word.styleOverride?.emoji
+      ? word.styleOverride.emoji
+      : word.text.toUpperCase(),
   );
   const spaceWidth = 0.35 * finalFontSize;
   const scales = words.map((word) =>
@@ -871,7 +967,7 @@ function renderPhraseLineWithEmphasis(
     currentTime <= word.timestamp[1] &&
     style.wordEmphasisEnabled
       ? 1.18
-      : 1
+      : 1,
   );
 
   // Measure each word with its own font (per-word override support)
@@ -886,9 +982,7 @@ function renderPhraseLineWithEmphasis(
     return ctx.measureText(value).width;
   });
 
-  const scaledWidths = baseWidths.map(
-    (width, index) => width * scales[index]
-  );
+  const scaledWidths = baseWidths.map((width, index) => width * scales[index]);
   const totalWidth =
     scaledWidths.reduce((total, width) => total + width, 0) +
     spaceWidth * Math.max(0, words.length - 1);
@@ -920,9 +1014,13 @@ function renderPhraseLineWithEmphasis(
 
     // Per-word fade
     const timeSinceWordStart = currentTime - word.timestamp[0];
-    const chunkFadeOut = (useTextFade && chunkEndTime != null)
-      ? Math.min(1, Math.max(0, (chunkEndTime - currentTime) / fadeOutDuration))
-      : 1;
+    const chunkFadeOut =
+      useTextFade && chunkEndTime != null
+        ? Math.min(
+            1,
+            Math.max(0, (chunkEndTime - currentTime) / fadeOutDuration),
+          )
+        : 1;
     const wordAlpha = chunkFadeOut;
 
     ctx.save();
@@ -930,7 +1028,9 @@ function renderPhraseLineWithEmphasis(
 
     if (isActive) {
       const boxWidth = scaledWidth + highlightPaddingX * 2;
-      const wordFontSize = word.styleOverride?.fontSize ? Math.round(finalFontSize * word.styleOverride.fontSize) : finalFontSize;
+      const wordFontSize = word.styleOverride?.fontSize
+        ? Math.round(finalFontSize * word.styleOverride.fontSize)
+        : finalFontSize;
       const boxHeight = wordFontSize * scale + highlightPaddingY * 2;
 
       ctx.fillStyle = emphasisBgColor;
@@ -940,7 +1040,7 @@ function renderPhraseLineWithEmphasis(
         centerY - boxHeight / 2,
         boxWidth,
         boxHeight,
-        highlightRadius
+        highlightRadius,
       );
       ctx.fill();
     }
@@ -967,7 +1067,12 @@ function renderPhraseLineWithEmphasis(
       const letterStagger = charCount > 0 ? revealDuration / charCount : 0;
       charAlphas = [];
       for (let ci = 0; ci < charCount; ci++) {
-        charAlphas.push(Math.min(1, Math.max(0, (timeSinceWordStart - ci * letterStagger) / 0.06)));
+        charAlphas.push(
+          Math.min(
+            1,
+            Math.max(0, (timeSinceWordStart - ci * letterStagger) / 0.06),
+          ),
+        );
       }
     }
 
@@ -982,7 +1087,7 @@ function renderPhraseLineWithEmphasis(
       baseWidth,
       fillColor,
       word.styleOverride?.effect,
-      charAlphas
+      charAlphas,
     );
 
     // Draw emoji overlay above the word
@@ -1001,7 +1106,11 @@ function renderPhraseLineWithEmphasis(
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillStyle = "#000000";
-      ctx.fillText(word.styleOverride.emojiOverlay, wordCenterX, centerY - effectiveFontSize * 1.2 * emojiScale);
+      ctx.fillText(
+        word.styleOverride.emojiOverlay,
+        wordCenterX,
+        centerY - effectiveFontSize * 1.2 * emojiScale,
+      );
       ctx.restore();
     }
 
@@ -1027,7 +1136,7 @@ function drawWordText(
   baseWidth: number,
   fillColor: string,
   effect?: "knockout",
-  charAlphas?: number[]
+  charAlphas?: number[],
 ) {
   const uppercase = text.toUpperCase();
   const isKnockout = effect === "knockout";
@@ -1037,7 +1146,7 @@ function drawWordText(
     // Measure each character's width to position them individually
     const savedAlpha = ctx.globalAlpha;
     const chars = uppercase.split("");
-    const charWidths = chars.map(c => ctx.measureText(c).width);
+    const charWidths = chars.map((c) => ctx.measureText(c).width);
     const totalCharWidth = charWidths.reduce((a, b) => a + b, 0);
     // Starting X so that text is centered at centerX (in scaled coords)
     let charX = -totalCharWidth / 2;
@@ -1052,7 +1161,10 @@ function drawWordText(
       if (style.borderWidth > 0) {
         ctx.save();
         ctx.strokeStyle = style.borderColor;
-        const scaledBorderWidth = Math.max(0.5, (style.borderWidth * baseScale) / Math.max(scale, 0.001));
+        const scaledBorderWidth = Math.max(
+          0.5,
+          (style.borderWidth * baseScale) / Math.max(scale, 0.001),
+        );
         ctx.lineWidth = scaledBorderWidth;
         ctx.translate(centerX, centerY);
         ctx.scale(scale, scale);
@@ -1064,12 +1176,17 @@ function drawWordText(
 
       // Fill
       let charFillStyle: string | CanvasGradient = fillColor;
-      if (fillColor === style.color && (style.color === "#CCCCCC" || style.color === "#C0C0C0")) {
+      if (
+        fillColor === style.color &&
+        (style.color === "#CCCCCC" || style.color === "#C0C0C0")
+      ) {
         const scaledWidth = baseWidth * scale;
         const gradientHeight = 20 * baseScale;
         const gradient = ctx.createLinearGradient(
-          centerX - scaledWidth / 2, centerY - gradientHeight,
-          centerX + scaledWidth / 2, centerY + gradientHeight
+          centerX - scaledWidth / 2,
+          centerY - gradientHeight,
+          centerX + scaledWidth / 2,
+          centerY + gradientHeight,
         );
         gradient.addColorStop(0, "#FFFFFF");
         gradient.addColorStop(0.5, "#CCCCCC");
@@ -1107,7 +1224,7 @@ function drawWordText(
     ctx.strokeStyle = style.borderColor;
     const scaledBorderWidth = Math.max(
       0.5,
-      (style.borderWidth * baseScale) / Math.max(scale, 0.001)
+      (style.borderWidth * baseScale) / Math.max(scale, 0.001),
     );
     ctx.lineWidth = scaledBorderWidth;
     ctx.translate(centerX, centerY);
@@ -1141,7 +1258,7 @@ function drawWordText(
       centerX - scaledWidth / 2,
       centerY - gradientHeight,
       centerX + scaledWidth / 2,
-      centerY + gradientHeight
+      centerY + gradientHeight,
     );
     gradient.addColorStop(0, "#FFFFFF");
     gradient.addColorStop(0.5, "#CCCCCC");
@@ -1153,10 +1270,7 @@ function drawWordText(
   if (style.dropShadowIntensity > 0) {
     const shadowOpacity = Math.min(1, style.dropShadowIntensity);
     ctx.shadowColor = `rgba(0,0,0,${shadowOpacity})`;
-    ctx.shadowBlur = Math.max(
-      2,
-      style.dropShadowIntensity * 5 * baseScale
-    );
+    ctx.shadowBlur = Math.max(2, style.dropShadowIntensity * 5 * baseScale);
     const shadowOffset = 2 * baseScale;
     ctx.shadowOffsetX = shadowOffset;
     ctx.shadowOffsetY = shadowOffset;

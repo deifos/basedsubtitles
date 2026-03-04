@@ -2,8 +2,10 @@
 
 import { useState, useRef, useEffect } from "react";
 
-interface DebouncedColorInputProps
-  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "onChange" | "value" | "type"> {
+interface DebouncedColorInputProps extends Omit<
+  React.InputHTMLAttributes<HTMLInputElement>,
+  "onChange" | "value" | "type"
+> {
   value: string;
   onChange: (value: string) => void;
   delay?: number;

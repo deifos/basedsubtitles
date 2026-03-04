@@ -1,8 +1,8 @@
-import { clsx, type ClassValue } from "clsx"
-import { twMerge } from "tailwind-merge"
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
+  return twMerge(clsx(inputs));
 }
 
 /**
@@ -48,12 +48,12 @@ export function formatVttTime(seconds: number): string {
 
 export interface WordStyleOverride {
   fontFamily?: string;
-  fontSize?: number;  // multiplier (e.g. 1.5 = 150% of global)
+  fontSize?: number; // multiplier (e.g. 1.5 = 150% of global)
   color?: string;
   effect?: "knockout";
-  emoji?: string;        // replaces word text with this emoji
+  emoji?: string; // replaces word text with this emoji
   emojiOverlay?: string; // renders this emoji above the word
-  emojiScale?: number;   // per-word emoji size multiplier (default 1.0)
+  emojiScale?: number; // per-word emoji size multiplier (default 1.0)
 }
 
 export interface ProcessedWord {
@@ -94,7 +94,7 @@ export function processTranscriptChunks(
   transcript: SourceTranscript,
   mode: "word" | "phrase" = "word",
   maxWordsPerLine?: number,
-  dynamicEnabled?: boolean
+  dynamicEnabled?: boolean,
 ): ProcessedChunk[] {
   if (mode === "word") {
     return transcript.chunks.map((chunk) => ({
@@ -129,7 +129,10 @@ export function processTranscriptChunks(
     if (dynamicEnabled) {
       currentGroup.words = currentGroup.words.map((word, i) => {
         if (word.dynamicPosition) return word; // preserve user toggle
-        return { ...word, dynamicPosition: i === 0 ? "behind" as const : "front" as const };
+        return {
+          ...word,
+          dynamicPosition: i === 0 ? ("behind" as const) : ("front" as const),
+        };
       });
     }
 
@@ -177,10 +180,10 @@ export function processTranscriptChunks(
     const wouldExceedDuration = end - currentGroup.start > MAX_PHRASE_DURATION;
     const crossesDisabledBoundary = chunkDisabled !== currentGroup.disabled;
     const endsWithPunctuation = /[.!?]$/.test(
-      currentGroup.texts[currentGroup.texts.length - 1]
+      currentGroup.texts[currentGroup.texts.length - 1],
     );
     const endsWithCommaLike = /[,;:]$/.test(
-      currentGroup.texts[currentGroup.texts.length - 1]
+      currentGroup.texts[currentGroup.texts.length - 1],
     );
 
     const shouldEndPhrase =
@@ -226,14 +229,14 @@ export function transcriptToSrt(
       timestamp: [number, number];
     }>;
   },
-  mode: "word" | "phrase" = "word"
+  mode: "word" | "phrase" = "word",
 ): string {
   const processedChunks = processTranscriptChunks(transcript, mode);
   return processedChunks
     .map((chunk, index) => {
       const [start, end] = chunk.timestamp;
       return `${index + 1}\n${formatSrtTime(start)} --> ${formatSrtTime(
-        end
+        end,
       )}\n${chunk.text}\n`;
     })
     .join("\n");
@@ -249,7 +252,7 @@ export function transcriptToVtt(
       timestamp: [number, number];
     }>;
   },
-  mode: "word" | "phrase" = "word"
+  mode: "word" | "phrase" = "word",
 ): string {
   const header = "WEBVTT\n\n";
   const processedChunks = processTranscriptChunks(transcript, mode);
@@ -257,7 +260,7 @@ export function transcriptToVtt(
     .map((chunk, index) => {
       const [start, end] = chunk.timestamp;
       return `${index + 1}\n${formatVttTime(start)} --> ${formatVttTime(
-        end
+        end,
       )}\n${chunk.text}\n`;
     })
     .join("\n");

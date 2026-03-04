@@ -212,10 +212,22 @@ const lilitaOne = Lilita_One({
 export const metadata: Metadata = {
   title: {
     default: "Based Subtitles - AI Video Subtitle Generator",
-    template: "%s | Based Subtitles"
+    template: "%s | Based Subtitles",
   },
-  description: "Generate professional subtitles for your videos with AI. 100% local, privacy-first subtitle generation powered by transformers.js. No server uploads required.",
-  keywords: ["subtitles", "video subtitles", "AI subtitles", "subtitle generator", "video captions", "transcription", "local AI", "privacy-first", "transformers.js", "whisper"],
+  description:
+    "Generate professional subtitles for your videos with AI. 100% local, privacy-first subtitle generation powered by transformers.js. No server uploads required.",
+  keywords: [
+    "subtitles",
+    "video subtitles",
+    "AI subtitles",
+    "subtitle generator",
+    "video captions",
+    "transcription",
+    "local AI",
+    "privacy-first",
+    "transformers.js",
+    "whisper",
+  ],
   authors: [{ name: "deifosv", url: "https://x.com/deifosv" }],
   creator: "deifosv",
   openGraph: {
@@ -223,13 +235,15 @@ export const metadata: Metadata = {
     locale: "en_US",
     url: "https://basedsubs.getbasedapps.com",
     title: "Based Subtitles - AI Video Subtitle Generator",
-    description: "Generate professional subtitles for your videos with AI. 100% local, privacy-first subtitle generation.",
+    description:
+      "Generate professional subtitles for your videos with AI. 100% local, privacy-first subtitle generation.",
     siteName: "Based Subtitles",
   },
   twitter: {
     card: "summary_large_image",
     title: "Based Subtitles - AI Video Subtitle Generator",
-    description: "Generate professional subtitles for your videos with AI. 100% local, privacy-first subtitle generation.",
+    description:
+      "Generate professional subtitles for your videos with AI. 100% local, privacy-first subtitle generation.",
     creator: "@deifosv",
   },
   robots: {

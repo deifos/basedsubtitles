@@ -57,7 +57,7 @@ export function Transcript({
   const jsonTranscript = useMemo(() => {
     return JSON.stringify(transcript, null, 2).replace(
       /( {4}"timestamp": )\[\s+(\S+)\s+(\S+)\s+\]/gm,
-      "$1[$2 $3]"
+      "$1[$2 $3]",
     );
   }, [transcript]);
 

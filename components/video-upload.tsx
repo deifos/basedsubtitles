@@ -1,12 +1,24 @@
 "use client";
 
-import { useCallback, useState, forwardRef, useEffect, memo, useRef } from "react";
+import {
+  useCallback,
+  useState,
+  forwardRef,
+  useEffect,
+  memo,
+  useRef,
+} from "react";
 import { cn, formatTime, type WordStyleOverride } from "@/lib/utils";
 import { VideoCaption } from "./video-caption";
 import { SubtitleStyle } from "./subtitle-styling";
 import { UploadIcon, Play, Pause, Volume2, VolumeX } from "lucide-react";
 import type { MaskData } from "@/hooks/useBackgroundRemoval";
-import { renderSubtitleToCanvas, renderDynamicBehindText, renderDynamicFrontText, estimateFaceFromMask } from "@/lib/render-subtitle";
+import {
+  renderSubtitleToCanvas,
+  renderDynamicBehindText,
+  renderDynamicFrontText,
+  estimateFaceFromMask,
+} from "@/lib/render-subtitle";
 
 interface VideoUploadProps {
   onVideoSelect: (file: File) => void;
@@ -50,7 +62,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
       bgRemovalReady = false,
       getMaskAtTime,
     },
-    ref
+    ref,
   ) => {
     const [videoSrc, setVideoSrc] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -80,8 +92,10 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
     }, [currentTime, duration]);
 
     // Whether compositing mode is active
-    const isDynamicMode = subtitleStyle.dynamicEnabled && bgRemovalReady && getMaskAtTime;
-    const isBgRemovalMode = bgRemovalReady && subtitleStyle.backgroundRemovalEnabled && getMaskAtTime;
+    const isDynamicMode =
+      subtitleStyle.dynamicEnabled && bgRemovalReady && getMaskAtTime;
+    const isBgRemovalMode =
+      bgRemovalReady && subtitleStyle.backgroundRemovalEnabled && getMaskAtTime;
     const compositingActive = isDynamicMode || isBgRemovalMode;
 
     // Reset video source when ref.current.src is empty
@@ -123,7 +137,8 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
           }
 
           // Detect aspect ratio from video dimensions
-          const detectedRatio: "16:9" | "9:16" = video.videoHeight > video.videoWidth ? "9:16" : "16:9";
+          const detectedRatio: "16:9" | "9:16" =
+            video.videoHeight > video.videoWidth ? "9:16" : "16:9";
 
           setVideoSrc(video.src);
           setError(null);
@@ -138,7 +153,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
           setVideoSrc(null);
         }
       },
-      [onVideoSelect, onAspectRatioDetected]
+      [onVideoSelect, onAspectRatioDetected],
     );
 
     const handleDrop = useCallback(
@@ -148,7 +163,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
         const file = e.dataTransfer.files[0];
         if (file) handleFile(file);
       },
-      [handleFile]
+      [handleFile],
     );
 
     const handleChange = useCallback(
@@ -159,7 +174,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
         // Reset the input value to allow selecting the same file again
         e.target.value = "";
       },
-      [handleFile]
+      [handleFile],
     );
 
     useEffect(() => {
@@ -181,7 +196,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
 
       const disabledRanges: Array<[number, number]> = [];
 
-      transcript.chunks.forEach(chunk => {
+      transcript.chunks.forEach((chunk) => {
         if (chunk.disabled) {
           disabledRanges.push(chunk.timestamp);
         }
@@ -192,13 +207,16 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
       const mergedRanges: Array<[number, number]> = [];
 
       for (const range of disabledRanges) {
-        if (mergedRanges.length === 0 || mergedRanges[mergedRanges.length - 1][1] < range[0]) {
+        if (
+          mergedRanges.length === 0 ||
+          mergedRanges[mergedRanges.length - 1][1] < range[0]
+        ) {
           mergedRanges.push(range);
         } else {
           // Merge overlapping ranges
           mergedRanges[mergedRanges.length - 1][1] = Math.max(
             mergedRanges[mergedRanges.length - 1][1],
-            range[1]
+            range[1],
           );
         }
       }
@@ -237,7 +255,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
           }
         }
       },
-      [onTimeUpdate, transcript, isSkipping, getDisabledRanges]
+      [onTimeUpdate, transcript, isSkipping, getDisabledRanges],
     );
 
     // Canvas compositing loop for background removal preview
@@ -250,8 +268,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
         return;
       }
 
-      const videoEl =
-        ref && typeof ref !== "function" ? ref.current : null;
+      const videoEl = ref && typeof ref !== "function" ? ref.current : null;
       if (!videoEl) return;
 
       const canvas = canvasRef.current;
@@ -300,20 +317,42 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
 
         const mask = getMaskAtTime!(time);
 
+        // Compute center-crop region when canvas AR differs from video AR
+        // (e.g. landscape video shown in a 9:16 container with object-cover)
+        const vw = videoEl.videoWidth;
+        const vh = videoEl.videoHeight;
+        const w = canvas.width;
+        const h = canvas.height;
+        const canvasAR = w / h;
+        const videoAR = vw / vh;
+        let sx = 0,
+          sy = 0,
+          sw = vw,
+          sh = vh;
+        if (Math.abs(canvasAR - videoAR) > 0.01) {
+          if (videoAR > canvasAR) {
+            // Video is wider — crop sides
+            sw = Math.round(vh * canvasAR);
+            sx = Math.round((vw - sw) / 2);
+          } else {
+            // Video is taller — crop top/bottom
+            sh = Math.round(vw / canvasAR);
+            sy = Math.round((vh - sh) / 2);
+          }
+        }
+
         if (!mask) {
-          ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+          ctx.drawImage(videoEl, sx, sy, sw, sh, 0, 0, w, h);
           animFrameRef.current = requestAnimationFrame(render);
           return;
         }
 
-        const w = canvas.width;
-        const h = canvas.height;
         const isDynamic = subtitleStyle.dynamicEnabled;
 
         // Step 1: Draw background layer
         if (isDynamic) {
           // Dynamic mode: keep original video as background
-          ctx.drawImage(videoEl, 0, 0, w, h);
+          ctx.drawImage(videoEl, sx, sy, sw, sh, 0, 0, w, h);
         } else if (subtitleStyle.backgroundType === "blur") {
           const blurCanvas = blurCanvasRef.current!;
           if (blurCanvas.width !== w || blurCanvas.height !== h) {
@@ -344,19 +383,25 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
             fgCanvas.height = h;
           }
 
-          // Draw video frame onto foreground canvas
+          // Draw video frame onto foreground canvas (with crop)
           fgCtx.clearRect(0, 0, w, h);
-          fgCtx.drawImage(videoEl, 0, 0, w, h);
+          fgCtx.drawImage(videoEl, sx, sy, sw, sh, 0, 0, w, h);
 
           // Resize mask canvas only when mask dimensions change
-          if (maskCanvas.width !== mask.width || maskCanvas.height !== mask.height) {
+          if (
+            maskCanvas.width !== mask.width ||
+            maskCanvas.height !== mask.height
+          ) {
             maskCanvas.width = mask.width;
             maskCanvas.height = mask.height;
           }
 
           // Reuse ImageData if dimensions match, otherwise create new one
           if (lastMaskW !== mask.width || lastMaskH !== mask.height) {
-            cachedMaskImageData = maskCtx.createImageData(mask.width, mask.height);
+            cachedMaskImageData = maskCtx.createImageData(
+              mask.width,
+              mask.height,
+            );
             lastMaskW = mask.width;
             lastMaskH = mask.height;
           }
@@ -365,7 +410,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
           const pixels = maskImageData.data;
           for (let i = 0; i < mask.data.length; i++) {
             const idx = i * 4;
-            pixels[idx] = 255;     // R
+            pixels[idx] = 255; // R
             pixels[idx + 1] = 255; // G
             pixels[idx + 2] = 255; // B
             pixels[idx + 3] = mask.data[i]; // A = mask alpha
@@ -383,10 +428,32 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
 
         // Step 4: Render front text (dynamic) or on-top text (non-dynamic)
         if (isDynamic && transcript) {
-          const faceBounds = estimateFaceFromMask(mask.data, mask.width, mask.height, w, h);
-          renderDynamicFrontText(ctx, transcript, time, subtitleStyle, w, h, faceBounds);
+          const faceBounds = estimateFaceFromMask(
+            mask.data,
+            mask.width,
+            mask.height,
+            w,
+            h,
+          );
+          renderDynamicFrontText(
+            ctx,
+            transcript,
+            time,
+            subtitleStyle,
+            w,
+            h,
+            faceBounds,
+          );
         } else if (transcript) {
-          renderSubtitleToCanvas(ctx, transcript, time, subtitleStyle, mode, w, h);
+          renderSubtitleToCanvas(
+            ctx,
+            transcript,
+            time,
+            subtitleStyle,
+            mode,
+            w,
+            h,
+          );
         }
 
         // Step 5: Branding watermark
@@ -417,14 +484,21 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
           animFrameRef.current = 0;
         }
       };
-    }, [compositingActive, ref, subtitleStyle, transcript, mode, getMaskAtTime]);
+    }, [
+      compositingActive,
+      ref,
+      subtitleStyle,
+      transcript,
+      mode,
+      getMaskAtTime,
+    ]);
 
     return (
       <div
         className={cn(
           "relative border-2 border-dashed rounded-lg transition-colors overflow-hidden",
           videoSrc ? "" : "min-h-[300px]",
-          className
+          className,
         )}
         onDragOver={(e) => {
           e.preventDefault();
@@ -436,109 +510,112 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
             <div
               className={cn(
                 "relative mx-auto flex flex-col",
-                ratio === "16:9" ? "w-full" : "w-auto"
+                ratio === "16:9" ? "w-full" : "w-auto",
               )}
             >
-            <div
-              className="relative flex justify-center"
-              style={{
-                aspectRatio: ratio === "16:9" ? "16/9" : "9/16"
-              }}
-            >
-              <video
-                ref={ref}
-                src={videoSrc}
-                playsInline
-                preload="auto"
-                className={cn(
-                  ratio === "16:9"
-                    ? "object-cover w-full max-w-4xl max-h-[500px]"
-                    : ratio === "9:16" && zoomPortrait
-                      ? "object-cover h-[500px] max-h-[500px]"
-                      : "object-contain h-[500px] max-h-[500px]"
-                )}
-                onTimeUpdate={handleTimeUpdate}
-                onPlay={() => setIsPlaying(true)}
-                onPause={() => setIsPlaying(false)}
-                onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
-                onClick={() => {
-                  if (!compositingActive) {
-                    const videoEl = ref && typeof ref !== "function" ? ref.current : null;
-                    if (videoEl) {
-                      if (videoEl.paused) videoEl.play().catch(() => {});
-                      else videoEl.pause();
-                    }
-                  }
-                }}
+              <div
+                className="relative flex justify-center"
                 style={{
                   aspectRatio: ratio === "16:9" ? "16/9" : "9/16",
-                  cursor: "pointer",
                 }}
-              />
-              {/* Canvas overlay for background removal compositing */}
-              {compositingActive && (
-                <canvas
-                  ref={canvasRef}
+              >
+                <video
+                  ref={ref}
+                  src={videoSrc}
+                  playsInline
+                  preload="auto"
                   className={cn(
-                    "absolute inset-0 cursor-pointer",
                     ratio === "16:9"
-                      ? "w-full max-w-4xl max-h-[500px] mx-auto"
-                      : ratio === "9:16" && zoomPortrait
-                        ? "h-[500px] max-h-[500px] mx-auto"
-                        : "h-[500px] max-h-[500px] mx-auto"
+                      ? "object-cover w-full max-w-4xl max-h-[500px]"
+                      : ratio === "9:16" && !zoomPortrait
+                        ? "object-cover h-[500px] max-h-[500px]"
+                        : "object-contain h-[500px] max-h-[500px]",
                   )}
-                  style={{
-                    aspectRatio: ratio === "16:9" ? "16/9" : "9/16",
-                  }}
+                  onTimeUpdate={handleTimeUpdate}
+                  onPlay={() => setIsPlaying(true)}
+                  onPause={() => setIsPlaying(false)}
+                  onLoadedMetadata={(e) =>
+                    setDuration(e.currentTarget.duration)
+                  }
                   onClick={() => {
-                    const videoEl = ref && typeof ref !== "function" ? ref.current : null;
-                    if (videoEl) {
-                      if (videoEl.paused) videoEl.play().catch(() => {});
-                      else videoEl.pause();
+                    if (!compositingActive) {
+                      const videoEl =
+                        ref && typeof ref !== "function" ? ref.current : null;
+                      if (videoEl) {
+                        if (videoEl.paused) videoEl.play().catch(() => {});
+                        else videoEl.pause();
+                      }
                     }
                   }}
-                />
-              )}
-              {isSkipping && (
-                <div className="absolute top-4 right-4 bg-black bg-opacity-75 text-white px-3 py-1 rounded-md text-sm font-medium z-10">
-                  Skipping disabled segment
-                </div>
-              )}
-              {/* Branding watermark DOM overlay (non-compositing mode) */}
-              {subtitleStyle.brandingWatermark && !compositingActive && (
-                <div
-                  className="absolute bottom-[3%] left-[3%] pointer-events-none z-20"
                   style={{
-                    fontSize: "clamp(8px, 1.2vw, 13px)",
-                    fontWeight: 700,
-                    fontFamily: "system-ui, -apple-system, sans-serif",
-                    color: "rgba(255, 255, 255, 0.6)",
-                    textShadow: "0 1px 3px rgba(0, 0, 0, 0.5)",
-                    letterSpacing: "0.02em",
+                    aspectRatio: ratio === "16:9" ? "16/9" : "9/16",
+                    cursor: "pointer",
                   }}
-                >
-                  basedsubs.getbasedapps.com
-                </div>
-              )}
-              {/* DOM-based captions: visible when not compositing, invisible hit-targets when compositing + word select active */}
-              {transcript && !compositingActive && (
-                <VideoCaption
-                  transcript={transcript}
-                  currentTime={currentTime}
-                  style={subtitleStyle}
-                  mode={mode}
-                  ratio={ratio}
-
-
                 />
-              )}
-            </div>
-            {/* Custom player controls — always visible */}
+                {/* Canvas overlay for background removal compositing */}
+                {compositingActive && (
+                  <canvas
+                    ref={canvasRef}
+                    className={cn(
+                      "absolute inset-0 cursor-pointer",
+                      ratio === "16:9"
+                        ? "w-full max-w-4xl max-h-[500px] mx-auto"
+                        : ratio === "9:16" && zoomPortrait
+                          ? "h-[500px] max-h-[500px] mx-auto"
+                          : "h-[500px] max-h-[500px] mx-auto",
+                    )}
+                    style={{
+                      aspectRatio: ratio === "16:9" ? "16/9" : "9/16",
+                    }}
+                    onClick={() => {
+                      const videoEl =
+                        ref && typeof ref !== "function" ? ref.current : null;
+                      if (videoEl) {
+                        if (videoEl.paused) videoEl.play().catch(() => {});
+                        else videoEl.pause();
+                      }
+                    }}
+                  />
+                )}
+                {isSkipping && (
+                  <div className="absolute top-4 right-4 bg-black bg-opacity-75 text-white px-3 py-1 rounded-md text-sm font-medium z-10">
+                    Skipping disabled segment
+                  </div>
+                )}
+                {/* Branding watermark DOM overlay (non-compositing mode) */}
+                {subtitleStyle.brandingWatermark && !compositingActive && (
+                  <div
+                    className="absolute bottom-[3%] left-[3%] pointer-events-none z-20"
+                    style={{
+                      fontSize: "clamp(8px, 1.2vw, 13px)",
+                      fontWeight: 700,
+                      fontFamily: "system-ui, -apple-system, sans-serif",
+                      color: "rgba(255, 255, 255, 0.6)",
+                      textShadow: "0 1px 3px rgba(0, 0, 0, 0.5)",
+                      letterSpacing: "0.02em",
+                    }}
+                  >
+                    basedsubs.getbasedapps.com
+                  </div>
+                )}
+                {/* DOM-based captions: visible when not compositing, invisible hit-targets when compositing + word select active */}
+                {transcript && !compositingActive && (
+                  <VideoCaption
+                    transcript={transcript}
+                    currentTime={currentTime}
+                    style={subtitleStyle}
+                    mode={mode}
+                    ratio={ratio}
+                  />
+                )}
+              </div>
+              {/* Custom player controls — always visible */}
               <div className="flex items-center gap-2 px-3 py-2 bg-black/90 rounded-b-lg w-full">
                 {/* Play/Pause */}
                 <button
                   onClick={() => {
-                    const videoEl = ref && typeof ref !== "function" ? ref.current : null;
+                    const videoEl =
+                      ref && typeof ref !== "function" ? ref.current : null;
                     if (videoEl) {
                       if (videoEl.paused) videoEl.play().catch(() => {});
                       else videoEl.pause();
@@ -546,11 +623,18 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
                   }}
                   className="text-white hover:text-white/80 transition-colors shrink-0"
                 >
-                  {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                  {isPlaying ? (
+                    <Pause className="h-4 w-4" />
+                  ) : (
+                    <Play className="h-4 w-4" />
+                  )}
                 </button>
 
                 {/* Time — updated via ref during drag to avoid re-renders */}
-                <span ref={timeDisplayRef} className="text-white text-xs tabular-nums shrink-0">
+                <span
+                  ref={timeDisplayRef}
+                  className="text-white text-xs tabular-nums shrink-0"
+                >
                   {formatTime(currentTime)}
                 </span>
 
@@ -571,29 +655,40 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
                     e.currentTarget.setPointerCapture(e.pointerId);
 
                     const rect = e.currentTarget.getBoundingClientRect();
-                    const fraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                    const fraction = Math.max(
+                      0,
+                      Math.min(1, (e.clientX - rect.left) / rect.width),
+                    );
                     const time = fraction * (duration || 1);
                     seekValueRef.current = time;
 
-                    if (seekBarFillRef.current) seekBarFillRef.current.style.width = `${fraction * 100}%`;
-                    if (timeDisplayRef.current) timeDisplayRef.current.textContent = formatTime(time);
+                    if (seekBarFillRef.current)
+                      seekBarFillRef.current.style.width = `${fraction * 100}%`;
+                    if (timeDisplayRef.current)
+                      timeDisplayRef.current.textContent = formatTime(time);
                     onTimeUpdate?.(time);
                   }}
                   onPointerMove={(e) => {
                     if (!seekingRef.current) return;
 
                     const rect = e.currentTarget.getBoundingClientRect();
-                    const fraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                    const fraction = Math.max(
+                      0,
+                      Math.min(1, (e.clientX - rect.left) / rect.width),
+                    );
                     const time = fraction * (duration || 1);
                     seekValueRef.current = time;
 
-                    if (seekBarFillRef.current) seekBarFillRef.current.style.width = `${fraction * 100}%`;
-                    if (timeDisplayRef.current) timeDisplayRef.current.textContent = formatTime(time);
+                    if (seekBarFillRef.current)
+                      seekBarFillRef.current.style.width = `${fraction * 100}%`;
+                    if (timeDisplayRef.current)
+                      timeDisplayRef.current.textContent = formatTime(time);
                     onTimeUpdate?.(time);
                   }}
                   onPointerUp={() => {
                     seekingRef.current = false;
-                    const videoEl = ref && typeof ref !== "function" ? ref.current : null;
+                    const videoEl =
+                      ref && typeof ref !== "function" ? ref.current : null;
                     if (videoEl) {
                       videoEl.currentTime = seekValueRef.current;
                     }
@@ -602,20 +697,28 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
                     // Fallback if pointer capture is lost (e.g. browser tab switch)
                     if (seekingRef.current) {
                       seekingRef.current = false;
-                      const videoEl = ref && typeof ref !== "function" ? ref.current : null;
+                      const videoEl =
+                        ref && typeof ref !== "function" ? ref.current : null;
                       if (videoEl) {
                         videoEl.currentTime = seekValueRef.current;
                       }
                     }
                   }}
                   onKeyDown={(e) => {
-                    const videoEl = ref && typeof ref !== "function" ? ref.current : null;
+                    const videoEl =
+                      ref && typeof ref !== "function" ? ref.current : null;
                     if (!videoEl) return;
                     if (e.key === "ArrowLeft") {
-                      videoEl.currentTime = Math.max(0, videoEl.currentTime - 5);
+                      videoEl.currentTime = Math.max(
+                        0,
+                        videoEl.currentTime - 5,
+                      );
                       e.preventDefault();
                     } else if (e.key === "ArrowRight") {
-                      videoEl.currentTime = Math.min(duration, videoEl.currentTime + 5);
+                      videoEl.currentTime = Math.min(
+                        duration,
+                        videoEl.currentTime + 5,
+                      );
                       e.preventDefault();
                     }
                   }}
@@ -636,7 +739,8 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
                 {/* Mute toggle */}
                 <button
                   onClick={() => {
-                    const videoEl = ref && typeof ref !== "function" ? ref.current : null;
+                    const videoEl =
+                      ref && typeof ref !== "function" ? ref.current : null;
                     if (videoEl) {
                       videoEl.muted = !videoEl.muted;
                       setIsMuted(!isMuted);
@@ -644,7 +748,11 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
                   }}
                   className="text-white hover:text-white/80 transition-colors shrink-0"
                 >
-                  {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                  {isMuted ? (
+                    <VolumeX className="h-4 w-4" />
+                  ) : (
+                    <Volume2 className="h-4 w-4" />
+                  )}
                 </button>
               </div>
             </div>
@@ -672,7 +780,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
         )}
       </div>
     );
-  }
+  },
 );
 
 VideoUploadComponent.displayName = "VideoUpload";

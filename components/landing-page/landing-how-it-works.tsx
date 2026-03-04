@@ -43,7 +43,8 @@ export function LandingHowItWorks(): JSX.Element {
       <div
         className="pointer-events-none absolute inset-0 -z-20"
         style={{
-          backgroundImage: "radial-gradient(circle, #c7cbd1 1px, transparent 1px)",
+          backgroundImage:
+            "radial-gradient(circle, #c7cbd1 1px, transparent 1px)",
           backgroundSize: "24px 24px",
         }}
       />
@@ -79,7 +80,9 @@ export function LandingHowItWorks(): JSX.Element {
                 className="relative text-center group rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm shadow-slate-100 transition-all hover:shadow-lg hover:shadow-slate-200/60"
               >
                 {/* Step number + icon visual */}
-                <div className={`relative w-20 h-20 mx-auto ${step.bg} rounded-2xl flex items-center justify-center mb-5`}>
+                <div
+                  className={`relative w-20 h-20 mx-auto ${step.bg} rounded-2xl flex items-center justify-center mb-5`}
+                >
                   <span
                     className={`absolute -top-2 -right-2 text-xs font-black ${step.text} bg-white rounded-full w-7 h-7 flex items-center justify-center ring-2 ring-white shadow-sm`}
                     style={{ fontFamily: "var(--font-outfit), sans-serif" }}

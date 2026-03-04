@@ -16,7 +16,8 @@ export function LandingHero({ onVideoSelect }: LandingHeroProps): JSX.Element {
       <div
         className="pointer-events-none absolute inset-0 -z-20"
         style={{
-          backgroundImage: "radial-gradient(circle, #c7cbd1 1px, transparent 1px)",
+          backgroundImage:
+            "radial-gradient(circle, #c7cbd1 1px, transparent 1px)",
           backgroundSize: "24px 24px",
         }}
       />
@@ -56,8 +57,8 @@ export function LandingHero({ onVideoSelect }: LandingHeroProps): JSX.Element {
             className="mt-4 text-base sm:text-lg text-slate-500 max-w-xl mx-auto leading-relaxed"
             style={{ fontFamily: "var(--font-outfit), sans-serif" }}
           >
-            Drop a video. Get AI-generated subtitles in seconds.
-            Everything happens on your device — nothing is ever uploaded.
+            Drop a video. Get AI-generated subtitles in seconds. Everything
+            happens on your device — nothing is ever uploaded.
           </p>
         </div>
 

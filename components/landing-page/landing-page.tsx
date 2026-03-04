@@ -29,7 +29,7 @@ export function LandingPage({ onVideoSelect }: LandingPageProps): JSX.Element {
         onVideoSelect?.(file);
       }
     },
-    [onVideoSelect]
+    [onVideoSelect],
   );
 
   const handlePageDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
@@ -37,12 +37,15 @@ export function LandingPage({ onVideoSelect }: LandingPageProps): JSX.Element {
     setIsPageDragOver(true);
   }, []);
 
-  const handlePageDragLeave = useCallback((event: DragEvent<HTMLDivElement>) => {
-    // Only trigger when leaving the page container itself
-    if (event.currentTarget === event.target) {
-      setIsPageDragOver(false);
-    }
-  }, []);
+  const handlePageDragLeave = useCallback(
+    (event: DragEvent<HTMLDivElement>) => {
+      // Only trigger when leaving the page container itself
+      if (event.currentTarget === event.target) {
+        setIsPageDragOver(false);
+      }
+    },
+    [],
+  );
 
   return (
     <div

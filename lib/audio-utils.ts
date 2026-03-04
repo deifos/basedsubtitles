@@ -5,7 +5,7 @@ declare global {
 }
 
 export async function extractAudioFromVideo(
-  videoFile: File
+  videoFile: File,
 ): Promise<Float32Array> {
   // Read file as ArrayBuffer
   const buffer = await new Promise<ArrayBuffer>((resolve, reject) => {
@@ -61,7 +61,7 @@ export async function extractAudioFromVideo(
       console.error("Error stack:", e.stack);
     }
     throw new Error(
-      `Error processing audio: ${e instanceof Error ? e.message : String(e)}`
+      `Error processing audio: ${e instanceof Error ? e.message : String(e)}`,
     );
   } finally {
     await audioContext.close();

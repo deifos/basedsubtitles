@@ -66,41 +66,48 @@ export function VideoCaption({
   const [currentText, setCurrentText] = useState("");
 
   // processTranscriptChunks handles dynamic mode internally now
-  const processedChunks: ProcessedChunk[] = processTranscriptChunks(transcript, mode, style.maxWordsPerLine);
+  const processedChunks: ProcessedChunk[] = processTranscriptChunks(
+    transcript,
+    mode,
+    style.maxWordsPerLine,
+  );
 
   // Filter out disabled and subtitleHidden chunks for playback preview
   const enabledChunks = processedChunks.filter((chunk) => {
     if (mode === "phrase" && chunk.words) {
       // For phrase mode, check if any word in the phrase is disabled or hidden
-      return !chunk.words.some(word => {
-        const original = transcript.chunks.find(originalChunk =>
-          originalChunk.timestamp[0] === word.timestamp[0] &&
-          originalChunk.timestamp[1] === word.timestamp[1]
+      return !chunk.words.some((word) => {
+        const original = transcript.chunks.find(
+          (originalChunk) =>
+            originalChunk.timestamp[0] === word.timestamp[0] &&
+            originalChunk.timestamp[1] === word.timestamp[1],
         );
         return original?.disabled || original?.subtitleHidden;
       });
     } else {
       // For word mode, check if the chunk itself is disabled or hidden
       const original = transcript.chunks.find(
-        originalChunk =>
+        (originalChunk) =>
           originalChunk.timestamp[0] === chunk.timestamp[0] &&
-          originalChunk.timestamp[1] === chunk.timestamp[1]
+          originalChunk.timestamp[1] === chunk.timestamp[1],
       );
       return !original?.disabled && !original?.subtitleHidden;
     }
   });
-  
+
   const currentChunks = enabledChunks.filter(
     (chunk) =>
-      currentTime >= chunk.timestamp[0] && currentTime <= chunk.timestamp[1]
+      currentTime >= chunk.timestamp[0] && currentTime <= chunk.timestamp[1],
   );
 
   // For phrase mode, find the current word within the phrase
-  const getCurrentWordInPhrase = (chunk: ProcessedChunk): ProcessedWord | undefined => {
+  const getCurrentWordInPhrase = (
+    chunk: ProcessedChunk,
+  ): ProcessedWord | undefined => {
     if (mode !== "phrase" || !chunk.words) return undefined;
     return chunk.words.find(
       (word) =>
-        currentTime >= word.timestamp[0] && currentTime <= word.timestamp[1]
+        currentTime >= word.timestamp[0] && currentTime <= word.timestamp[1],
     );
   };
 
@@ -123,7 +130,7 @@ export function VideoCaption({
     }
   }, [currentChunks, currentText]);
 
-  // Separate effect to ensure immediate style updates 
+  // Separate effect to ensure immediate style updates
   useEffect(() => {
     // Force re-render when style changes by resetting animation state
     if (currentText) {
@@ -142,12 +149,16 @@ export function VideoCaption({
     const posClasses = (() => {
       switch (position) {
         case "top":
-          return isPortrait ? `top-[6%] ${widthClass}` : `top-[12%] ${widthClass}`;
+          return isPortrait
+            ? `top-[6%] ${widthClass}`
+            : `top-[12%] ${widthClass}`;
         case "middle":
           return `top-1/2 -translate-y-1/2 ${widthClass}`;
         case "bottom":
         default:
-          return isPortrait ? `bottom-[8%] ${widthClass}` : `bottom-[16%] ${widthClass}`;
+          return isPortrait
+            ? `bottom-[8%] ${widthClass}`
+            : `bottom-[16%] ${widthClass}`;
       }
     })();
 
@@ -156,7 +167,7 @@ export function VideoCaption({
         className={cn(
           "absolute left-1/2 -translate-x-1/2 text-center pointer-events-none",
           "z-10",
-          posClasses
+          posClasses,
         )}
         style={{
           fontFamily: style.fontFamily,
@@ -164,10 +175,7 @@ export function VideoCaption({
           fontWeight: style.fontWeight,
         }}
       >
-        <div
-          className="inline-block px-3 py-2"
-          style={{ opacity: 0 }}
-        >
+        <div className="inline-block px-3 py-2" style={{ opacity: 0 }}>
           <div className="flex flex-col gap-1">
             <span>&nbsp;</span>
           </div>
@@ -181,11 +189,13 @@ export function VideoCaption({
   // Progressive word reveal: show words one by one as they start being spoken
   let currentChunk = rawChunk;
   if (style.dynamicFollowWord && mode === "phrase" && rawChunk.words) {
-    const visibleWords = rawChunk.words.filter(w => currentTime >= w.timestamp[0]);
+    const visibleWords = rawChunk.words.filter(
+      (w) => currentTime >= w.timestamp[0],
+    );
     if (visibleWords.length === 0) return null;
     currentChunk = {
       ...rawChunk,
-      text: visibleWords.map(w => w.text).join(" "),
+      text: visibleWords.map((w) => w.text).join(" "),
       words: visibleWords,
     };
   }
@@ -195,30 +205,40 @@ export function VideoCaption({
 
   // Detect if any word uses knockout — need to avoid stacking context isolation
   // so mix-blend-mode: difference can reach the video behind
-  const hasKnockout = mode === "phrase" && currentChunk.words?.some(
-    (w: ProcessedWord) => w.styleOverride?.effect === "knockout"
-  );
+  const hasKnockout =
+    mode === "phrase" &&
+    currentChunk.words?.some(
+      (w: ProcessedWord) => w.styleOverride?.effect === "knockout",
+    );
 
   // Fade calculations
   const textFadeIn = style.textFadeIn ?? false;
   const fadeOutDuration = 0.25; // 250ms chunk fade-out
   const timeToChunkEnd = currentChunk.timestamp[1] - currentTime;
-  const chunkFadeOut = textFadeIn ? Math.min(1, Math.max(0, timeToChunkEnd / fadeOutDuration)) : 1;
+  const chunkFadeOut = textFadeIn
+    ? Math.min(1, Math.max(0, timeToChunkEnd / fadeOutDuration))
+    : 1;
   // Word mode: also fade in at chunk level
   const timeSinceChunkStart = currentTime - currentChunk.timestamp[0];
   const fadeInDuration = 0.15; // 150ms per-word fade-in (word mode chunk-level)
-  const chunkFadeIn = (textFadeIn && mode === "word")
-    ? Math.min(1, Math.max(0, timeSinceChunkStart / fadeInDuration))
-    : 1;
+  const chunkFadeIn =
+    textFadeIn && mode === "word"
+      ? Math.min(1, Math.max(0, timeSinceChunkStart / fadeInDuration))
+      : 1;
   // Container opacity (skip for knockout to avoid stacking context)
   const containerFadeOpacity = hasKnockout ? 1 : chunkFadeIn * chunkFadeOut;
 
-  const isMetallicColor = style.color === "#CCCCCC" || style.color === "#C0C0C0";
-  const previewStrokeWidth = style.borderWidth > 0 ? Math.max(0.5, style.borderWidth) : 0;
-  const previewStroke = previewStrokeWidth > 0 ? `${previewStrokeWidth}px ${style.borderColor}` : "none";
+  const isMetallicColor =
+    style.color === "#CCCCCC" || style.color === "#C0C0C0";
+  const previewStrokeWidth =
+    style.borderWidth > 0 ? Math.max(0.5, style.borderWidth) : 0;
+  const previewStroke =
+    previewStrokeWidth > 0
+      ? `${previewStrokeWidth}px ${style.borderColor}`
+      : "none";
   const previewFilter = `drop-shadow(2px 2px ${Math.max(
     2,
-    style.dropShadowIntensity * 4
+    style.dropShadowIntensity * 4,
   )}px rgba(0, 0, 0, ${style.dropShadowIntensity}))`;
 
   const baseTypographyStyles: React.CSSProperties = {
@@ -231,7 +251,8 @@ export function VideoCaption({
 
   const metallicTypographyStyles: React.CSSProperties = isMetallicColor
     ? {
-        background: "linear-gradient(to bottom, #FFFFFF 0%, #CCCCCC 50%, #999999 100%)",
+        background:
+          "linear-gradient(to bottom, #FFFFFF 0%, #CCCCCC 50%, #999999 100%)",
         WebkitBackgroundClip: "text",
         WebkitTextFillColor: "transparent",
       }
@@ -244,7 +265,7 @@ export function VideoCaption({
       const wordChunk = transcript.chunks.find(
         (c) =>
           c.timestamp[0] === currentChunk.timestamp[0] &&
-          c.timestamp[1] === currentChunk.timestamp[1]
+          c.timestamp[1] === currentChunk.timestamp[1],
       );
       const wordOverride = wordChunk?.styleOverride;
 
@@ -252,13 +273,32 @@ export function VideoCaption({
       const emojiScale = wordOverride?.emojiScale ?? 1;
       if (wordOverride?.emoji) {
         return (
-          <span style={{ ...baseTypographyStyles, ...metallicTypographyStyles, position: "relative", display: "inline-block" }}>
+          <span
+            style={{
+              ...baseTypographyStyles,
+              ...metallicTypographyStyles,
+              position: "relative",
+              display: "inline-block",
+            }}
+          >
             {wordOverride.emojiOverlay && (
-              <span style={{ position: "absolute", top: `${-1.4 * emojiScale}em`, left: "50%", transform: "translateX(-50%)", fontSize: `${1.4 * emojiScale}em`, lineHeight: 1, pointerEvents: "none" }}>
+              <span
+                style={{
+                  position: "absolute",
+                  top: `${-1.4 * emojiScale}em`,
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  fontSize: `${1.4 * emojiScale}em`,
+                  lineHeight: 1,
+                  pointerEvents: "none",
+                }}
+              >
                 {wordOverride.emojiOverlay}
               </span>
             )}
-            <span style={{ fontSize: `${1.2 * emojiScale}em`, lineHeight: 1 }}>{wordOverride.emoji}</span>
+            <span style={{ fontSize: `${1.2 * emojiScale}em`, lineHeight: 1 }}>
+              {wordOverride.emoji}
+            </span>
           </span>
         );
       }
@@ -266,8 +306,25 @@ export function VideoCaption({
       // Emoji overlay only (no replace)
       if (wordOverride?.emojiOverlay) {
         return (
-          <span style={{ ...baseTypographyStyles, ...metallicTypographyStyles, position: "relative", display: "inline-block" }}>
-            <span style={{ position: "absolute", top: `${-1.4 * emojiScale}em`, left: "50%", transform: "translateX(-50%)", fontSize: `${1.4 * emojiScale}em`, lineHeight: 1, pointerEvents: "none" }}>
+          <span
+            style={{
+              ...baseTypographyStyles,
+              ...metallicTypographyStyles,
+              position: "relative",
+              display: "inline-block",
+            }}
+          >
+            <span
+              style={{
+                position: "absolute",
+                top: `${-1.4 * emojiScale}em`,
+                left: "50%",
+                transform: "translateX(-50%)",
+                fontSize: `${1.4 * emojiScale}em`,
+                lineHeight: 1,
+                pointerEvents: "none",
+              }}
+            >
               {wordOverride.emojiOverlay}
             </span>
             {text}
@@ -303,9 +360,12 @@ export function VideoCaption({
           // Determine emphasis colors based on text color
           const wordColor = word.styleOverride?.color ?? style.color;
           const textIsLight = isLightColor(wordColor);
-          const emphasisBgColor = textIsLight ? "rgba(0, 0, 0, 0.65)" : "rgba(255, 255, 255, 0.85)";
+          const emphasisBgColor = textIsLight
+            ? "rgba(0, 0, 0, 0.65)"
+            : "rgba(255, 255, 255, 0.85)";
           const emphasisTextColor = textIsLight ? "#FFFFFF" : "#000000";
-          const isActive = isCurrentWord && (style.wordEmphasisEnabled ?? false);
+          const isActive =
+            isCurrentWord && (style.wordEmphasisEnabled ?? false);
 
           // Build per-word override styles
           const isKnockout = word.styleOverride?.effect === "knockout";
@@ -323,7 +383,9 @@ export function VideoCaption({
             overrideStyles.color = word.styleOverride.color;
           }
           if (word.styleOverride?.fontFamily) {
-            overrideStyles.fontFamily = resolveCssFont(word.styleOverride.fontFamily);
+            overrideStyles.fontFamily = resolveCssFont(
+              word.styleOverride.fontFamily,
+            );
           }
           if (word.styleOverride?.fontSize) {
             overrideStyles.fontSize = `${word.styleOverride.fontSize}em`;
@@ -337,12 +399,13 @@ export function VideoCaption({
             ...baseTypographyStyles,
             ...(isActive ? {} : metallicTypographyStyles),
             display: "inline-block",
-            transition: isKnockout ? "none" : "transform 0.18s ease, background-color 0.18s ease",
+            transition: isKnockout
+              ? "none"
+              : "transform 0.18s ease, background-color 0.18s ease",
             padding: "0 0.15em",
             borderRadius: "0.35em",
             transform: isKnockout ? "none" : "scale(1)",
             backgroundColor: "transparent",
-
 
             opacity: wordOpacity,
             ...overrideStyles,
@@ -376,15 +439,24 @@ export function VideoCaption({
           const renderWordContent = () => {
             // Emoji replace: render emoji instead of text, skip letter fade
             const eScale = word.styleOverride?.emojiScale ?? 1;
-            if (hasEmojiReplace) return <span style={{ fontSize: `${1.2 * eScale}em`, lineHeight: 1 }}>{word.styleOverride!.emoji}</span>;
+            if (hasEmojiReplace)
+              return (
+                <span style={{ fontSize: `${1.2 * eScale}em`, lineHeight: 1 }}>
+                  {word.styleOverride!.emoji}
+                </span>
+              );
 
             if (!textFadeIn || isKnockout) return word.text;
             const wordDuration = word.timestamp[1] - word.timestamp[0];
             const revealDuration = Math.min(0.3, wordDuration * 0.6);
             const charCount = word.text.length;
-            const letterStagger = charCount > 0 ? revealDuration / charCount : 0;
+            const letterStagger =
+              charCount > 0 ? revealDuration / charCount : 0;
             return word.text.split("").map((char, ci) => {
-              const charAlpha = Math.min(1, Math.max(0, (timeSinceWordStart - ci * letterStagger) / 0.06));
+              const charAlpha = Math.min(
+                1,
+                Math.max(0, (timeSinceWordStart - ci * letterStagger) / 0.06),
+              );
               return (
                 <span key={ci} style={{ opacity: charAlpha }}>
                   {char}
@@ -401,17 +473,33 @@ export function VideoCaption({
           return (
             <React.Fragment key={`${word.timestamp[0]}-${index}`}>
               <span
-                style={{ ...baseWordStyles, ...activeWordStyles, ...positionStyles }}
+                style={{
+                  ...baseWordStyles,
+                  ...activeWordStyles,
+                  ...positionStyles,
+                }}
               >
                 {hasEmojiOverlay && (
-                  <span style={{ position: "absolute", top: `${-1.4 * (word.styleOverride?.emojiScale ?? 1)}em`, left: "50%", transform: "translateX(-50%)", fontSize: `${1.4 * (word.styleOverride?.emojiScale ?? 1)}em`, lineHeight: 1, pointerEvents: "none" }}>
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: `${-1.4 * (word.styleOverride?.emojiScale ?? 1)}em`,
+                      left: "50%",
+                      transform: "translateX(-50%)",
+                      fontSize: `${1.4 * (word.styleOverride?.emojiScale ?? 1)}em`,
+                      lineHeight: 1,
+                      pointerEvents: "none",
+                    }}
+                  >
                     {word.styleOverride!.emojiOverlay}
                   </span>
                 )}
                 {renderWordContent()}
               </span>
               {index < (currentChunk.words?.length || 0) - 1 && (
-                <span style={{ display: "inline-block", width: "0.35em" }}> </span>
+                <span style={{ display: "inline-block", width: "0.35em" }}>
+                  {" "}
+                </span>
               )}
             </React.Fragment>
           );
@@ -424,23 +512,27 @@ export function VideoCaption({
   const words = text.split(" ");
   const maxWordsPerLine = style.maxWordsPerLine ?? (ratio === "9:16" ? 4 : 6);
   const shouldSplitText = words.length > maxWordsPerLine;
-  
+
   let line1 = text;
   let line2 = "";
-  
+
   if (shouldSplitText) {
     // Try to split at natural break points
     const midpoint = Math.ceil(words.length / 2);
     let splitPoint = midpoint;
-    
+
     // Look for natural break points (punctuation) near the middle
-    for (let i = Math.max(2, midpoint - 2); i <= Math.min(words.length - 2, midpoint + 2); i++) {
+    for (
+      let i = Math.max(2, midpoint - 2);
+      i <= Math.min(words.length - 2, midpoint + 2);
+      i++
+    ) {
       if (/[,;:.!?]$/.test(words[i])) {
         splitPoint = i + 1;
         break;
       }
     }
-    
+
     line1 = words.slice(0, splitPoint).join(" ");
     line2 = words.slice(splitPoint).join(" ");
   }
@@ -481,7 +573,7 @@ export function VideoCaption({
         "absolute text-center",
         hasKnockout ? "inset-x-0 mx-auto" : "left-1/2 -translate-x-1/2 z-10",
         "pointer-events-none",
-        positionClasses
+        positionClasses,
       )}
       style={{
         fontFamily: style.fontFamily,
@@ -493,7 +585,10 @@ export function VideoCaption({
         className="inline-block px-3 py-2"
         style={{
           backgroundColor: style.backgroundColor,
-          borderRadius: style.backgroundColor && style.backgroundColor !== "transparent" ? "0.5rem" : undefined,
+          borderRadius:
+            style.backgroundColor && style.backgroundColor !== "transparent"
+              ? "0.5rem"
+              : undefined,
           ...(hasKnockout ? {} : { transform: "scale(1) translateY(0)" }),
           opacity: isAnimating ? containerFadeOpacity : 0,
         }}
@@ -502,11 +597,18 @@ export function VideoCaption({
           {mode === "phrase" && shouldSplitText ? (
             // For phrase mode with split text, we need to handle highlighting per line
             <>
-              <span style={{ ...baseTypographyStyles, ...metallicTypographyStyles }}>
+              <span
+                style={{ ...baseTypographyStyles, ...metallicTypographyStyles }}
+              >
                 {line1}
               </span>
               {line2 && (
-                <span style={{ ...baseTypographyStyles, ...metallicTypographyStyles }}>
+                <span
+                  style={{
+                    ...baseTypographyStyles,
+                    ...metallicTypographyStyles,
+                  }}
+                >
                   {line2}
                 </span>
               )}

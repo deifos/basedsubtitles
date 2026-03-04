@@ -38,7 +38,10 @@ export const STATUS_MESSAGES: Record<TranscriptionStatus, string> = {
 };
 
 async function detectPreferredDevice(): Promise<DeviceType> {
-  if (typeof navigator === "undefined" || typeof (navigator as any).gpu === "undefined") {
+  if (
+    typeof navigator === "undefined" ||
+    typeof (navigator as any).gpu === "undefined"
+  ) {
     return "wasm";
   }
 
@@ -88,75 +91,81 @@ export function useTranscription() {
     };
   }, []);
 
-  const workerMessageHandler = useCallback((e: MessageEvent) => {
-    switch (e.data.status) {
-      case "loading":
-        updateStatus("loading");
-        modelReadyRef.current = false;
-        break;
+  const workerMessageHandler = useCallback(
+    (e: MessageEvent) => {
+      switch (e.data.status) {
+        case "loading":
+          updateStatus("loading");
+          modelReadyRef.current = false;
+          break;
 
-      case "ready":
-        // Only resolve if this "ready" matches the most recent load request
-        if (activeLoadIdRef.current === loadIdRef.current) {
-          modelReadyRef.current = true;
-          if (statusRef.current === "loading") {
-            updateStatus("ready");
+        case "ready":
+          // Only resolve if this "ready" matches the most recent load request
+          if (activeLoadIdRef.current === loadIdRef.current) {
+            modelReadyRef.current = true;
+            if (statusRef.current === "loading") {
+              updateStatus("ready");
+            }
+            setProgress((prev) => Math.max(prev, 90));
+            if (modelLoadResolveRef.current) {
+              modelLoadResolveRef.current();
+            }
+            modelLoadingPromiseRef.current = null;
+            modelLoadResolveRef.current = null;
+            modelLoadRejectRef.current = null;
           }
-          setProgress((prev) => Math.max(prev, 90));
-          if (modelLoadResolveRef.current) {
-            modelLoadResolveRef.current();
+          break;
+
+        case "complete": {
+          // Add generation time from worker
+          const resultWithTime = {
+            ...e.data.result,
+            generationTime: e.data.time,
+          };
+          setResult(resultWithTime);
+          updateStatus("ready");
+          setProgress(100);
+
+          // Terminate worker to free model memory (~800MB-1.2GB for Whisper)
+          // Worker will be re-created if user transcribes again
+          if (worker.current) {
+            worker.current.removeEventListener("message", workerMessageHandler);
+            worker.current.terminate();
+            worker.current = null;
+          }
+          modelReadyRef.current = false;
+          modelLoadingPromiseRef.current = null;
+          modelLoadResolveRef.current = null;
+          modelLoadRejectRef.current = null;
+          break;
+        }
+
+        case "error":
+          setError(e.data.data);
+          updateStatus("idle");
+          setProgress(0);
+          modelReadyRef.current = false;
+          if (modelLoadRejectRef.current) {
+            modelLoadRejectRef.current(new Error(e.data.data));
           }
           modelLoadingPromiseRef.current = null;
           modelLoadResolveRef.current = null;
           modelLoadRejectRef.current = null;
-        }
-        break;
+          break;
 
-      case "complete": {
-        // Add generation time from worker
-        const resultWithTime = { ...e.data.result, generationTime: e.data.time };
-        setResult(resultWithTime);
-        updateStatus("ready");
-        setProgress(100);
-
-        // Terminate worker to free model memory (~800MB-1.2GB for Whisper)
-        // Worker will be re-created if user transcribes again
-        if (worker.current) {
-          worker.current.removeEventListener("message", workerMessageHandler);
-          worker.current.terminate();
-          worker.current = null;
-        }
-        modelReadyRef.current = false;
-        modelLoadingPromiseRef.current = null;
-        modelLoadResolveRef.current = null;
-        modelLoadRejectRef.current = null;
-        break;
+        case "progress":
+        case "initiate":
+        case "download":
+        case "done":
+          if (typeof e.data.progress === "number") {
+            const clamped = Math.max(0, Math.min(1, e.data.progress));
+            setProgress(Math.round(clamped * 100));
+          }
+          break;
       }
-
-      case "error":
-        setError(e.data.data);
-        updateStatus("idle");
-        setProgress(0);
-        modelReadyRef.current = false;
-        if (modelLoadRejectRef.current) {
-          modelLoadRejectRef.current(new Error(e.data.data));
-        }
-        modelLoadingPromiseRef.current = null;
-        modelLoadResolveRef.current = null;
-        modelLoadRejectRef.current = null;
-        break;
-
-      case "progress":
-      case "initiate":
-      case "download":
-      case "done":
-        if (typeof e.data.progress === "number") {
-          const clamped = Math.max(0, Math.min(1, e.data.progress));
-          setProgress(Math.round(clamped * 100));
-        }
-        break;
-    }
-  }, [updateStatus]);
+    },
+    [updateStatus],
+  );
 
   const initializeWorker = useCallback(() => {
     if (worker.current || typeof window === "undefined") {
@@ -183,43 +192,48 @@ export function useTranscription() {
     };
   }, [initializeWorker, workerMessageHandler]);
 
-  const ensureModelLoaded = useCallback(async (modelSize: ModelSize = "base") => {
-    initializeWorker();
+  const ensureModelLoaded = useCallback(
+    async (modelSize: ModelSize = "base") => {
+      initializeWorker();
 
-    if (modelReadyRef.current && modelSizeRef.current === modelSize) {
-      return;
-    }
+      if (modelReadyRef.current && modelSizeRef.current === modelSize) {
+        return;
+      }
 
-    if (!worker.current) {
-      throw new Error("Worker not initialized properly");
-    }
+      if (!worker.current) {
+        throw new Error("Worker not initialized properly");
+      }
 
-    // If model size changed, need to reload
-    if (modelSizeRef.current !== modelSize) {
-      modelReadyRef.current = false;
-      modelLoadingPromiseRef.current = null;
-    }
+      // If model size changed, need to reload
+      if (modelSizeRef.current !== modelSize) {
+        modelReadyRef.current = false;
+        modelLoadingPromiseRef.current = null;
+      }
 
-    modelSizeRef.current = modelSize;
+      modelSizeRef.current = modelSize;
 
-    if (!modelLoadingPromiseRef.current) {
-      // Increment load ID so stale "ready" messages from previous loads are ignored
-      loadIdRef.current++;
-      activeLoadIdRef.current = loadIdRef.current;
+      if (!modelLoadingPromiseRef.current) {
+        // Increment load ID so stale "ready" messages from previous loads are ignored
+        loadIdRef.current++;
+        activeLoadIdRef.current = loadIdRef.current;
 
-      modelLoadingPromiseRef.current = new Promise<void>((resolve, reject) => {
-        modelLoadResolveRef.current = resolve;
-        modelLoadRejectRef.current = reject;
-      });
+        modelLoadingPromiseRef.current = new Promise<void>(
+          (resolve, reject) => {
+            modelLoadResolveRef.current = resolve;
+            modelLoadRejectRef.current = reject;
+          },
+        );
 
-      worker.current.postMessage({
-        type: "load",
-        data: { device: deviceRef.current, modelSize },
-      });
-    }
+        worker.current.postMessage({
+          type: "load",
+          data: { device: deviceRef.current, modelSize },
+        });
+      }
 
-    await modelLoadingPromiseRef.current;
-  }, [initializeWorker]);
+      await modelLoadingPromiseRef.current;
+    },
+    [initializeWorker],
+  );
 
   // Initialize worker
   useEffect(() => {
@@ -234,7 +248,11 @@ export function useTranscription() {
     updateStatus("ready");
   };
 
-  const startTranscription = async (file: File, language: string = "en", modelSize: ModelSize = "base") => {
+  const startTranscription = async (
+    file: File,
+    language: string = "en",
+    modelSize: ModelSize = "base",
+  ) => {
     try {
       // Reset states
       setError(null);
