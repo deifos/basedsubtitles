@@ -252,6 +252,10 @@ export function useVideoDownloadMediaBunny({
         exportHeight = Math.round(exportHeight * scale);
       }
 
+      // H.264 requires even dimensions
+      exportWidth = exportWidth % 2 === 0 ? exportWidth : exportWidth - 1;
+      exportHeight = exportHeight % 2 === 0 ? exportHeight : exportHeight - 1;
+
       canvas.width = exportWidth;
       canvas.height = exportHeight;
       const needsCrop = ratio === "9:16" && isLandscape;
@@ -823,6 +827,7 @@ export function useVideoDownloadMediaBunny({
     bgRemovalReady,
     bgProcessFrame,
     getMaskAtTime,
+    buildExportTimeline,
   ]);
 
   const cancelDownload = useCallback(() => {

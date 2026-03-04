@@ -186,9 +186,10 @@ export function useFaceTracking(): UseFaceTrackingReturn {
 
   const buildExportTimeline = useCallback(
     async (videoElement: HTMLVideoElement): Promise<PositionTimeline> => {
-      // If we already collected keyframes during preview, use those
+      // If we already collected keyframes during preview, use those directly.
+      // They are already EMA-smoothed from the real-time tracking loop.
       if (timelineRef.current.length > 0) {
-        return smoothTimeline(timelineRef.current);
+        return timelineRef.current;
       }
 
       // Otherwise, scan the video at ~5fps
