@@ -966,23 +966,6 @@ export function SubtitleStyling({
           </div>
         )}
 
-        {/* Text fade in - letter-by-letter reveal */}
-        <div className="flex items-center justify-between rounded-lg border border-border/50 px-3 py-2">
-          <div>
-            <p className="text-sm font-medium">Text fade in</p>
-            <p className="text-xs text-muted-foreground">
-              Letters reveal left-to-right within each word
-            </p>
-          </div>
-          <Switch
-            checked={style.textFadeIn ?? false}
-            onCheckedChange={(value) =>
-              onChange({ ...style, textFadeIn: value })
-            }
-            aria-label="Toggle text fade in"
-          />
-        </div>
-
         {/* Background Removal Section - only when masks are ready */}
         {bgRemovalReady && (
           <div className="space-y-3 rounded-lg border border-border/40 bg-muted/40 p-3">

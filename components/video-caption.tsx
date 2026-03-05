@@ -211,22 +211,7 @@ export function VideoCaption({
       (w: ProcessedWord) => w.styleOverride?.effect === "knockout",
     );
 
-  // Fade calculations
-  const textFadeIn = style.textFadeIn ?? false;
-  const fadeOutDuration = 0.25; // 250ms chunk fade-out
-  const timeToChunkEnd = currentChunk.timestamp[1] - currentTime;
-  const chunkFadeOut = textFadeIn
-    ? Math.min(1, Math.max(0, timeToChunkEnd / fadeOutDuration))
-    : 1;
-  // Word mode: also fade in at chunk level
-  const timeSinceChunkStart = currentTime - currentChunk.timestamp[0];
-  const fadeInDuration = 0.15; // 150ms per-word fade-in (word mode chunk-level)
-  const chunkFadeIn =
-    textFadeIn && mode === "word"
-      ? Math.min(1, Math.max(0, timeSinceChunkStart / fadeInDuration))
-      : 1;
-  // Container opacity (skip for knockout to avoid stacking context)
-  const containerFadeOpacity = hasKnockout ? 1 : chunkFadeIn * chunkFadeOut;
+  const containerFadeOpacity = 1;
 
   const isMetallicColor =
     style.color === "#CCCCCC" || style.color === "#C0C0C0";
@@ -392,9 +377,7 @@ export function VideoCaption({
             overrideStyles.fontSize = `${word.styleOverride.fontSize}em`;
           }
 
-          // Per-word fade (when textFadeIn is on, per-letter opacity handles the reveal)
-          const timeSinceWordStart = currentTime - word.timestamp[0];
-          const wordOpacity = textFadeIn && !isKnockout ? chunkFadeOut : 1;
+          const wordOpacity = 1;
 
           const baseWordStyles: React.CSSProperties = {
             ...baseTypographyStyles,
@@ -447,23 +430,7 @@ export function VideoCaption({
                 </span>
               );
 
-            if (!textFadeIn || isKnockout) return word.text;
-            const wordDuration = word.timestamp[1] - word.timestamp[0];
-            const revealDuration = Math.min(0.3, wordDuration * 0.6);
-            const charCount = word.text.length;
-            const letterStagger =
-              charCount > 0 ? revealDuration / charCount : 0;
-            return word.text.split("").map((char, ci) => {
-              const charAlpha = Math.min(
-                1,
-                Math.max(0, (timeSinceWordStart - ci * letterStagger) / 0.06),
-              );
-              return (
-                <span key={ci} style={{ opacity: charAlpha }}>
-                  {char}
-                </span>
-              );
-            });
+            return word.text;
           };
 
           // Add relative positioning when overlay emoji is present

@@ -8,7 +8,7 @@
  * - PATCH: Bug fixes and small improvements
  */
 
-export const APP_VERSION = "1.8.2";
+export const APP_VERSION = "1.9.0";
 
 export interface ChangelogEntry {
   version: string;
@@ -21,6 +21,48 @@ export interface ChangelogEntry {
 }
 
 export const changelog: ChangelogEntry[] = [
+  {
+    version: "1.9.0",
+    date: "2026-03-05",
+    title: "Face Tracking Export, Stroke Slider & Fixes",
+    changes: [
+      {
+        type: "fixed",
+        description:
+          "Face tracking was not applied during 9:16 video export — the buildExportTimeline function was missing from the useCallback dependency array, causing the export to always use a stale closure where it was undefined",
+      },
+      {
+        type: "fixed",
+        description:
+          "Exported face tracking had a slight delay compared to the preview — added a 150ms look-ahead offset when sampling the face timeline during export to compensate for EMA smoothing phase lag",
+      },
+      {
+        type: "fixed",
+        description:
+          "Export failed with odd-dimension error on 4K sources — 9:16 crop of 2160p height produces 1215px width (odd), which H.264 rejects. Dimensions are now rounded down to even numbers",
+      },
+      {
+        type: "fixed",
+        description:
+          "Font stroke/border was filling inside the text at higher widths — canvas strokeText draws centered on the glyph outline so half went inward. Now draws stroke at 2x width before fill, and CSS preview uses paint-order: stroke fill",
+      },
+      {
+        type: "changed",
+        description:
+          "Border width control replaced with a 0–20px slider instead of a dropdown with only 4 options (None/Thin/Medium/Thick)",
+      },
+      {
+        type: "changed",
+        description:
+          "Default subtitle style now uses 10px white border stroke for better contrast and readability on any background",
+      },
+      {
+        type: "removed",
+        description:
+          "Removed text fade-in effect (letter-by-letter reveal) — timing was unreliable, words would disappear before fully revealing on short chunks",
+      },
+    ],
+  },
   {
     version: "1.8.2",
     date: "2026-03-04",
