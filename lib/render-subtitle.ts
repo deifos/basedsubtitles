@@ -883,7 +883,8 @@ function renderTextLine(
   if (style.borderWidth > 0) {
     ctx.save();
     ctx.strokeStyle = style.borderColor;
-    const strokeWidth = Math.max(0.5, style.borderWidth * baseScale);
+    // Double lineWidth so the outer visible half matches the user's value
+    const strokeWidth = Math.max(0.5, style.borderWidth * baseScale * 2);
     ctx.lineWidth = strokeWidth;
     ctx.lineJoin = "round";
     ctx.miterLimit = 2;
@@ -1161,9 +1162,10 @@ function drawWordText(
       if (style.borderWidth > 0) {
         ctx.save();
         ctx.strokeStyle = style.borderColor;
+        // Double lineWidth so the outer visible half matches the user's value
         const scaledBorderWidth = Math.max(
           0.5,
-          (style.borderWidth * baseScale) / Math.max(scale, 0.001),
+          (style.borderWidth * baseScale * 2) / Math.max(scale, 0.001),
         );
         ctx.lineWidth = scaledBorderWidth;
         ctx.translate(centerX, centerY);

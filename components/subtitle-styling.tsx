@@ -250,13 +250,6 @@ const fontWeightOptions = [
   { value: "700", label: "Bold" },
 ];
 
-const borderWidthOptions = [
-  { value: 0, label: "None" },
-  { value: 1, label: "Thin" },
-  { value: 2, label: "Medium" },
-  { value: 4, label: "Thick" },
-];
-
 type SubtitlePresetName = "green" | "gold" | "subtitle" | "gamer";
 
 interface SubtitlePreset {
@@ -497,10 +490,6 @@ export function SubtitleStyling({
     onChange({ ...style, backgroundColor: color });
   };
 
-  const handleBorderWidthChange = (value: string) => {
-    onChange({ ...style, borderWidth: Number(value) });
-  };
-
   const handleBorderColorChange = (color: string) => {
     onChange({ ...style, borderColor: color });
   };
@@ -533,6 +522,7 @@ export function SubtitleStyling({
         style.borderWidth > 0
           ? `${Math.max(0.5, style.borderWidth)}px ${style.borderColor}`
           : "none",
+      paintOrder: "stroke fill",
       letterSpacing: "0.05em",
       filter: `drop-shadow(2px 2px ${Math.max(2, style.dropShadowIntensity * 4)}px rgba(0, 0, 0, ${style.dropShadowIntensity}))`,
       borderRadius: "0.5rem",
@@ -908,27 +898,18 @@ export function SubtitleStyling({
         )}
 
         <div className="space-y-2">
-          <label className="text-sm font-medium block">Border Width</label>
-          <Select
-            value={style.borderWidth.toString()}
-            onValueChange={handleBorderWidthChange}
-          >
-            <SelectTrigger className="w-full p-2 border rounded-md bg-background">
-              <SelectValue placeholder="Select a border width" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                {borderWidthOptions.map((option) => (
-                  <SelectItem
-                    key={option.value}
-                    value={option.value.toString()}
-                  >
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
+          <label className="text-sm font-medium block">
+            Border Width ({style.borderWidth}px)
+          </label>
+          <Slider
+            value={[style.borderWidth]}
+            onValueChange={(values) =>
+              onChange({ ...style, borderWidth: values[0] })
+            }
+            min={0}
+            max={20}
+            step={1}
+          />
         </div>
 
         {style.borderWidth > 0 && (

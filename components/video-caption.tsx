@@ -246,6 +246,7 @@ export function VideoCaption({
     textTransform: "uppercase",
     letterSpacing: "0.05em",
     WebkitTextStroke: previewStroke,
+    paintOrder: "stroke fill",
     filter: previewFilter,
   };
 
