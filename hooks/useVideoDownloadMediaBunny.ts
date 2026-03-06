@@ -260,9 +260,12 @@ export function useVideoDownloadMediaBunny({
       canvas.height = exportHeight;
       const needsCrop = ratio === "9:16" && isLandscape;
 
-      // Build face tracking timeline for dynamic crop during export
+      // Build face tracking timeline for dynamic crop or left-right split during export
+      const needsFaceTimeline =
+        needsCrop ||
+        (subtitleStyle.splitSubtitleMode === "left-right" && !needsCrop);
       let faceTimeline: PositionTimeline | null = null;
-      if (needsCrop && buildExportTimeline) {
+      if (needsFaceTimeline && buildExportTimeline) {
         setStatus("Analyzing face positions...");
         faceTimeline = await buildExportTimeline(video);
       }
@@ -379,6 +382,23 @@ export function useVideoDownloadMediaBunny({
         return !chunk.disabled && !chunk.subtitleHidden;
       });
 
+      // Lookahead constant to compensate for EMA smoothing lag in face tracking export
+      const FACE_TRACK_LOOKAHEAD = 0.15; // seconds
+
+      // Pre-compute a fixed face X position for each subtitle phrase.
+      // Left-right split text stays at the face position from phrase start — it doesn't
+      // move mid-phrase, which avoids distracting text drift and is easier to read.
+      const phraseFaceXMap = new Map<number, number>();
+      if (subtitleStyle.splitSubtitleMode === "left-right" && faceTimeline && !needsCrop) {
+        for (const chunk of enabledChunks) {
+          const startTime = chunk.timestamp[0];
+          phraseFaceXMap.set(
+            startTime,
+            interpolateCenterX(faceTimeline, startTime + FACE_TRACK_LOOKAHEAD),
+          );
+        }
+      }
+
       const totalFrames = Math.ceil(duration * fps);
       setStatus("Rendering video frames...");
 
@@ -418,7 +438,6 @@ export function useVideoDownloadMediaBunny({
         // Look ahead slightly to compensate for EMA smoothing lag — during
         // preview the crop and detection run in the same rAF tick so the
         // lag is imperceptible, but in export it manifests as a visible delay.
-        const FACE_TRACK_LOOKAHEAD = 0.15; // seconds
         const frameCropX = faceTimeline
           ? computeCropX(
               interpolateCenterX(faceTimeline, time + FACE_TRACK_LOOKAHEAD),
@@ -498,6 +517,12 @@ export function useVideoDownloadMediaBunny({
           return time >= start && time <= end;
         });
 
+        // Face X for left-right split: frozen per-phrase, not interpolated per-frame.
+        // This keeps text stationary for the phrase duration so it's easy to read.
+        const frameFaceX = currentChunk
+          ? (phraseFaceXMap.get(currentChunk.timestamp[0]) ?? 0.5)
+          : 0.5;
+
         const isDynamicMode =
           subtitleStyle.dynamicEnabled && bgRemovalReady && bgProcessFrame;
         const bgActive =
@@ -546,6 +571,7 @@ export function useVideoDownloadMediaBunny({
                 canvas,
                 mode,
                 time,
+                frameFaceX,
               );
             }
             drawBrandingWatermark(
@@ -707,6 +733,7 @@ export function useVideoDownloadMediaBunny({
               canvas,
               mode,
               time,
+              frameFaceX,
             );
           }
         } else {
@@ -719,6 +746,7 @@ export function useVideoDownloadMediaBunny({
               canvas,
               mode,
               time,
+              frameFaceX,
             );
           }
         }
@@ -865,6 +893,82 @@ export function useVideoDownloadMediaBunny({
   };
 }
 
+// Split subtitle: render two halves around the person's head
+function renderSplitSubtitleOnCanvas(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  style: SubtitleStyle,
+  canvas: HTMLCanvasElement,
+  splitMode: "above-below" | "left-right",
+  faceX: number,
+) {
+  const isVerticalVideo = canvas.height > canvas.width;
+  const videoScale = canvas.height / 500;
+  const finalFontSize = Math.round(style.fontSize * videoScale);
+  const fontFamily = resolveFontFamily(style.fontFamily);
+  ctx.font = `${style.fontWeight} ${finalFontSize}px ${fontFamily}`;
+  ctx.textBaseline = "middle";
+
+  const words = text.split(" ");
+  if (words.length < 2) {
+    ctx.textAlign = "center";
+    renderTextLine(
+      ctx,
+      text,
+      canvas.width / 2,
+      canvas.height * (isVerticalVideo ? 0.92 : 0.84),
+      style,
+      videoScale,
+    );
+    return;
+  }
+
+  const mid = Math.ceil(words.length / 2);
+  let splitPoint = mid;
+  for (
+    let i = Math.max(1, mid - 2);
+    i <= Math.min(words.length - 1, mid + 2);
+    i++
+  ) {
+    if (/[,;:.!?]$/.test(words[i - 1])) {
+      splitPoint = i;
+      break;
+    }
+  }
+  const line1 = words.slice(0, splitPoint).join(" ");
+  const line2 = words.slice(splitPoint).join(" ");
+  if (!line2) {
+    ctx.textAlign = "center";
+    renderTextLine(
+      ctx,
+      text,
+      canvas.width / 2,
+      canvas.height * (isVerticalVideo ? 0.92 : 0.84),
+      style,
+      videoScale,
+    );
+    return;
+  }
+
+  if (splitMode === "above-below") {
+    const y1 = canvas.height * (isVerticalVideo ? 0.08 : 0.14);
+    const y2 = canvas.height * (isVerticalVideo ? 0.92 : 0.86);
+    ctx.textAlign = "center";
+    renderTextLine(ctx, line1, canvas.width / 2, y1, style, videoScale);
+    renderTextLine(ctx, line2, canvas.width / 2, y2, style, videoScale);
+  } else {
+    // left-right — position at eye level (~38% from top)
+    const facePixelX = faceX * canvas.width;
+    const gap = canvas.width * 0.07;
+    const y = canvas.height * 0.38;
+    ctx.textAlign = "right";
+    renderTextLine(ctx, line1, facePixelX - gap, y, style, videoScale);
+    ctx.textAlign = "left";
+    renderTextLine(ctx, line2, facePixelX + gap, y, style, videoScale);
+    ctx.textAlign = "center";
+  }
+}
+
 // Subtitle rendering function
 function renderSubtitle(
   ctx: CanvasRenderingContext2D,
@@ -873,18 +977,26 @@ function renderSubtitle(
   canvas: HTMLCanvasElement,
   mode: "word" | "phrase",
   currentTime: number,
+  faceX: number = 0.5,
 ) {
-  // Progressive word reveal: only show words spoken so far
-  let displayText = chunk.text;
-  let chunkWords = chunk.words;
-  if (style.dynamicFollowWord && mode === "phrase" && chunk.words) {
-    const visibleWords = chunk.words.filter(
-      (w) => currentTime >= w.timestamp[0],
+  // Split subtitle mode: render two blocks around the person
+  const splitMode = style.splitSubtitleMode ?? "none";
+  if (splitMode !== "none") {
+    renderSplitSubtitleOnCanvas(
+      ctx,
+      chunk.text,
+      style,
+      canvas,
+      splitMode,
+      faceX,
     );
-    if (visibleWords.length === 0) return;
-    displayText = visibleWords.map((w) => w.text).join(" ");
-    chunkWords = visibleWords;
+    return;
   }
+
+  // Display on Spoken: full phrase shown dim from phrase start, each word lights up
+  // when spoken. Keep full text/words so layout is always stable.
+  const displayText = chunk.text;
+  const chunkWords = chunk.words;
 
   const isVerticalVideo = canvas.height > canvas.width;
 
@@ -986,7 +1098,7 @@ function renderSubtitle(
 
   const phraseWords = Array.isArray(chunkWords) ? chunkWords : undefined;
   const canEmphasize =
-    (style.wordEmphasisEnabled || style.textFadeIn) &&
+    (style.wordEmphasisEnabled || style.textFadeIn || style.dynamicFollowWord) &&
     mode === "phrase" &&
     phraseWords &&
     phraseWords.length > 0 &&
@@ -1279,7 +1391,9 @@ function renderPhraseLineWithEmphasis(
             Math.max(0, (chunkEndTime - currentTime) / fadeOutDuration),
           )
         : 1;
-    const wordAlpha = chunkFadeOut;
+    const isSpoken = currentTime >= word.timestamp[0];
+    const wordAlpha =
+      style.dynamicFollowWord && !isSpoken ? 0.2 : chunkFadeOut;
 
     ctx.save();
     ctx.globalAlpha = wordAlpha;

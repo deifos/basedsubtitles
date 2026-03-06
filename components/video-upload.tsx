@@ -722,6 +722,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
                     style={subtitleStyle}
                     mode={mode}
                     ratio={ratio}
+                    getFaceX={getCenterX}
                   />
                 )}
               </div>

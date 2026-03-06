@@ -43,12 +43,12 @@ interface MainAppProps {
 // Default subtitle style - Gold preset
 const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
   fontFamily: "var(--font-bangers), 'Bangers', cursive",
-  fontSize: 16,
+  fontSize: 22,
   fontWeight: "600",
-  color: "#F4D35E",
-  backgroundColor: "#1F1300",
-  borderWidth: 10,
-  borderColor: "#FFFFFF",
+  color: "#00FF41",
+  backgroundColor: "transparent",
+  borderWidth: 0,
+  borderColor: "#000000",
   dropShadowIntensity: 0.4,
   wordEmphasisEnabled: false,
   position: "bottom",
@@ -61,9 +61,10 @@ const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
   dynamicYPosition: 35,
   dynamicFrontFontSize: 40,
   dynamicFrontYPosition: 75,
-  dynamicFollowWord: false,
+  dynamicFollowWord: true,
   textFadeIn: false,
   brandingWatermark: true,
+  splitSubtitleMode: "none",
 };
 
 export function MainApp({
@@ -127,18 +128,21 @@ export function MainApp({
   const [isFaceTrackingActive, setIsFaceTrackingActive] = useState(false);
   const [isVideoLandscape, setIsVideoLandscape] = useState(false);
 
-  // Start/stop face tracking based on ratio, toggle, and video availability
+  // Start/stop face tracking: runs when split subtitle is active OR manual toggle is on
+  const splitActive = subtitleStyle.splitSubtitleMode !== "none";
   useEffect(() => {
     const videoEl = videoRef.current;
     if (!videoEl || !videoEl.src || videoEl.src === window.location.href) {
       return;
     }
 
+    const shouldTrack = faceTrackingEnabled || splitActive;
+
     const tryStart = () => {
       if (!videoEl.videoWidth) return; // metadata not loaded yet
       const isLandscape = videoEl.videoWidth > videoEl.videoHeight;
       setIsVideoLandscape(isLandscape);
-      if (ratio === "9:16" && isLandscape && faceTrackingEnabled) {
+      if (shouldTrack) {
         startTracking(videoEl);
         setIsFaceTrackingActive(true);
       } else {
@@ -159,7 +163,7 @@ export function MainApp({
       stopTracking();
       setIsFaceTrackingActive(false);
     };
-  }, [ratio, faceTrackingEnabled, startTracking, stopTracking]);
+  }, [ratio, faceTrackingEnabled, splitActive, startTracking, stopTracking]);
 
   const handleVideoSelect = useCallback(
     (file: File) => {
@@ -541,6 +545,8 @@ export function MainApp({
                             mode={mode}
                             onModeChange={handleModeChange}
                             bgRemovalReady={bgRemovalReady}
+                            isFaceTrackingActive={faceTrackingEnabled}
+                            ratio={ratio}
                           />
                         </div>
                       </ScrollArea>
@@ -604,6 +610,8 @@ export function MainApp({
                         mode={mode}
                         onModeChange={handleModeChange}
                         bgRemovalReady={bgRemovalReady}
+                        isFaceTrackingActive={isFaceTrackingActive}
+                        ratio={ratio}
                       />
                     </div>
                   </ScrollArea>
@@ -735,9 +743,14 @@ export function MainApp({
                       <Button
                         variant={faceTrackingEnabled ? "default" : "outline"}
                         size="sm"
-                        onClick={() =>
-                          setFaceTrackingEnabled((prev) => !prev)
-                        }
+                        onClick={() => {
+                          setFaceTrackingEnabled((prev) => {
+                            if (prev) {
+                              setSubtitleStyle((s) => ({ ...s, splitSubtitleMode: "none" }));
+                            }
+                            return !prev;
+                          });
+                        }}
                         className="flex items-center gap-2"
                       >
                         <ScanFace className="h-4 w-4" />

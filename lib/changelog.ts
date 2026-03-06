@@ -8,7 +8,7 @@
  * - PATCH: Bug fixes and small improvements
  */
 
-export const APP_VERSION = "1.9.0";
+export const APP_VERSION = "2.0.0";
 
 export interface ChangelogEntry {
   version: string;
@@ -21,6 +21,63 @@ export interface ChangelogEntry {
 }
 
 export const changelog: ChangelogEntry[] = [
+  {
+    version: "2.0.0",
+    date: "2026-03-06",
+    title: "Split Subtitles & Display on Spoken",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Split subtitle mode — phrase text is divided in two and placed around the person's head. Two modes: Above/Below (works on any ratio) and Left/Right (widescreen only)",
+      },
+      {
+        type: "added",
+        description:
+          "Left/Right split positions text at eye level (~38% from top) with a gap on each side of the face so text has room to move as the person shifts",
+      },
+      {
+        type: "added",
+        description:
+          "Per-phrase frozen face position for split subtitles — text is anchored to where the face was at the start of each phrase and stays fixed for its duration, avoiding distracting mid-phrase drift",
+      },
+      {
+        type: "added",
+        description:
+          "Face tracking auto-starts when a split subtitle mode is selected and stops when set back to Off — no manual toggle required",
+      },
+      {
+        type: "added",
+        description:
+          "Display on Spoken — all phrase words appear dim at phrase start and each word lights up to full brightness when spoken. Layout is stable from the first word (no shifting as words appear)",
+      },
+      {
+        type: "added",
+        description:
+          "Display on Spoken works in all render paths: DOM preview, canvas compositing, and video export",
+      },
+      {
+        type: "added",
+        description:
+          "Display on Spoken combined with Split Subtitle mode — each half renders words individually with dim/bright per word",
+      },
+      {
+        type: "changed",
+        description:
+          "Split Subtitle section is always visible in the styling panel — no longer gated behind face tracking being active",
+      },
+      {
+        type: "changed",
+        description:
+          "Applying a style preset no longer resets the font size — presets change color, border, and font family while preserving the user's chosen size",
+      },
+      {
+        type: "changed",
+        description:
+          "Default style updated to green (#00FF41), medium font size, no background, and Display on Spoken enabled",
+      },
+    ],
+  },
   {
     version: "1.9.0",
     date: "2026-03-05",

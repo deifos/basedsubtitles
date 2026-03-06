@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { SubtitleStyle, FONT_FAMILIES } from "./subtitle-styling";
 import {
   processTranscriptChunks,
@@ -37,6 +37,7 @@ interface VideoCaptionProps {
   style: SubtitleStyle;
   mode: "word" | "phrase";
   ratio: "16:9" | "9:16";
+  getFaceX?: () => number;
 }
 
 // Helper to determine if a color is light or dark
@@ -61,9 +62,13 @@ export function VideoCaption({
   style,
   mode,
   ratio,
+  getFaceX,
 }: VideoCaptionProps) {
   const [isAnimating, setIsAnimating] = useState(false);
   const [currentText, setCurrentText] = useState("");
+  const splitMode = style.splitSubtitleMode ?? "none";
+  // Frozen face X for left-right split: captured once per phrase, not updated per frame
+  const frozenFaceX = useRef<number>(0.5);
 
   // processTranscriptChunks handles dynamic mode internally now
   const processedChunks: ProcessedChunk[] = processTranscriptChunks(
@@ -124,6 +129,11 @@ export function VideoCaption({
       // Set new text
       setCurrentText(text);
 
+      // Freeze face X position for this phrase (left-right split stays fixed per phrase)
+      if (splitMode === "left-right" && currentChunks.length > 0) {
+        frozenFaceX.current = getFaceX?.() ?? 0.5;
+      }
+
       // Animation removed - not supported by FFmpeg drawtext
       // Just show the text immediately
       setIsAnimating(true);
@@ -140,6 +150,11 @@ export function VideoCaption({
       }, 10);
     }
   }, [style, currentText]);
+
+  // For split mode with no active text, render nothing (absolute elements don't affect layout)
+  if (currentChunks.length === 0 && splitMode !== "none") {
+    return null;
+  }
 
   // Always render the container to reserve space and prevent layout jumps
   if (currentChunks.length === 0) {
@@ -186,19 +201,9 @@ export function VideoCaption({
 
   const rawChunk = currentChunks[0]; // Take the first matching chunk
 
-  // Progressive word reveal: show words one by one as they start being spoken
-  let currentChunk = rawChunk;
-  if (style.dynamicFollowWord && mode === "phrase" && rawChunk.words) {
-    const visibleWords = rawChunk.words.filter(
-      (w) => currentTime >= w.timestamp[0],
-    );
-    if (visibleWords.length === 0) return null;
-    currentChunk = {
-      ...rawChunk,
-      text: visibleWords.map((w) => w.text).join(" "),
-      words: visibleWords,
-    };
-  }
+  // Display on Spoken: full phrase shown dim from phrase start, each word lights up
+  // when spoken. Layout is always stable — no container shifting.
+  const currentChunk = rawChunk;
 
   const text = currentChunk.text;
   const currentWordInPhrase = getCurrentWordInPhrase(currentChunk);
@@ -377,7 +382,12 @@ export function VideoCaption({
             overrideStyles.fontSize = `${word.styleOverride.fontSize}em`;
           }
 
-          const wordOpacity = 1;
+          const wordOpacity =
+            style.dynamicFollowWord && mode === "phrase"
+              ? currentTime >= word.timestamp[0]
+                ? 1
+                : 0.2
+              : 1;
 
           const baseWordStyles: React.CSSProperties = {
             ...baseTypographyStyles,
@@ -532,6 +542,137 @@ export function VideoCaption({
     }
   })();
 
+  // Split subtitle mode: render two separate blocks around the person's head
+  if (splitMode !== "none") {
+    const splitWords = text.split(" ");
+    if (splitWords.length >= 2) {
+      const mid = Math.ceil(splitWords.length / 2);
+      let splitPoint = mid;
+      for (
+        let i = Math.max(1, mid - 2);
+        i <= Math.min(splitWords.length - 1, mid + 2);
+        i++
+      ) {
+        if (/[,;:.!?]$/.test(splitWords[i - 1])) {
+          splitPoint = i;
+          break;
+        }
+      }
+      const splitLine1 = splitWords.slice(0, splitPoint).join(" ");
+      const splitLine2 = splitWords.slice(splitPoint).join(" ");
+
+      // Render words individually when Display on Spoken is active so dim/bright works in split mode
+      const renderSplitWords = (wordTexts: string[], startIdx: number) => {
+        if (!style.dynamicFollowWord || mode !== "phrase" || !currentChunk.words) {
+          return (
+            <span style={{ ...baseTypographyStyles, ...metallicTypographyStyles }}>
+              {wordTexts.join(" ")}
+            </span>
+          );
+        }
+        return (
+          <>
+            {wordTexts.map((w, i) => {
+              const wordData = currentChunk.words![startIdx + i];
+              const opacity = wordData && currentTime >= wordData.timestamp[0] ? 1 : 0.2;
+              return (
+                <React.Fragment key={startIdx + i}>
+                  <span style={{ ...baseTypographyStyles, ...metallicTypographyStyles, opacity }}>
+                    {w}
+                  </span>
+                  {i < wordTexts.length - 1 && " "}
+                </React.Fragment>
+              );
+            })}
+          </>
+        );
+      };
+
+      if (splitLine2) {
+        const isPortrait = ratio === "9:16";
+        const blockStyle: React.CSSProperties = {
+          fontFamily: style.fontFamily,
+          fontSize: responsiveFontSize,
+          fontWeight: style.fontWeight,
+        };
+        const innerStyle: React.CSSProperties = {
+          backgroundColor: style.backgroundColor,
+          borderRadius:
+            style.backgroundColor && style.backgroundColor !== "transparent"
+              ? "0.5rem"
+              : undefined,
+          opacity: isAnimating ? 1 : 0,
+        };
+
+        if (splitMode === "above-below") {
+          const topClass = isPortrait ? "top-[6%]" : "top-[12%]";
+          const bottomClass = isPortrait ? "bottom-[8%]" : "bottom-[16%]";
+          const widthClass = isPortrait ? "w-[85%]" : "w-[90%]";
+          return (
+            <>
+              <div
+                className={`absolute left-1/2 -translate-x-1/2 text-center pointer-events-none z-10 ${topClass} ${widthClass}`}
+                style={blockStyle}
+              >
+                <div className="inline-block px-3 py-2" style={innerStyle}>
+                  {renderSplitWords(splitWords.slice(0, splitPoint), 0)}
+                </div>
+              </div>
+              <div
+                className={`absolute left-1/2 -translate-x-1/2 text-center pointer-events-none z-10 ${bottomClass} ${widthClass}`}
+                style={blockStyle}
+              >
+                <div className="inline-block px-3 py-2" style={innerStyle}>
+                  {renderSplitWords(splitWords.slice(splitPoint), splitPoint)}
+                </div>
+              </div>
+            </>
+          );
+        }
+
+        if (splitMode === "left-right") {
+          const faceX = frozenFaceX.current;
+          const facePercent = faceX * 100;
+          const gap = 7; // % gap from face center on each side
+          return (
+            <>
+              {/* Left block — right-aligned, ends before the face */}
+              <div
+                className="absolute text-right pointer-events-none z-10"
+                style={{
+                  ...blockStyle,
+                  right: `${100 - facePercent + gap}%`,
+                  top: "38%",
+                  transform: "translateY(-50%)",
+                  maxWidth: `${Math.max(10, facePercent - gap * 2)}%`,
+                }}
+              >
+                <div className="inline-block px-3 py-2" style={innerStyle}>
+                  {renderSplitWords(splitWords.slice(0, splitPoint), 0)}
+                </div>
+              </div>
+              {/* Right block — left-aligned, starts after the face */}
+              <div
+                className="absolute text-left pointer-events-none z-10"
+                style={{
+                  ...blockStyle,
+                  left: `${facePercent + gap}%`,
+                  top: "38%",
+                  transform: "translateY(-50%)",
+                  maxWidth: `${Math.max(10, 100 - facePercent - gap * 2)}%`,
+                }}
+              >
+                <div className="inline-block px-3 py-2" style={innerStyle}>
+                  {renderSplitWords(splitWords.slice(splitPoint), splitPoint)}
+                </div>
+              </div>
+            </>
+          );
+        }
+      }
+    }
+  }
+
   // Animation states - more subtle with shake
   // When knockout is active, avoid transform and z-index on containers
   // so mix-blend-mode: difference on word spans can reach the video backdrop
@@ -562,7 +703,7 @@ export function VideoCaption({
         }}
       >
         <div className="flex flex-col gap-1">
-          {mode === "phrase" && shouldSplitText ? (
+          {mode === "phrase" && shouldSplitText && !style.dynamicFollowWord ? (
             // For phrase mode with split text, we need to handle highlighting per line
             <>
               <span
@@ -582,7 +723,7 @@ export function VideoCaption({
               )}
             </>
           ) : (
-            // Single line or word mode - use highlighting
+            // Single line, word mode, or Display on Spoken (always word-by-word)
             renderPhraseWithHighlight()
           )}
         </div>

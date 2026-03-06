@@ -67,6 +67,7 @@ export interface SubtitleStyle {
   dynamicFollowWord: boolean; // highlight spoken word in front text (phrase mode only)
   textFadeIn: boolean; // letter-by-letter fade-in effect
   brandingWatermark: boolean; // show "basedsubs.getbasedapps.com" watermark
+  splitSubtitleMode: "none" | "above-below" | "left-right"; // split subtitle around head
 }
 
 interface SubtitleStylingProps {
@@ -76,6 +77,8 @@ interface SubtitleStylingProps {
   onModeChange?: (mode: "word" | "phrase") => void;
   className?: string;
   bgRemovalReady?: boolean;
+  isFaceTrackingActive?: boolean;
+  ratio?: "16:9" | "9:16";
 }
 
 export const FONT_FAMILIES = {
@@ -463,6 +466,8 @@ export function SubtitleStyling({
   onModeChange,
   className = "",
   bgRemovalReady = false,
+  isFaceTrackingActive = false,
+  ratio = "16:9",
 }: SubtitleStylingProps) {
   const activePresetName = useMemo<SubtitlePresetName | null>(() => {
     const match = PRESETS.find((preset) => isPresetActive(style, preset));
@@ -503,7 +508,8 @@ export function SubtitleStyling({
   };
 
   const applyPreset = (preset: SubtitlePreset) => {
-    onChange({ ...style, ...preset.style });
+    // Preserve the user's current font size — presets define visual style, not size
+    onChange({ ...style, ...preset.style, fontSize: style.fontSize });
   };
 
   // Find the current font's cssFont value for the trigger preview
@@ -778,24 +784,6 @@ export function SubtitleStyling({
               </div>
             </div>
 
-            {/* Follow-up word display - phrase mode only */}
-            {mode === "phrase" && (
-              <div className="flex items-center justify-between rounded-lg border border-border/50 px-3 py-2">
-                <div>
-                  <p className="text-sm font-medium">Follow-up word display</p>
-                  <p className="text-xs text-muted-foreground">
-                    Reveal words one by one as they are spoken
-                  </p>
-                </div>
-                <Switch
-                  checked={style.dynamicFollowWord}
-                  onCheckedChange={(checked) =>
-                    onChange({ ...style, dynamicFollowWord: checked })
-                  }
-                  aria-label="Toggle follow-up word display"
-                />
-              </div>
-            )}
           </>
         )}
 
@@ -818,6 +806,46 @@ export function SubtitleStyling({
                   >
                     <PositionIcon position={pos} isActive={isActive} />
                     <span className="capitalize">{pos}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Split Subtitle - always available, face tracking starts when enabled */}
+        {!style.dynamicEnabled && (
+          <div className="space-y-2 rounded-lg border border-border/40 bg-muted/40 p-3">
+            <h4 className="text-sm font-medium">Split Subtitle</h4>
+            <p className="text-xs text-muted-foreground">
+              Split the phrase around the person&apos;s head
+            </p>
+            <div className="grid grid-cols-3 gap-2">
+              {(
+                [
+                  { value: "none" as const, label: "Off" },
+                  { value: "above-below" as const, label: "Top / Bottom" },
+                  { value: "left-right" as const, label: "Left / Right" },
+                ] as const
+              ).map(({ value, label }) => {
+                const disabled = value === "left-right" && ratio === "9:16";
+                const isActive = (style.splitSubtitleMode ?? "none") === value;
+                return (
+                  <button
+                    key={value}
+                    disabled={disabled}
+                    onClick={() =>
+                      !disabled && onChange({ ...style, splitSubtitleMode: value })
+                    }
+                    className={`rounded-lg border px-2 py-2 text-xs font-medium transition-all ${
+                      isActive
+                        ? "border-amber-500/70 bg-amber-50 text-amber-700"
+                        : disabled
+                          ? "border-border/30 bg-background/50 text-muted-foreground/40 cursor-not-allowed opacity-50"
+                          : "border-border/50 bg-background text-muted-foreground hover:border-border hover:text-foreground"
+                    }`}
+                  >
+                    {label}
                   </button>
                 );
               })}
@@ -962,6 +990,28 @@ export function SubtitleStyling({
               onCheckedChange={handleWordEmphasisToggle}
               disabled={mode === "word"}
               aria-label="Toggle active word emphasis"
+            />
+          </div>
+        )}
+
+        {/* Display on Spoken - hidden when dynamic is active */}
+        {!style.dynamicEnabled && (
+          <div className="flex items-center justify-between rounded-lg border border-border/50 px-3 py-2">
+            <div>
+              <p className="text-sm font-medium">Display on Spoken</p>
+              <p className="text-xs text-muted-foreground">
+                {mode === "word"
+                  ? "Only available in phrase mode"
+                  : "Reveal words one by one as they are spoken."}
+              </p>
+            </div>
+            <Switch
+              checked={style.dynamicFollowWord}
+              onCheckedChange={(checked) =>
+                onChange({ ...style, dynamicFollowWord: checked })
+              }
+              disabled={mode === "word"}
+              aria-label="Toggle display on spoken"
             />
           </div>
         )}
