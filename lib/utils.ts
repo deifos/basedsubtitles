@@ -90,7 +90,54 @@ interface SourceTranscript {
  * dynamicPosition (first word = "behind", rest = "front") to words
  * that don't already have a position set.
  */
+// WeakMap cache: transcript object → param string → result
+// Invalidates automatically when React replaces the transcript object on edits.
+const _chunksCache = new WeakMap<
+  SourceTranscript,
+  Map<string, ProcessedChunk[]>
+>();
+
+export function binarySearchActiveChunk<
+  T extends { timestamp: [number, number] },
+>(chunks: T[], currentTime: number): T | undefined {
+  let lo = 0,
+    hi = chunks.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    const [start, end] = chunks[mid].timestamp;
+    if (currentTime < start) hi = mid - 1;
+    else if (currentTime > end) lo = mid + 1;
+    else return chunks[mid];
+  }
+  return undefined;
+}
+
 export function processTranscriptChunks(
+  transcript: SourceTranscript,
+  mode: "word" | "phrase" = "word",
+  maxWordsPerLine?: number,
+  dynamicEnabled?: boolean,
+): ProcessedChunk[] {
+  const cacheKey = `${mode}-${maxWordsPerLine ?? "d"}-${dynamicEnabled ?? 0}`;
+  let transcriptMap = _chunksCache.get(transcript);
+  if (!transcriptMap) {
+    transcriptMap = new Map();
+    _chunksCache.set(transcript, transcriptMap);
+  }
+  const cached = transcriptMap.get(cacheKey);
+  if (cached) return cached;
+
+  const result = _processTranscriptChunks(
+    transcript,
+    mode,
+    maxWordsPerLine,
+    dynamicEnabled,
+  );
+  transcriptMap.set(cacheKey, result);
+  return result;
+}
+
+function _processTranscriptChunks(
   transcript: SourceTranscript,
   mode: "word" | "phrase" = "word",
   maxWordsPerLine?: number,
@@ -101,6 +148,7 @@ export function processTranscriptChunks(
       text: chunk.text,
       timestamp: chunk.timestamp,
       disabled: chunk.disabled,
+      subtitleHidden: chunk.subtitleHidden,
     }));
   }
 

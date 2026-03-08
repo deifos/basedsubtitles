@@ -86,9 +86,9 @@ function VersionBlock({
       <div className="ml-10 mb-12">
         <div className="border-2 border-black bg-white">
           <div className="divide-y-2 divide-black/10">
-            {entry.changes.map((change, index) => (
+            {entry.changes.map((change) => (
               <div
-                key={index}
+                key={change.description}
                 className="flex items-start gap-3 p-4 hover:bg-black/[0.02] transition-colors"
               >
                 <ChangeTypeBadge type={change.type} />

@@ -40,12 +40,14 @@ export const STATUS_MESSAGES: Record<TranscriptionStatus, string> = {
 async function detectPreferredDevice(): Promise<DeviceType> {
   if (
     typeof navigator === "undefined" ||
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     typeof (navigator as any).gpu === "undefined"
   ) {
     return "wasm";
   }
 
   try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const adapter = await (navigator as any).gpu.requestAdapter();
     return adapter ? "webgpu" : "wasm";
   } catch {
@@ -57,6 +59,7 @@ export function useTranscription() {
   const [status, setStatusState] = useState<TranscriptionStatus>("idle");
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<TranscriptionResult | null>(null);
+  const [liveText, setLiveText] = useState<string>("");
   const [progress, setProgress] = useState(0);
   const [device, setDevice] = useState<DeviceType>("wasm");
   const worker = useRef<Worker | null>(null);
@@ -115,6 +118,20 @@ export function useTranscription() {
             modelLoadRejectRef.current = null;
           }
           break;
+
+        case "update": {
+          // Per-chunk partial result — update sidebar and progress in real time
+          if (e.data.result) {
+            setResult(e.data.result);
+            setLiveText(e.data.result.text || "");
+          } else if (typeof e.data.text === "string") {
+            setLiveText(e.data.text);
+          }
+          if (typeof e.data.progress === "number") {
+            setProgress(e.data.progress);
+          }
+          break;
+        }
 
         case "complete": {
           // Add generation time from worker
@@ -240,7 +257,8 @@ export function useTranscription() {
     modelReadyRef.current = false;
   }, []);
 
-  const handleVideoSelect = async (file: File) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const handleVideoSelect = async (_file: File) => {
     // Reset states — don't preload any model here; let the user pick model size first
     setError(null);
     setResult(null);
@@ -257,6 +275,7 @@ export function useTranscription() {
       // Reset states
       setError(null);
       setResult(null);
+      setLiveText("");
       setProgress(0);
 
       updateStatus("processing");
@@ -311,6 +330,7 @@ export function useTranscription() {
     // Reset states
     setError(null);
     setResult(null);
+    setLiveText("");
     updateStatus(modelReadyRef.current ? "ready" : "idle");
     setProgress(0);
 
@@ -322,6 +342,7 @@ export function useTranscription() {
   const cancelTranscription = useCallback(() => {
     setError(null);
     setResult(null);
+    setLiveText("");
     updateStatus("idle");
     setProgress(0);
     modelReadyRef.current = false;
@@ -342,6 +363,7 @@ export function useTranscription() {
     status,
     error,
     result,
+    liveText,
     progress,
     device,
     setResult,

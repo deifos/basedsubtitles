@@ -23,12 +23,15 @@ export function DebouncedColorInput({
   ...props
 }: DebouncedColorInputProps) {
   const [localValue, setLocalValue] = useState(value);
+  const [prevProp, setPrevProp] = useState(value);
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  // Sync from parent when value changes externally
-  useEffect(() => {
+  // Sync from parent when value changes externally (e.g. preset applied).
+  // Done during render — avoids the derived-state-in-useEffect anti-pattern.
+  if (value !== prevProp) {
+    setPrevProp(value);
     setLocalValue(value);
-  }, [value]);
+  }
 
   // Cleanup on unmount
   useEffect(() => {

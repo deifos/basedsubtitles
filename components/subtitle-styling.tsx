@@ -77,7 +77,6 @@ interface SubtitleStylingProps {
   onModeChange?: (mode: "word" | "phrase") => void;
   className?: string;
   bgRemovalReady?: boolean;
-  isFaceTrackingActive?: boolean;
   ratio?: "16:9" | "9:16";
 }
 
@@ -466,7 +465,6 @@ export function SubtitleStyling({
   onModeChange,
   className = "",
   bgRemovalReady = false,
-  isFaceTrackingActive = false,
   ratio = "16:9",
 }: SubtitleStylingProps) {
   const activePresetName = useMemo<SubtitlePresetName | null>(() => {
@@ -783,7 +781,6 @@ export function SubtitleStyling({
                 </div>
               </div>
             </div>
-
           </>
         )}
 
@@ -835,7 +832,8 @@ export function SubtitleStyling({
                     key={value}
                     disabled={disabled}
                     onClick={() =>
-                      !disabled && onChange({ ...style, splitSubtitleMode: value })
+                      !disabled &&
+                      onChange({ ...style, splitSubtitleMode: value })
                     }
                     className={`rounded-lg border px-2 py-2 text-xs font-medium transition-all ${
                       isActive

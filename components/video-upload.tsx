@@ -12,6 +12,7 @@ import { cn, formatTime, type WordStyleOverride } from "@/lib/utils";
 import { VideoCaption } from "./video-caption";
 import { SubtitleStyle } from "./subtitle-styling";
 import { UploadIcon, Play, Pause, Volume2, VolumeX } from "lucide-react";
+import { toast } from "sonner";
 import type { MaskData } from "@/hooks/useBackgroundRemoval";
 import {
   renderSubtitleToCanvas,
@@ -75,6 +76,8 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
     const [isPlaying, setIsPlaying] = useState(false);
     const [duration, setDuration] = useState(0);
     const [isMuted, setIsMuted] = useState(false);
+    // Local time state: updated directly from video's timeupdate without going through main-app
+    const [localTime, setLocalTime] = useState(0);
     const processedFileRef = useRef<File | null>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const faceTrackCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -87,9 +90,11 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
     const seekingRef = useRef(false);
     const seekValueRef = useRef(0);
 
-    // Sync progress bar fill + time display from currentTime prop, skip while dragging
+    // Sync progress bar fill + time display from currentTime prop, skip while dragging.
+    // Also syncs localTime so VideoCaption reflects external seeks (sidebar clicks, reset).
     useEffect(() => {
       if (seekingRef.current) return;
+      setLocalTime(currentTime);
       if (seekBarFillRef.current && duration > 0) {
         seekBarFillRef.current.style.width = `${(currentTime / duration) * 100}%`;
       }
@@ -128,6 +133,13 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
             throw new Error("Please select a video file");
           }
 
+          const maxBytes = 1 * 1024 * 1024 * 1024; // 1 GB
+          if (file.size > maxBytes) {
+            throw new Error(
+              `File is too large (${(file.size / 1024 / 1024 / 1024).toFixed(1)} GB). Please use a video under 1 GB to avoid running out of memory.`,
+            );
+          }
+
           // Create video element to check duration
           const video = document.createElement("video");
           video.preload = "metadata";
@@ -137,11 +149,6 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
             video.onerror = reject;
             video.src = URL.createObjectURL(file);
           });
-
-          if (video.duration > 300) {
-            URL.revokeObjectURL(video.src);
-            throw new Error("Video must be less than 5 minutes");
-          }
 
           // Detect aspect ratio from video dimensions
           const detectedRatio: "16:9" | "9:16" =
@@ -156,7 +163,10 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
             onAspectRatioDetected(detectedRatio);
           }
         } catch (err) {
-          setError(err instanceof Error ? err.message : "Error loading video");
+          const message =
+            err instanceof Error ? err.message : "Error loading video";
+          setError(message);
+          toast.error(message);
           setVideoSrc(null);
         }
       },
@@ -238,10 +248,21 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
         if (seekingRef.current) return;
 
         const video = e.currentTarget;
-        const currentTime = video.currentTime;
+        const time = video.currentTime;
 
-        // Call the original onTimeUpdate
-        onTimeUpdate?.(currentTime);
+        // Update local time for VideoCaption directly — avoids main-app round-trip re-renders
+        setLocalTime(time);
+
+        // Update seek bar + time display via refs (no React state involved)
+        if (seekBarFillRef.current && duration > 0) {
+          seekBarFillRef.current.style.width = `${(time / duration) * 100}%`;
+        }
+        if (timeDisplayRef.current) {
+          timeDisplayRef.current.textContent = formatTime(time);
+        }
+
+        // Notify main-app (throttled to chunk boundaries inside main-app)
+        onTimeUpdate?.(time);
 
         // Skip disabled segments
         if (!isSkipping && transcript) {
@@ -249,7 +270,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
 
           for (const [start, end] of disabledRanges) {
             // If current time is within a disabled range, skip to the end
-            if (currentTime >= start && currentTime < end) {
+            if (time >= start && time < end) {
               setIsSkipping(true);
               video.currentTime = end + 0.1; // Add small buffer to avoid edge cases
 
@@ -262,7 +283,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
           }
         }
       },
-      [onTimeUpdate, transcript, isSkipping, getDisabledRanges],
+      [onTimeUpdate, transcript, isSkipping, getDisabledRanges, duration],
     );
 
     // Canvas compositing loop for background removal preview
@@ -718,7 +739,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
                 {transcript && !compositingActive && (
                   <VideoCaption
                     transcript={transcript}
-                    currentTime={currentTime}
+                    currentTime={localTime}
                     style={subtitleStyle}
                     mode={mode}
                     ratio={ratio}
@@ -783,6 +804,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
                       seekBarFillRef.current.style.width = `${fraction * 100}%`;
                     if (timeDisplayRef.current)
                       timeDisplayRef.current.textContent = formatTime(time);
+                    setLocalTime(time);
                     onTimeUpdate?.(time);
                   }}
                   onPointerMove={(e) => {
@@ -800,6 +822,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
                       seekBarFillRef.current.style.width = `${fraction * 100}%`;
                     if (timeDisplayRef.current)
                       timeDisplayRef.current.textContent = formatTime(time);
+                    setLocalTime(time);
                     onTimeUpdate?.(time);
                   }}
                   onPointerUp={() => {
@@ -887,7 +910,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
               <UploadIcon className="mx-auto mt-8" />
             </p>
             <p className="text-xs text-muted-foreground">
-              Supports MP4 and WebM formats, max 5 minutes
+              Supports MP4, WebM, and MOV formats, max 1 GB
             </p>
           </div>
         )}

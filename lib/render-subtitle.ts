@@ -1,5 +1,10 @@
 import { SubtitleStyle } from "@/components/subtitle-styling";
-import { processTranscriptChunks, type WordStyleOverride } from "@/lib/utils";
+import {
+  processTranscriptChunks,
+  binarySearchActiveChunk,
+  type WordStyleOverride,
+} from "@/lib/utils";
+import { resolveFontFamily } from "@/lib/font-config";
 
 interface TranscriptData {
   text: string;
@@ -22,46 +27,6 @@ interface WordTiming {
 
 export interface FaceBounds {
   chinY: number; // Y coordinate of estimated chin in canvas pixels
-}
-
-const FONT_MAPPINGS: Record<string, string> = {
-  "var(--font-bangers)": "Bangers",
-  "var(--font-montserrat)": "Montserrat",
-  "var(--font-inter)": "Inter",
-  "var(--font-bebas-neue)": "Bebas Neue",
-  "var(--font-poppins)": "Poppins",
-  "var(--font-open-sans)": "Open Sans",
-  "var(--font-oswald)": "Oswald",
-  "var(--font-anton)": "Anton",
-  "var(--font-fredoka)": "Fredoka",
-  "var(--font-righteous)": "Righteous",
-  "var(--font-nunito)": "Nunito",
-  "var(--font-roboto)": "Roboto",
-  "var(--font-permanent-marker)": "Permanent Marker",
-  "var(--font-pacifico)": "Pacifico",
-  "var(--font-lobster)": "Lobster",
-  "var(--font-alfa-slab-one)": "Alfa Slab One",
-  "var(--font-staatliches)": "Staatliches",
-  "var(--font-fugaz-one)": "Fugaz One",
-  "var(--font-chewy)": "Chewy",
-  "var(--font-playfair-display)": "Playfair Display",
-  "var(--font-lora)": "Lora",
-  "var(--font-plus-jakarta-sans)": "Plus Jakarta Sans",
-  "var(--font-outfit)": "Outfit",
-  "var(--font-lilita-one)": "Lilita One",
-};
-
-function resolveFontFamily(fontFamily: string): string {
-  if (!fontFamily.includes("var(")) return fontFamily;
-
-  for (const [cssVar, actualFont] of Object.entries(FONT_MAPPINGS)) {
-    if (fontFamily.includes(cssVar)) {
-      return fontFamily.replace(cssVar, actualFont);
-    }
-  }
-
-  const fallbackMatch = fontFamily.match(/,\s*(.+)$/);
-  return fallbackMatch ? fallbackMatch[1] : "Arial, sans-serif";
 }
 
 function isLightColor(color: string): boolean {
@@ -96,30 +61,15 @@ export function renderSubtitleToCanvas(
     style.maxWordsPerLine,
   );
 
-  // Filter enabled chunks (exclude disabled and subtitleHidden)
+  // Filter enabled chunks using data already present in processed chunks (O(n))
   const enabledChunks = processedChunks.filter((chunk) => {
-    if (mode === "phrase" && chunk.words) {
-      return !chunk.words.some((word) => {
-        const original = transcript.chunks.find(
-          (c) =>
-            c.timestamp[0] === word.timestamp[0] &&
-            c.timestamp[1] === word.timestamp[1],
-        );
-        return original?.disabled || original?.subtitleHidden;
-      });
+    if (chunk.words) {
+      return !chunk.words.some((w) => w.disabled || w.subtitleHidden);
     }
-    const original = transcript.chunks.find(
-      (c) =>
-        c.timestamp[0] === chunk.timestamp[0] &&
-        c.timestamp[1] === chunk.timestamp[1],
-    );
-    return !original?.disabled && !original?.subtitleHidden;
+    return !chunk.disabled && !chunk.subtitleHidden;
   });
 
-  const currentChunk = enabledChunks.find(
-    (chunk) =>
-      currentTime >= chunk.timestamp[0] && currentTime <= chunk.timestamp[1],
-  );
+  const currentChunk = binarySearchActiveChunk(enabledChunks, currentTime);
 
   if (!currentChunk) return;
 
@@ -168,13 +118,24 @@ function renderSplitSubtitleToCanvas(
   if (words.length < 2) {
     // Can't split — fall back to centered rendering
     ctx.textAlign = "center";
-    renderTextLine(ctx, text, canvasWidth / 2, canvasHeight * (isVerticalVideo ? 0.92 : 0.84), style, videoScale);
+    renderTextLine(
+      ctx,
+      text,
+      canvasWidth / 2,
+      canvasHeight * (isVerticalVideo ? 0.92 : 0.84),
+      style,
+      videoScale,
+    );
     return;
   }
 
   const mid = Math.ceil(words.length / 2);
   let splitPoint = mid;
-  for (let i = Math.max(1, mid - 2); i <= Math.min(words.length - 1, mid + 2); i++) {
+  for (
+    let i = Math.max(1, mid - 2);
+    i <= Math.min(words.length - 1, mid + 2);
+    i++
+  ) {
     if (/[,;:.!?]$/.test(words[i - 1])) {
       splitPoint = i;
       break;
@@ -184,7 +145,14 @@ function renderSplitSubtitleToCanvas(
   const line2 = words.slice(splitPoint).join(" ");
   if (!line2) {
     ctx.textAlign = "center";
-    renderTextLine(ctx, text, canvasWidth / 2, canvasHeight * (isVerticalVideo ? 0.92 : 0.84), style, videoScale);
+    renderTextLine(
+      ctx,
+      text,
+      canvasWidth / 2,
+      canvasHeight * (isVerticalVideo ? 0.92 : 0.84),
+      style,
+      videoScale,
+    );
     return;
   }
 
@@ -265,22 +233,12 @@ export function renderDynamicBehindText(
 
   const enabledChunks = processedChunks.filter((chunk) => {
     if (chunk.words) {
-      return !chunk.words.some((word) => {
-        const original = transcript.chunks.find(
-          (c) =>
-            c.timestamp[0] === word.timestamp[0] &&
-            c.timestamp[1] === word.timestamp[1],
-        );
-        return original?.disabled || original?.subtitleHidden;
-      });
+      return !chunk.words.some((w) => w.disabled || w.subtitleHidden);
     }
-    return true;
+    return !chunk.disabled && !chunk.subtitleHidden;
   });
 
-  const currentChunk = enabledChunks.find(
-    (chunk) =>
-      currentTime >= chunk.timestamp[0] && currentTime <= chunk.timestamp[1],
-  );
+  const currentChunk = binarySearchActiveChunk(enabledChunks, currentTime);
 
   if (!currentChunk || !currentChunk.words) return;
 
@@ -332,22 +290,12 @@ export function renderDynamicFrontText(
 
   const enabledChunks = processedChunks.filter((chunk) => {
     if (chunk.words) {
-      return !chunk.words.some((word) => {
-        const original = transcript.chunks.find(
-          (c) =>
-            c.timestamp[0] === word.timestamp[0] &&
-            c.timestamp[1] === word.timestamp[1],
-        );
-        return original?.disabled || original?.subtitleHidden;
-      });
+      return !chunk.words.some((w) => w.disabled || w.subtitleHidden);
     }
-    return true;
+    return !chunk.disabled && !chunk.subtitleHidden;
   });
 
-  const currentChunk = enabledChunks.find(
-    (chunk) =>
-      currentTime >= chunk.timestamp[0] && currentTime <= chunk.timestamp[1],
-  );
+  const currentChunk = binarySearchActiveChunk(enabledChunks, currentTime);
 
   if (!currentChunk || !currentChunk.words) return;
 
@@ -830,7 +778,9 @@ function renderChunkToCanvas(
 
   const phraseWords = Array.isArray(chunkWords) ? chunkWords : undefined;
   const canEmphasize =
-    (style.wordEmphasisEnabled || style.textFadeIn || style.dynamicFollowWord) &&
+    (style.wordEmphasisEnabled ||
+      style.textFadeIn ||
+      style.dynamicFollowWord) &&
     mode === "phrase" &&
     phraseWords &&
     phraseWords.length > 0 &&
@@ -1090,8 +1040,7 @@ function renderPhraseLineWithEmphasis(
           )
         : 1;
     const isSpoken = currentTime >= word.timestamp[0];
-    const wordAlpha =
-      style.dynamicFollowWord && !isSpoken ? 0.2 : chunkFadeOut;
+    const wordAlpha = style.dynamicFollowWord && !isSpoken ? 0.2 : chunkFadeOut;
 
     ctx.save();
     ctx.globalAlpha = wordAlpha;

@@ -3,14 +3,11 @@
 import type { JSX } from "react";
 import {
   Captions,
-  Eraser,
-  Layers3,
-  Type,
-  Languages,
+  ScanFace,
+  AlignVerticalSpaceAround,
   Download,
   WifiOff,
   BadgeCheck,
-  Camera,
   Globe,
   Sparkles,
 } from "lucide-react";
@@ -84,68 +81,70 @@ export function LandingFeatures(): JSX.Element {
             </div>
           </div>
 
-          {/* Background Removal */}
-          <div className="group relative rounded-2xl border border-slate-200/80 bg-gradient-to-br from-rose-50 to-white p-6 shadow-sm transition-all hover:shadow-lg hover:shadow-rose-100/60 hover:-translate-y-0.5 overflow-hidden">
-            <div className="relative w-full h-28 rounded-xl bg-rose-100/50 flex items-center justify-center mb-4">
-              {/* Person in front, background fading */}
-              <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-rose-200/30 via-transparent to-rose-200/30" />
-              <Camera
-                className="h-12 w-12 text-rose-400 relative z-10"
+          {/* Face Tracking Subtitle Placement */}
+          <div className="group relative rounded-2xl border border-slate-200/80 bg-gradient-to-br from-violet-50 to-white p-6 shadow-sm transition-all hover:shadow-lg hover:shadow-violet-100/60 hover:-translate-y-0.5 overflow-hidden">
+            <div className="relative w-full h-28 rounded-xl bg-violet-100/50 flex items-center justify-center mb-4">
+              <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-violet-200/30 via-transparent to-violet-200/30" />
+              <ScanFace
+                className="h-14 w-14 text-violet-500 relative z-10"
                 strokeWidth={1.2}
               />
-              <Eraser
-                className="absolute bottom-2 right-2 h-6 w-6 text-rose-500"
-                strokeWidth={1.5}
-              />
+              <span
+                className="absolute bottom-2 left-0 right-0 text-center text-[10px] font-bold text-violet-600/70 select-none"
+                style={{ fontFamily: "var(--font-geist-mono), monospace" }}
+              >
+                tracking · positioning
+              </span>
             </div>
             <h3
               className="text-sm font-bold text-slate-900"
               style={{ fontFamily: "var(--font-outfit), sans-serif" }}
             >
-              Background Removal
+              Smart Face Tracking
             </h3>
             <p
               className="mt-1.5 text-xs text-slate-500 leading-relaxed"
               style={{ fontFamily: "var(--font-outfit), sans-serif" }}
             >
-              AI person segmentation that runs locally. Remove backgrounds
-              without uploading a frame.
+              Subtitles follow the speaker. Face detection keeps text away from
+              the face automatically.
             </p>
           </div>
 
-          {/* Dynamic 3D Subtitles — Visual: text layered behind icon */}
+          {/* Split Subtitle Mode */}
           <div className="group relative rounded-2xl border border-slate-200/80 bg-gradient-to-br from-amber-50 to-white p-6 shadow-sm transition-all hover:shadow-lg hover:shadow-amber-100/60 hover:-translate-y-0.5 overflow-hidden">
             <div className="relative w-full h-28 rounded-xl bg-amber-100/50 flex items-center justify-center mb-4">
-              {/* Text behind and in front of icon */}
-              <span
-                className="absolute text-2xl font-black text-amber-300/60 -rotate-3 top-3 left-4 select-none"
-                style={{ fontFamily: "var(--font-bangers), cursive" }}
-              >
-                HELLO
-              </span>
-              <Layers3
-                className="h-14 w-14 text-amber-500 relative z-10"
-                strokeWidth={1.2}
-              />
-              <span
-                className="absolute text-lg font-black text-amber-600/80 rotate-2 bottom-3 right-4 select-none z-20"
-                style={{ fontFamily: "var(--font-bangers), cursive" }}
-              >
-                WORLD
-              </span>
+              <div className="flex flex-col items-center justify-between h-full w-full px-4 py-3">
+                <span
+                  className="text-sm font-black text-amber-600/80 select-none"
+                  style={{ fontFamily: "var(--font-bangers), cursive" }}
+                >
+                  SUBTITLE TOP
+                </span>
+                <AlignVerticalSpaceAround
+                  className="h-8 w-8 text-amber-400"
+                  strokeWidth={1.4}
+                />
+                <span
+                  className="text-sm font-black text-amber-600/80 select-none"
+                  style={{ fontFamily: "var(--font-bangers), cursive" }}
+                >
+                  SUBTITLE BOTTOM
+                </span>
+              </div>
             </div>
             <h3
               className="text-sm font-bold text-slate-900"
               style={{ fontFamily: "var(--font-outfit), sans-serif" }}
             >
-              Dynamic 3D Subtitles
+              Split Subtitle Mode
             </h3>
             <p
               className="mt-1.5 text-xs text-slate-500 leading-relaxed"
               style={{ fontFamily: "var(--font-outfit), sans-serif" }}
             >
-              Place text behind or in front of people. Cinematic depth effects
-              that pop.
+              Split subtitles above and below the speaker, or left and right —
+              powered by face tracking.
             </p>
           </div>
 

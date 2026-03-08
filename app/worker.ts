@@ -72,11 +72,6 @@ class PipelineSingleton {
 let activeDevice: DeviceType | null = null;
 let activeModelSize: ModelSize | null = null;
 let loadPromise: Promise<void> | null = null;
-type TranscriptionResult = Awaited<
-  ReturnType<AutomaticSpeechRecognitionPipeline>
->;
-
-let transcriptionPromise: Promise<TranscriptionResult> | null = null;
 
 // Handle messages from the main thread - simplified like sample app
 self.addEventListener("message", async (e: MessageEvent) => {
@@ -109,15 +104,6 @@ async function handleLoad({
     device !== activeDevice ||
     modelSize !== activeModelSize
   ) {
-    if (transcriptionPromise) {
-      try {
-        await transcriptionPromise;
-      } catch {
-        // Ignore errors from in-flight transcription while switching devices
-      }
-      transcriptionPromise = null;
-    }
-
     if (device !== activeDevice || modelSize !== activeModelSize) {
       PipelineSingleton.resetInstance();
       loadPromise = null;
@@ -166,7 +152,6 @@ async function handleLoad({
   } catch (error) {
     console.error("Worker: Error loading model:", error);
     loadPromise = null;
-    transcriptionPromise = null;
     self.postMessage({
       status: "error",
       data: error instanceof Error ? error.message : "Unknown error occurred",
@@ -174,7 +159,13 @@ async function handleLoad({
   }
 }
 
-// Handle transcription requests - optimized like sample app
+// Handle transcription requests.
+//
+// Instead of calling the high-level pipeline (which processes all chunks then
+// merges at the end with no intermediate results), we replicate _call_whisper's
+// internal loop from the library source and call _decode_asr after every chunk.
+// This gives streaming partial results with accuracy identical to the single
+// full pipeline call, because we use the same chunking math and merge logic.
 async function handleRun({
   audio,
   language = "en",
@@ -199,26 +190,129 @@ async function handleRun({
       targetDevice,
     );
 
-    if (transcriptionPromise) {
-      await transcriptionPromise;
-    }
+    // Access the pipeline's internal components (same as _call_whisper uses)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const p = transcriber as any;
+    const proc = p.processor;
+    const model = p.model;
+    const tokenizer = p.tokenizer;
+
+    const sampling_rate: number = proc.feature_extractor.config.sampling_rate;
+    const hop_length: number = proc.feature_extractor.config.hop_length;
+    const time_precision: number =
+      proc.feature_extractor.config.chunk_length /
+      model.config.max_source_positions;
+
+    // Match the library's default chunk/stride settings
+    const CHUNK_S = 30;
+    const STRIDE_S = 5;
+    const window_samples = sampling_rate * CHUNK_S;
+    const stride_samples = sampling_rate * STRIDE_S;
+    const jump_samples = window_samples - 2 * stride_samples; // 20s step
+
+    // Generation config:
+    //   return_timestamps: true  → model generates timestamp tokens in the output,
+    //                              which _decode_asr needs for proper stride-aware
+    //                              chunk merging (skipping left/right stride regions).
+    //   return_token_timestamps: true → model also returns per-token timestamps via
+    //                              its alignment head, used by _decode_asr("word")
+    //                              to produce word-level output.
+    // Combining both matches the sample app's approach while giving word timestamps.
+    const generation_config: Record<string, unknown> = {
+      language,
+      return_timestamps: true,
+      return_token_timestamps: true,
+      force_full_sequences: false,
+    };
 
     const start = performance.now();
 
-    // Use same settings as sample app for better performance
-    transcriptionPromise = transcriber(audio, {
-      language,
-      return_timestamps: "word",
-      chunk_length_s: 30,
-    });
+    // Build chunk list (feature extraction for each 30s window)
+    type Chunk = {
+      stride: number[]; // [length_samples, left_stride_samples, right_stride_samples]
+      input_features: unknown;
+      is_last: boolean;
+      tokens?: bigint[];
+      token_timestamps?: number[];
+    };
+    const chunks: Chunk[] = [];
+    let offset = 0;
+    while (true) {
+      const offset_end = offset + window_samples;
+      const subarr = audio.subarray(offset, offset_end);
+      const feature = await proc(subarr);
+      const is_first = offset === 0;
+      const is_last = offset_end >= audio.length;
+      chunks.push({
+        stride: [
+          subarr.length,
+          is_first ? 0 : stride_samples,
+          is_last ? 0 : stride_samples,
+        ],
+        input_features: feature.input_features,
+        is_last,
+      });
+      if (is_last) break;
+      offset += jump_samples;
+    }
 
-    const result = await transcriptionPromise;
+    // Run model.generate() per chunk, streaming _decode_asr results after each one.
+    // This is identical to _call_whisper's loop, just with an intermediate decode.
+    const processed: Chunk[] = [];
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+
+      const data = await model.generate({
+        inputs: chunk.input_features,
+        ...generation_config,
+        num_frames: Math.floor(chunk.stride[0] / hop_length),
+      });
+
+      chunk.tokens = data.sequences.tolist()[0] as bigint[];
+      chunk.token_timestamps = (
+        data.token_timestamps.tolist()[0] as number[]
+      ).map((x: number) => Math.round(x * 100) / 100);
+
+      // Convert stride from samples → seconds (required by _decode_asr)
+      chunk.stride = chunk.stride.map((x) => x / sampling_rate);
+
+      processed.push(chunk);
+
+      // Merge all chunks processed so far — same call the library makes at the end
+      const [partialText, partialOptional] = tokenizer._decode_asr(processed, {
+        time_precision,
+        return_timestamps: "word",
+        force_full_sequences: false,
+      }) as [
+        string,
+        { chunks?: Array<{ text: string; timestamp: [number, number] }> },
+      ];
+
+      self.postMessage({
+        status: "update",
+        result: {
+          text: partialText,
+          chunks: partialOptional.chunks ?? [],
+        },
+        progress: 60 + Math.round(((i + 1) / chunks.length) * 39),
+      });
+    }
 
     const end = performance.now();
 
+    // The last update already has the final result, but re-run for the complete message
+    const [fullText, fullOptional] = tokenizer._decode_asr(processed, {
+      time_precision,
+      return_timestamps: "word",
+      force_full_sequences: false,
+    }) as [
+      string,
+      { chunks?: Array<{ text: string; timestamp: [number, number] }> },
+    ];
+
     self.postMessage({
       status: "complete",
-      result,
+      result: { text: fullText, chunks: fullOptional.chunks ?? [] },
       time: end - start,
     });
   } catch (error) {
@@ -226,12 +320,9 @@ async function handleRun({
     PipelineSingleton.resetInstance();
     activeDevice = null;
     loadPromise = null;
-    transcriptionPromise = null;
     self.postMessage({
       status: "error",
       data: error instanceof Error ? error.message : "Unknown error occurred",
     });
-  } finally {
-    transcriptionPromise = null;
   }
 }

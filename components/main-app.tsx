@@ -6,13 +6,26 @@ import { SiteFooter } from "@/components/site-footer";
 import { BuyMeCoffee } from "@/components/buy-me-coffee";
 import { VideoUpload } from "@/components/video-upload";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Upload, Download, Video, ZoomIn, ZoomOut, ScanFace } from "lucide-react";
+import {
+  Upload,
+  Download,
+  Video,
+  ZoomIn,
+  ZoomOut,
+  ScanFace,
+  Loader2,
+} from "lucide-react";
 import { TranscriptSidebar } from "@/components/transcript-sidebar";
 import { SubtitleStyling, SubtitleStyle } from "@/components/subtitle-styling";
 import { WordStylePopover } from "@/components/word-style-popover";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { processTranscriptChunks, type WordStyleOverride } from "@/lib/utils";
+import {
+  processTranscriptChunks,
+  binarySearchActiveChunk,
+  formatTime,
+  type WordStyleOverride,
+} from "@/lib/utils";
 import { ProcessingOverlay } from "@/components/processing-overlay";
 import {
   useTranscription,
@@ -90,6 +103,7 @@ export function MainApp({
   >(null);
   const previousResultRef = useRef<TranscriptionResult | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const lastChunkKeyRef = useRef<string | null>(null);
 
   const {
     status,
@@ -115,13 +129,8 @@ export function MainApp({
     processFrame: bgProcessFrame,
   } = useBackgroundRemoval();
 
-  const {
-    isLoading: isFaceTrackingLoading,
-    startTracking,
-    stopTracking,
-    getCenterX,
-    buildExportTimeline,
-  } = useFaceTracking();
+  const { startTracking, stopTracking, getCenterX, buildExportTimeline } =
+    useFaceTracking();
 
   // User toggle for face tracking + whether it's actively running
   const [faceTrackingEnabled, setFaceTrackingEnabled] = useState(true);
@@ -311,10 +320,6 @@ export function MainApp({
     }
   }, [result, setResult, handleResetVideo]);
 
-  const handleTimeUpdate = useCallback((time: number) => {
-    setCurrentTime(time);
-  }, []);
-
   const handleModeChange = useCallback((value: "word" | "phrase") => {
     setMode(value);
   }, []);
@@ -385,39 +390,65 @@ export function MainApp({
   }, [result, selectedWordTimestamp]);
 
   // Get current phrase words for the word chip bar
-  const currentPhraseWords = useMemo(() => {
+  // Pre-compute phrase chunks once per transcript/mode change (not per frame)
+  const processedPhraseChunks = useMemo(() => {
     if (!result || mode !== "phrase") return [];
-    const chunks = processTranscriptChunks(
+    return processTranscriptChunks(
       result,
       "phrase",
       subtitleStyle.maxWordsPerLine,
       subtitleStyle.dynamicEnabled,
     );
-    const activeChunk = chunks.find(
-      (c) => currentTime >= c.timestamp[0] && currentTime <= c.timestamp[1],
-    );
-    if (!activeChunk?.words) return [];
-    return activeChunk.words.filter((w) => {
-      const original = result.chunks.find(
-        (oc) =>
-          oc.timestamp[0] === w.timestamp[0] &&
-          oc.timestamp[1] === w.timestamp[1],
-      );
-      return !original?.disabled && !original?.subtitleHidden;
-    });
   }, [
     result,
     mode,
     subtitleStyle.maxWordsPerLine,
     subtitleStyle.dynamicEnabled,
-    currentTime,
   ]);
 
-  // Determine if we should show the loading overlay
-  // Don't show overlay when status is 'ready' and we're just waiting for user to transcribe
+  const handleTimeUpdate = useCallback(
+    (time: number) => {
+      // Only call setCurrentTime when the active phrase chunk changes.
+      // This prevents main-app (and all its children) from re-rendering every
+      // 250ms during playback. VideoCaption uses localTime inside VideoUpload
+      // and doesn't need main-app re-renders for subtitle display.
+      if (processedPhraseChunks.length > 0) {
+        const newChunk = binarySearchActiveChunk(processedPhraseChunks, time);
+        const newKey = newChunk
+          ? `${newChunk.timestamp[0]}-${newChunk.timestamp[1]}`
+          : null;
+        if (newKey !== lastChunkKeyRef.current) {
+          lastChunkKeyRef.current = newKey;
+          setCurrentTime(time);
+        }
+      } else {
+        // Word mode or no transcript: update normally (sidebar highlighting)
+        setCurrentTime(time);
+      }
+    },
+    [processedPhraseChunks],
+  );
+
+  // Binary-search for the active chunk on each time update
+  const currentPhraseWords = useMemo(() => {
+    if (!processedPhraseChunks.length) return [];
+    const activeChunk = binarySearchActiveChunk(
+      processedPhraseChunks,
+      currentTime,
+    );
+    if (!activeChunk?.words) return [];
+    return activeChunk.words.filter((w) => !w.disabled && !w.subtitleHidden);
+  }, [processedPhraseChunks, currentTime]);
+
   const isProcessing =
     status !== "idle" && status !== "ready" && progress < 100;
+  // Full blocking overlay during model load / audio extraction / first chunk.
+  // Once partial chunks arrive (result != null) switch to the slim header banner.
+  const isBlockingOverlay = isProcessing && result === null;
+  const isTranscribingBanner = isProcessing && result !== null;
   const statusMessage = STATUS_MESSAGES[status] ?? "Processing video...";
+  const latestTranscribedTime = result?.chunks?.at(-1)?.timestamp?.[1] ?? null;
+  const isLongVideo = (result?.chunks?.at(-1)?.timestamp?.[1] ?? 0) > 30 * 60;
 
   return (
     <main className="flex min-h-screen flex-col relative pb-16 lg:pb-0 bg-white">
@@ -443,7 +474,7 @@ export function MainApp({
               </p>
             </div>
           </div>
-          <div className="flex flex-col sm:flex-row gap-2">
+          <div className="flex flex-col sm:flex-row gap-2 items-center">
             {uploadedFile && !result && (
               <Button
                 onClick={() => setShowLanguageModal(true)}
@@ -454,7 +485,37 @@ export function MainApp({
                 Transcribe Video
               </Button>
             )}
-            {result && (
+            {isTranscribingBanner && (
+              <div className="flex items-center gap-3">
+                <Loader2 className="h-4 w-4 animate-spin text-slate-500 shrink-0" />
+                <span
+                  className="text-sm text-slate-600 font-medium"
+                  style={{ fontFamily: "var(--font-outfit), sans-serif" }}
+                >
+                  Transcribing
+                  {latestTranscribedTime !== null
+                    ? ` ${formatTime(latestTranscribedTime)}`
+                    : ""}{" "}
+                  · {Math.round(progress)}%{" "}
+                  <span
+                    className={
+                      device === "webgpu" ? "text-green-600" : "text-slate-400"
+                    }
+                  >
+                    ({device === "webgpu" ? "WebGPU" : "CPU"})
+                  </span>
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={cancelTranscription}
+                  style={{ fontFamily: "var(--font-outfit), sans-serif" }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            )}
+            {result && status === "ready" && (
               <>
                 <Button
                   onClick={handleChangeLanguage}
@@ -545,7 +606,6 @@ export function MainApp({
                             mode={mode}
                             onModeChange={handleModeChange}
                             bgRemovalReady={bgRemovalReady}
-                            isFaceTrackingActive={faceTrackingEnabled}
                             ratio={ratio}
                           />
                         </div>
@@ -589,10 +649,55 @@ export function MainApp({
                             mode={mode}
                             maxWordsPerLine={subtitleStyle.maxWordsPerLine}
                             dynamicEnabled={subtitleStyle.dynamicEnabled}
+                            videoFileName={uploadedFile?.name}
                           />
                         </div>
                       </ScrollArea>
                     </div>
+                    {isTranscribingBanner && (
+                      <div className="border-t border-amber-200 bg-amber-50 px-4 py-3 flex flex-col gap-2 shrink-0">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Loader2 className="h-4 w-4 animate-spin text-amber-600 shrink-0" />
+                            <span
+                              className="text-sm text-amber-800 font-semibold"
+                              style={{
+                                fontFamily: "var(--font-outfit), sans-serif",
+                              }}
+                            >
+                              Transcribing
+                              {latestTranscribedTime !== null
+                                ? ` ${formatTime(latestTranscribedTime)}`
+                                : ""}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`text-xs font-medium ${device === "webgpu" ? "text-green-600" : "text-slate-400"}`}
+                              style={{
+                                fontFamily: "var(--font-outfit), sans-serif",
+                              }}
+                            >
+                              {device === "webgpu" ? "WebGPU" : "CPU"}
+                            </span>
+                            <span
+                              className="text-sm font-bold text-amber-700"
+                              style={{
+                                fontFamily: "var(--font-outfit), sans-serif",
+                              }}
+                            >
+                              {Math.round(progress)}%
+                            </span>
+                          </div>
+                        </div>
+                        <div className="w-full bg-amber-100 rounded-full h-1.5 overflow-hidden">
+                          <div
+                            className="bg-amber-500 h-1.5 rounded-full transition-all duration-500"
+                            style={{ width: `${progress}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </SheetContent>
                 </Sheet>
               </>
@@ -610,7 +715,6 @@ export function MainApp({
                         mode={mode}
                         onModeChange={handleModeChange}
                         bgRemovalReady={bgRemovalReady}
-                        isFaceTrackingActive={isFaceTrackingActive}
                         ratio={ratio}
                       />
                     </div>
@@ -746,7 +850,10 @@ export function MainApp({
                         onClick={() => {
                           setFaceTrackingEnabled((prev) => {
                             if (prev) {
-                              setSubtitleStyle((s) => ({ ...s, splitSubtitleMode: "none" }));
+                              setSubtitleStyle((s) => ({
+                                ...s,
+                                splitSubtitleMode: "none",
+                              }));
                             }
                             return !prev;
                           });
@@ -847,6 +954,22 @@ export function MainApp({
                         {device === "webgpu" ? "WebGPU" : "WASM"})
                       </div>
                     )}
+                    {isLongVideo && !isDownloadProcessing && (
+                      <div
+                        className="w-full max-w-md rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 space-y-1"
+                        style={{ fontFamily: "var(--font-outfit), sans-serif" }}
+                      >
+                        <p className="font-semibold">Long video detected</p>
+                        <p className="text-amber-700 leading-snug">
+                          Encoding in the browser can take a very long time for
+                          videos over 30 minutes. Consider exporting subtitles
+                          as <strong>SRT</strong> from the transcript panel and
+                          using a desktop app (e.g. HandBrake, VLC) to burn them
+                          in, or watch the video in any media player that
+                          supports .srt files.
+                        </p>
+                      </div>
+                    )}
                     <Button
                       onClick={downloadVideo}
                       className="flex items-center gap-2 rounded-lg bg-slate-900 text-white font-semibold hover:bg-slate-800 shadow-sm"
@@ -897,8 +1020,10 @@ export function MainApp({
 
               {/* Transcript Sidebar - Hidden on mobile, shown on desktop */}
               {result && (
-                <div className="hidden lg:block w-full lg:w-96 h-[560px]">
-                  <ScrollArea className="rounded-2xl h-[560px] w-full border border-slate-200/80 bg-white p-4 shadow-lg shadow-slate-200/40">
+                <div className="hidden lg:flex lg:flex-col w-full lg:w-96 h-[560px]">
+                  <ScrollArea
+                    className={`flex-1 w-full border border-slate-200/80 bg-white p-4 shadow-lg shadow-slate-200/40 ${isTranscribingBanner ? "rounded-t-2xl" : "rounded-2xl"}`}
+                  >
                     <div className="mb-4 pb-2 border-b border-slate-100">
                       <h4
                         className="text-base font-semibold text-slate-900"
@@ -932,8 +1057,53 @@ export function MainApp({
                       mode={mode}
                       maxWordsPerLine={subtitleStyle.maxWordsPerLine}
                       dynamicEnabled={subtitleStyle.dynamicEnabled}
+                      videoFileName={uploadedFile?.name}
                     />
                   </ScrollArea>
+                  {isTranscribingBanner && (
+                    <div className="rounded-b-2xl border border-t-0 border-amber-200 bg-amber-50 shadow-lg shadow-slate-200/40 px-4 py-3 flex flex-col gap-2 shrink-0">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Loader2 className="h-4 w-4 animate-spin text-amber-600 shrink-0" />
+                          <span
+                            className="text-sm text-amber-800 font-semibold"
+                            style={{
+                              fontFamily: "var(--font-outfit), sans-serif",
+                            }}
+                          >
+                            Transcribing
+                            {latestTranscribedTime !== null
+                              ? ` ${formatTime(latestTranscribedTime)}`
+                              : ""}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`text-xs font-medium ${device === "webgpu" ? "text-green-600" : "text-slate-400"}`}
+                            style={{
+                              fontFamily: "var(--font-outfit), sans-serif",
+                            }}
+                          >
+                            {device === "webgpu" ? "WebGPU" : "CPU"}
+                          </span>
+                          <span
+                            className="text-sm font-bold text-amber-700"
+                            style={{
+                              fontFamily: "var(--font-outfit), sans-serif",
+                            }}
+                          >
+                            {Math.round(progress)}%
+                          </span>
+                        </div>
+                      </div>
+                      <div className="w-full bg-amber-100 rounded-full h-1.5 overflow-hidden">
+                        <div
+                          className="bg-amber-500 h-1.5 rounded-full transition-all duration-500"
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -941,9 +1111,10 @@ export function MainApp({
         </div>
       </section>
 
-      {/* Processing Overlay */}
+      {/* Processing Overlay — blocks UI during model load and audio extraction.
+          Hidden once the first transcription chunk arrives (result != null). */}
       <ProcessingOverlay
-        isVisible={isProcessing}
+        isVisible={isBlockingOverlay}
         statusMessage={statusMessage}
         progress={progress}
         canCancel={status !== "idle" && status !== "ready"}

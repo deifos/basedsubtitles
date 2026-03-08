@@ -1,165 +1,175 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# BasedSubtitles
+
+AI-powered subtitle generator that runs 100% in your browser. No uploads, no servers, no accounts.
+
+- Transcribes video audio using [Whisper.js](https://huggingface.co/docs/transformers.js) (WebGPU/WASM)
+- Exports MP4 with subtitles baked in using [Mediabunny](https://mediabunny.dev/)
+- Works offline after first load (models are cached by the browser)
+
+Live at [basedsubs.getbasedapps.com](https://basedsubs.getbasedapps.com)
+
+## Features
+
+- **100% local** — audio never leaves your device
+- **100+ languages** — Whisper multilingual models (tiny/base/small)
+- **25+ Google Fonts** — Bangers, Bebas Neue, Permanent Marker, Montserrat, and more
+- **Per-word styling** — override font, size, color, and effects on individual words
+- **Emoji replace / overlay** — swap a word for an emoji or float one above it
+- **Background removal** — AI person segmentation, runs locally via Web Worker
+- **3D depth effect** — subtitles render behind or in front of the detected person
+- **Face tracking** — MediaPipe Blaze Face, real-time EMA-smoothed position
+- **Split subtitle mode** — phrase words placed above/below or left/right of the face
+- **Display on Spoken** — words light up as each one is spoken (karaoke style)
+- **Portrait / landscape** — 9:16 and 16:9 export with portrait zoom/crop
+- **Camera recording** — record directly from front or back camera
+- **MP4 export** — baked subtitles, H.264 + AAC, 30fps
 
 ## Getting Started
 
-First, run the development server:
-
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-## Domain
-
-https://basedsubs.getbasedapps.com
+```bash
+npm run build   # production build
+npm run lint    # ESLint
+npm run format  # Prettier
+```
 
 ## Architecture
 
 ### Subtitle Generation
 
-Uses [Transformers.js](https://huggingface.co/docs/transformers.js) with OpenAI Whisper models running entirely in the browser (WebGPU/WASM). No server-side processing.
-
-**Flow:**
+Whisper models run in a dedicated Web Worker (`app/worker.ts`) via `@huggingface/transformers`. Audio is extracted from the video file client-side and passed as a `Float32Array`. No network requests occur after the model is cached.
 
 ```
-Video File → Extract Audio (Web Worker) → Whisper Transcription → TranscriptChunks[]
+Video File → audio-utils (Web Worker) → Float32Array → Whisper Worker → TranscriptChunks[]
 ```
 
-**Models Available:**
+Models available:
+| Name | Size | Notes |
+|------|------|-------|
+| Tiny | ~75 MB | Fastest |
+| Base | ~150 MB | Default |
+| Small | ~500 MB | Most accurate |
 
-- Tiny (~75MB) - Fastest, lower accuracy
-- Base (~150MB) - Balanced (default)
-- Small (~500MB) - Most accurate, slower
+#### Streaming transcription — how it works
 
-**Language Support:** 100+ languages via Whisper's multilingual models.
+The `@huggingface/transformers` ASR pipeline processes the whole audio then merges at the end, with no built-in way to get partial results per chunk. To support long videos and live previews, `app/worker.ts` replicates the pipeline's internal `_call_whisper` loop directly:
+
+1. **Chunk the audio** using the same 30s window / 5s stride / 20s jump that the pipeline uses internally.
+2. **Call `model.generate()`** on each chunk with:
+   - `return_timestamps: true` — embeds timestamp tokens in the output sequence. `_decode_asr` requires these to detect where each chunk's usable region starts and ends (stride filtering via `first_timestamp` / `last_timestamp`). Without them, multi-chunk merging silently skips content.
+   - `return_token_timestamps: true` — uses DTW cross-attention alignment to produce per-token timestamps, enabling word-level output from `_decode_asr`.
+3. **Call `tokenizer._decode_asr(processedSoFar, { return_timestamps: "word" })`** after each chunk. This does stride-aware merging of all chunks processed so far and posts a partial `update` result to the main thread.
+4. After all chunks are processed, the final `_decode_asr` call produces the complete transcript.
+
+This approach gives accuracy identical to the single full pipeline call (same chunking math, same merge logic) while streaming word-level results chunk by chunk.
+
+#### Why not use the high-level pipeline call?
+
+`transcriber(audio, { chunk_length_s: 30, stride_length_s: 5 })` processes all chunks, then merges once at the end. The old `@xenova/transformers` library exposed a `chunk_callback` fired after each internal chunk; `@huggingface/transformers` does not. Replicating the internal loop is the only way to stream results.
 
 ### Background Removal
 
-AI person segmentation using a dedicated Web Worker. Processes video frames locally to generate masks for separating the person from the background.
-
-**Flow:**
+A second Web Worker runs AI person segmentation on video frames and returns masks at 5fps. The masks are cached and reused at 30fps during both preview and export.
 
 ```
-Video Frames → Background Removal Worker → Segmentation Masks → Composited Output
+Video Frames → BG Removal Worker → Masks[] → Composited Canvas
 ```
 
-**Features:**
+### Face Tracking
 
-- Enable/disable background removal on processed video
-- "Subtitle behind person" mode — text renders behind the detected person
-- Dynamic 3D subtitle effects with front/back text layering
+MediaPipe Blaze Face runs in the main thread, scanning frames at ~5fps. Position is smoothed with an EMA filter (α = 0.15). During export, a 150ms lookahead compensates for EMA phase lag.
 
-### Video Export (Mediabunny)
+### Rendering Pipeline
 
-Uses [Mediabunny](https://github.com/nickspaargaren/mediabunny) for rendering subtitles directly onto video frames and exporting as MP4.
+| Mode                          | How                                                            |
+| ----------------------------- | -------------------------------------------------------------- |
+| Plain preview                 | DOM `VideoCaption` component (CSS + HTML)                      |
+| Compositing (BG removal / 3D) | Canvas loop → `lib/render-subtitle.ts`                         |
+| Export                        | `hooks/useVideoDownloadMediaBunny.ts` internal canvas renderer |
 
-**Flow:**
+The preview and export renderers share font resolution logic via `lib/font-config.ts`.
+
+### Video Export
+
+Mediabunny renders each frame to an offscreen canvas, composites subtitles (and optionally masks), then encodes to MP4. Export is capped at 1080p on mobile to stay within canvas memory limits.
 
 ```
-Video + Subtitles + Masks → Frame-by-frame rendering → Mediabunny (MP4) → Download
+Video + Subtitles + Masks → frame-by-frame canvas render → Mediabunny → MP4 download
 ```
 
-**Export Features:**
-
-- Baked-in subtitles (permanently rendered into the video)
-- Landscape (16:9) and portrait (9:16) aspect ratios
-- Portrait zoom mode for cropping
-- Background removal compositing during export
-- High quality 30fps MP4 output
-
-### Project Structure
+## Project Structure
 
 ```
 app/
-  page.tsx                  # Home page (renders AppRoot)
-  layout.tsx                # Root layout with 25+ Google Fonts
-  worker.ts                 # Transcription Web Worker (Whisper.js)
-  bg-removal-worker.ts      # Background removal Web Worker
-  sitemap.ts                # SEO sitemap
-  changelog/
-    page.tsx                # Changelog page
+  page.tsx                    # Home page
+  layout.tsx                  # Root layout (Google Fonts, analytics)
+  worker.ts                   # Transcription Web Worker (Whisper)
+  bg-removal-worker.ts        # Background removal Web Worker
+  changelog/page.tsx          # Changelog page
 
 components/
-  app-root.tsx              # State toggle: Landing ↔ Editor
-  main-app.tsx              # Main editor application
-  site-footer.tsx           # Footer (Built by Vlad, version, getbasedapps)
-  buy-me-coffee.tsx         # Floating coffee button
-  video-upload.tsx          # Video player with subtitle overlay
-  video-caption.tsx         # Subtitle rendering on canvas
-  subtitle-styling.tsx      # Full styling controls panel
-  transcript-sidebar.tsx    # Editable transcript list
-  transcript.tsx            # Transcript data display
-  processing-overlay.tsx    # Loading overlay with progress
-  language-selector.tsx     # Language dropdown
-  language-selection-modal.tsx # Modal for language + model selection
-  landing-page/
-    landing-page.tsx        # Landing page composition
-    landing-header.tsx      # Header with nav
-    landing-hero.tsx        # Hero section with dropzone
-    landing-dropzone.tsx    # Drag-and-drop video upload
-    landing-features.tsx    # Feature highlights grid
-    landing-local.tsx       # "Runs locally" section
-    landing-how-it-works.tsx # 3-step flow
-    landing-cta.tsx         # Call to action
-  ui/                       # Radix UI components (shadcn/ui)
+  main-app.tsx                # Main editor — all state lives here
+  video-upload.tsx            # Video player + compositing canvas
+  video-caption.tsx           # DOM subtitle renderer
+  subtitle-styling.tsx        # Style controls panel
+  transcript-sidebar.tsx      # Editable transcript list
+  word-style-popover.tsx      # Per-word style overrides
+  landing-page/               # Landing page components
+  ui/                         # shadcn/ui primitives
 
 hooks/
-  useTranscription.ts       # Whisper transcription via Web Worker
-  useBackgroundRemoval.ts   # Background removal via Web Worker
-  useVideoDownloadMediaBunny.ts # Video export with Mediabunny
+  useTranscription.ts         # Whisper via Web Worker
+  useBackgroundRemoval.ts     # BG removal via Web Worker
+  useFaceTracking.ts          # MediaPipe face detection
+  useVideoDownloadMediaBunny.ts # Video export
+  useCameraRecording.ts       # Camera input
 
 lib/
-  changelog.ts              # Version constant & changelog data
-  audio-utils.ts            # Audio extraction utilities
-  render-subtitle.ts        # Subtitle rendering to canvas
-  utils.ts                  # Shared utilities (cn, etc.)
+  font-config.ts              # Shared font map (CSS vars → canvas names)
+  render-subtitle.ts          # Canvas subtitle rendering (preview)
+  person-tracking.ts          # Face position interpolation
+  audio-utils.ts              # Audio extraction
+  utils.ts                    # cn(), formatTime(), processTranscriptChunks()
+  changelog.ts                # Version history data
 ```
 
-### Dependencies
+## Adding a Font
 
-#### Production
+1. Add the Google Font import to `app/layout.tsx`
+2. Add the CSS variable → font name entry to `lib/font-config.ts`
+3. Add the font as an option in `components/subtitle-styling.tsx`
 
-| Package                       | Purpose                                   |
-| ----------------------------- | ----------------------------------------- |
-| `@huggingface/transformers`   | Whisper AI models for local transcription |
-| `@radix-ui/react-dialog`      | Dialog/modal components                   |
-| `@radix-ui/react-progress`    | Progress bar                              |
-| `@radix-ui/react-scroll-area` | Scrollable areas                          |
-| `@radix-ui/react-select`      | Select dropdowns                          |
-| `@radix-ui/react-slider`      | Slider controls                           |
-| `@radix-ui/react-slot`        | Radix slot utility                        |
-| `@radix-ui/react-switch`      | Toggle switches                           |
-| `@radix-ui/react-tabs`        | Tab components                            |
-| `class-variance-authority`    | CSS class composition                     |
-| `clsx`                        | Conditional class concatenation           |
-| `lucide-react`                | Icon library                              |
-| `mediabunny`                  | Video encoding/export (MP4)               |
-| `next`                        | React framework (v15)                     |
-| `react` / `react-dom`         | React (v19)                               |
-| `tailwind-merge`              | Tailwind class deduplication              |
+## Contributing
 
-#### Development
+Pull requests are welcome. For larger changes, open an issue first to discuss the approach.
 
-| Package                             | Purpose                      |
-| ----------------------------------- | ---------------------------- |
-| `@eslint/eslintrc`                  | ESLint configuration         |
-| `@tailwindcss/postcss`              | Tailwind CSS PostCSS plugin  |
-| `@types/node`                       | Node.js type definitions     |
-| `@types/react` / `@types/react-dom` | React type definitions       |
-| `eslint` / `eslint-config-next`     | Linting                      |
-| `tailwindcss`                       | Utility CSS framework (v4)   |
-| `tw-animate-css`                    | Tailwind animation utilities |
-| `typescript`                        | TypeScript compiler          |
+```bash
+npm run lint         # check for lint errors
+npm run format:check # check formatting
+npm run format       # auto-fix formatting
+```
 
-## Deploy on Vercel
+## Dependencies
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| Package                     | Purpose                          |
+| --------------------------- | -------------------------------- |
+| `@huggingface/transformers` | Whisper AI transcription (local) |
+| `@mediapipe/tasks-vision`   | Face detection                   |
+| `mediabunny`                | MP4 video encoding               |
+| `next`                      | React framework (v15)            |
+| `react` / `react-dom`       | React v19                        |
+| `@radix-ui/*`               | Accessible UI primitives         |
+| `emoji-picker-react`        | Emoji picker                     |
+| `lucide-react`              | Icons                            |
+| `sonner`                    | Toast notifications              |
+| `tailwindcss`               | Utility CSS (v4)                 |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## License
+
+MIT — see [LICENSE](./LICENSE).

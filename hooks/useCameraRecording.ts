@@ -283,6 +283,7 @@ export function useCameraRecording(): UseCameraRecordingReturn {
       );
       setState("error");
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, clearFrameInterval]);
 
   const stopRecording = useCallback(async () => {
@@ -424,7 +425,6 @@ export function useCameraRecording(): UseCameraRecordingReturn {
         outputRef.current.cancel();
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return {

@@ -78,7 +78,7 @@ export function LandingDropzone({
 
   return (
     <div
-      className={`group relative rounded-xl border-2 border-dashed p-6 shadow-sm transition-all focus-within:outline-none sm:p-8 ${
+      className={`group relative rounded-xl border-2 border-dashed p-4 shadow-sm transition-all focus-within:outline-none ${
         isDragOver
           ? "border-amber-400 bg-amber-50/60 scale-[1.02]"
           : "border-slate-300 bg-white hover:border-slate-400"
@@ -101,20 +101,20 @@ export function LandingDropzone({
           onCancel={() => setShowCamera(false)}
         />
       ) : (
-        <div className="flex flex-col items-center justify-center py-10 text-center sm:py-14">
-          <div className="relative flex h-16 w-16 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700">
-            <Film className="h-7 w-7" strokeWidth={1.5} />
-            <div className="pointer-events-none absolute -bottom-1.5 -right-1.5 flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-white shadow-sm ring-2 ring-white">
-              <Plus className="h-4 w-4" strokeWidth={1.5} />
+        <div className="flex flex-col items-center justify-center py-5 text-center">
+          <div className="relative flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700">
+            <Film className="h-5 w-5" strokeWidth={1.5} />
+            <div className="pointer-events-none absolute -bottom-1.5 -right-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-white shadow-sm ring-2 ring-white">
+              <Plus className="h-3 w-3" strokeWidth={1.5} />
             </div>
           </div>
-          <h2 className="mt-5 text-xl font-semibold tracking-tight text-slate-900">
+          <h2 className="mt-3 text-base font-semibold tracking-tight text-slate-900">
             Drop a video here
           </h2>
-          <p className="mt-2 text-sm text-slate-600">
-            MP4, MOV, WebM • up to ~2 hours • processed locally in your browser
+          <p className="mt-1 text-xs text-slate-500">
+            MP4, MOV, WebM • processed locally in your browser
           </p>
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
             <button
               type="button"
               onClick={openFilePicker}

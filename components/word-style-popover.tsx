@@ -165,9 +165,7 @@ export function WordStylePopover({
 
   const renderFontSection = () => (
     <div className="space-y-1.5">
-      {!compact && (
-        <label className="text-xs font-medium text-slate-600 block">Font</label>
-      )}
+      {!compact && <p className="text-xs font-medium text-slate-600">Font</p>}
       <Select
         value={override.fontFamily ?? "__none__"}
         onValueChange={handleFontFamilyChange}
@@ -202,9 +200,7 @@ export function WordStylePopover({
   const renderSizeSection = () => (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        {!compact && (
-          <label className="text-xs font-medium text-slate-600">Size</label>
-        )}
+        {!compact && <p className="text-xs font-medium text-slate-600">Size</p>}
         <span className="text-xs text-slate-400 tabular-nums">
           {sizePercent}%
         </span>
@@ -227,11 +223,7 @@ export function WordStylePopover({
 
   const renderColorSection = () => (
     <div className="space-y-1.5">
-      {!compact && (
-        <label className="text-xs font-medium text-slate-600 block">
-          Color
-        </label>
-      )}
+      {!compact && <p className="text-xs font-medium text-slate-600">Color</p>}
       <div className="flex items-center gap-2">
         <DebouncedColorInput
           value={override.color ?? "#FFFFFF"}
@@ -259,11 +251,7 @@ export function WordStylePopover({
 
   const renderEffectSection = () => (
     <div className="space-y-1.5">
-      {!compact && (
-        <label className="text-xs font-medium text-slate-600 block">
-          Effect
-        </label>
-      )}
+      {!compact && <p className="text-xs font-medium text-slate-600">Effect</p>}
       <button
         onClick={handleToggleKnockout}
         className={cn(
@@ -283,9 +271,7 @@ export function WordStylePopover({
       {/* Emoji Replace */}
       <div className="space-y-1.5">
         {!compact && (
-          <label className="text-xs font-medium text-slate-600 block">
-            Emoji Replace
-          </label>
+          <p className="text-xs font-medium text-slate-600">Emoji Replace</p>
         )}
         <div className="flex items-center gap-2">
           <button
@@ -458,7 +444,9 @@ export function WordStylePopover({
           className,
         )}
         style={{ fontFamily: "var(--font-outfit), sans-serif" }}
+        role="none"
         onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between mb-2">
@@ -526,7 +514,9 @@ export function WordStylePopover({
       style={{
         fontFamily: "var(--font-outfit), sans-serif",
       }}
+      role="none"
       onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => e.stopPropagation()}
     >
       {/* Header */}
       <div className="flex items-center justify-between mb-3">

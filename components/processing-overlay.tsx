@@ -10,6 +10,7 @@ interface ProcessingOverlayProps {
   progress: number;
   canCancel?: boolean;
   onCancel?: () => void;
+  liveText?: string;
 }
 
 export function ProcessingOverlay({
@@ -18,6 +19,7 @@ export function ProcessingOverlay({
   progress,
   canCancel = false,
   onCancel,
+  liveText,
 }: ProcessingOverlayProps) {
   if (!isVisible) return null;
 
@@ -33,6 +35,14 @@ export function ProcessingOverlay({
               {`${Math.round(progress)}% complete`}
             </p>
           </div>
+          {/* Live transcription preview — grows token by token while Whisper runs */}
+          {liveText && (
+            <div className="w-full max-h-40 overflow-y-auto rounded-md bg-slate-50 border border-slate-200 p-3">
+              <p className="text-xs text-slate-700 leading-relaxed font-mono whitespace-pre-wrap">
+                {liveText}
+              </p>
+            </div>
+          )}
           {canCancel && onCancel && (
             <Button variant="default" onClick={onCancel} className="w-full">
               Stop processing

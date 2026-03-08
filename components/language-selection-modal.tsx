@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -59,14 +59,8 @@ export function LanguageSelectionModal({
     useState<ModelSize>(defaultModelSize);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Sync with defaults when modal opens
-  useEffect(() => {
-    if (open) {
-      setSelectedLanguage(defaultLanguage);
-      setSelectedModelSize(defaultModelSize);
-      setIsProcessing(false);
-    }
-  }, [open, defaultLanguage, defaultModelSize]);
+  // Radix Dialog unmounts DialogContent when closed, so state resets naturally
+  // on each open — no effect needed to sync with defaultLanguage/defaultModelSize.
 
   const handleConfirm = () => {
     setIsProcessing(true);
@@ -90,7 +84,7 @@ export function LanguageSelectionModal({
           />
 
           <div className="space-y-2">
-            <label className="text-sm font-medium block">Model Size</label>
+            <p className="text-sm font-medium">Model Size</p>
             <div className="grid grid-cols-3 gap-2">
               {MODEL_SIZE_OPTIONS.map((option) => {
                 const isActive = selectedModelSize === option.value;

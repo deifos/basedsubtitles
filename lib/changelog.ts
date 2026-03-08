@@ -8,7 +8,7 @@
  * - PATCH: Bug fixes and small improvements
  */
 
-export const APP_VERSION = "2.0.0";
+export const APP_VERSION = "2.1.0";
 
 export interface ChangelogEntry {
   version: string;
@@ -21,6 +21,68 @@ export interface ChangelogEntry {
 }
 
 export const changelog: ChangelogEntry[] = [
+  {
+    version: "2.1.0",
+    date: "2026-03-08",
+    title: "Streaming Transcription & Long Video Support",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Streaming transcription — partial results appear chunk by chunk as Whisper processes the audio instead of waiting for the full video to finish",
+      },
+      {
+        type: "added",
+        description:
+          "Live subtitle preview updates in the transcript sidebar while transcription is still running",
+      },
+      {
+        type: "added",
+        description:
+          "Non-blocking UI after the first chunk arrives — blocking overlay replaced by a slim in-header progress indicator so you can see partial subtitles in real time",
+      },
+      {
+        type: "added",
+        description:
+          "Transcribing banner in the transcript sidebar (amber, with spinner and progress bar) pinned below the scroll area so it stays visible while reading results",
+      },
+      {
+        type: "added",
+        description:
+          "Transcribing banner now shows the current timestamp being processed (e.g. Transcribing 0:42 · 73%) so you can track progress without scrolling",
+      },
+      {
+        type: "changed",
+        description:
+          "Long video support is now reliable — transcription uses the same 30s / 5s stride chunking that the Whisper reference implementation uses, with stride-aware multi-chunk merging via _decode_asr",
+      },
+      {
+        type: "changed",
+        description:
+          "Whisper worker now replicates the pipeline's internal _call_whisper loop (model.generate() per chunk + tokenizer._decode_asr() for merging) instead of calling the high-level pipeline function, giving identical accuracy with streaming output",
+      },
+      {
+        type: "fixed",
+        description:
+          "Transcription was silently skipping sections of audio in videos longer than ~30 seconds — caused by sending the full audio in one call without stride-aware chunking",
+      },
+      {
+        type: "fixed",
+        description:
+          "Multi-chunk merging was incorrectly concatenating chunks instead of filtering stride overlap regions — fixed by enabling return_timestamps so timestamp tokens are present for _decode_asr's stride filtering logic",
+      },
+      {
+        type: "fixed",
+        description:
+          "Subtitle file downloads used a generic filename (subtitles.srt) regardless of the source video — now uses the video filename as the base (e.g. my-clip.srt)",
+      },
+      {
+        type: "removed",
+        description:
+          "Removed 'Add Subtitle' manual entry form from the transcript sidebar — no longer needed now that transcription accuracy covers the full video without gaps",
+      },
+    ],
+  },
   {
     version: "2.0.0",
     date: "2026-03-06",
