@@ -10,7 +10,7 @@ import {
   type ProcessedWord,
 } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Edit, Ban, EyeOff, SkipForward } from "lucide-react";
+import { Edit, Ban, EyeOff, SkipForward, Filter } from "lucide-react";
 
 interface TranscriptChunk {
   text: string;
@@ -51,6 +51,7 @@ export function TranscriptSidebar({
 }: TranscriptSidebarProps) {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editText, setEditText] = useState("");
+  const [hideSkipped, setHideSkipped] = useState(false);
   const transcriptContainerRef = useRef<HTMLDivElement>(null);
   const activeChunkRef = useRef<HTMLDivElement | null>(null);
 
@@ -325,6 +326,40 @@ export function TranscriptSidebar({
 
   return (
     <div className={`flex flex-col h-full ${className}`}>
+      {/* Toolbar */}
+      <div className="flex items-center justify-between px-2 pt-2 pb-1">
+        <span className="text-xs text-muted-foreground">
+          {(() => {
+            const skipped = displayChunks.filter((c) => c.disabled).length;
+            const hidden = displayChunks.filter(
+              (c) => !c.disabled && c.subtitleHidden,
+            ).length;
+            const parts = [];
+            if (skipped > 0) parts.push(`${skipped} skipped`);
+            if (hidden > 0) parts.push(`${hidden} hidden`);
+            return parts.length > 0 ? <span>{parts.join(", ")}</span> : null;
+          })()}
+        </span>
+        {displayChunks.some((c) => c.disabled || c.subtitleHidden) && (
+          <button
+            onClick={() => setHideSkipped((v) => !v)}
+            className={`inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs transition-colors ${
+              hideSkipped
+                ? "bg-slate-900 text-white"
+                : "bg-muted text-muted-foreground hover:text-foreground"
+            }`}
+            title={
+              hideSkipped
+                ? "Show all segments"
+                : "Hide skipped and hidden segments"
+            }
+          >
+            <Filter className="h-3 w-3" />
+            {hideSkipped ? "Show all" : "Hide inactive"}
+          </button>
+        )}
+      </div>
+
       <div
         className="flex-1 overflow-y-auto lg:max-h-96"
         ref={transcriptContainerRef}
@@ -337,6 +372,8 @@ export function TranscriptSidebar({
 
             const isDisabled = chunk.disabled ?? false;
             const isHidden = chunk.subtitleHidden ?? false;
+
+            if (hideSkipped && (isDisabled || isHidden)) return null;
 
             return (
               <div

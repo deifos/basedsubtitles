@@ -8,7 +8,7 @@
  * - PATCH: Bug fixes and small improvements
  */
 
-export const APP_VERSION = "2.1.0";
+export const APP_VERSION = "2.2.0";
 
 export interface ChangelogEntry {
   version: string;
@@ -21,6 +21,33 @@ export interface ChangelogEntry {
 }
 
 export const changelog: ChangelogEntry[] = [
+  {
+    version: "2.2.0",
+    date: "2026-03-08",
+    title: "Vertical Offset, Sidebar Cleanup & Open Source",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Vertical offset slider (±50 px) to fine-tune subtitle position above or below the default — applies to preview, canvas compositing, and exported video",
+      },
+      {
+        type: "fixed",
+        description:
+          "Vertical offset now correctly applied during video export — previously the setting was ignored and subtitles always rendered at the default position",
+      },
+      {
+        type: "added",
+        description:
+          '"Hide inactive" toggle in the transcript sidebar — hides both skipped segments (no audio) and hidden-subtitle segments (audio plays, no text) to keep the sidebar clean',
+      },
+      {
+        type: "changed",
+        description:
+          "Project is now open source — source code available on GitHub at github.com/deifos/basedsubtitles",
+      },
+    ],
+  },
   {
     version: "2.1.0",
     date: "2026-03-08",

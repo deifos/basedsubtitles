@@ -8,6 +8,16 @@ AI-powered subtitle generator that runs 100% in your browser. No uploads, no ser
 
 Live at [basedsubs.getbasedapps.com](https://basedsubs.getbasedapps.com)
 
+## AI Models
+
+All models run locally in the browser — no data ever leaves your device.
+
+| Model                             | Task                                            | Library                                   |
+| --------------------------------- | ----------------------------------------------- | ----------------------------------------- |
+| **Whisper** (tiny / base / small) | Speech-to-text transcription, 100+ languages    | `@huggingface/transformers` (WebGPU/WASM) |
+| **MODNet** (`Xenova/modnet`)      | Background removal — person segmentation        | `@huggingface/transformers` (Web Worker)  |
+| **MediaPipe Blaze Face**          | Real-time face detection for subtitle placement | `@mediapipe/tasks-vision`                 |
+
 ## Features
 
 - **100% local** — audio never leaves your device
@@ -75,7 +85,7 @@ This approach gives accuracy identical to the single full pipeline call (same ch
 
 ### Background Removal
 
-A second Web Worker runs AI person segmentation on video frames and returns masks at 5fps. The masks are cached and reused at 30fps during both preview and export.
+A second Web Worker runs **MODNet** (`Xenova/modnet`) for AI person segmentation on video frames and returns masks at 5fps. The masks are cached and reused at 30fps during both preview and export.
 
 ```
 Video Frames → BG Removal Worker → Masks[] → Composited Canvas
@@ -83,7 +93,7 @@ Video Frames → BG Removal Worker → Masks[] → Composited Canvas
 
 ### Face Tracking
 
-MediaPipe Blaze Face runs in the main thread, scanning frames at ~5fps. Position is smoothed with an EMA filter (α = 0.15). During export, a 150ms lookahead compensates for EMA phase lag.
+**MediaPipe Blaze Face** runs in the main thread, scanning frames at ~5fps. Position is smoothed with an EMA filter (α = 0.15). During export, a 150ms lookahead compensates for EMA phase lag.
 
 ### Rendering Pipeline
 

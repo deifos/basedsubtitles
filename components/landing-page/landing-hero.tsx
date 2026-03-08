@@ -2,6 +2,7 @@
 
 import type { JSX } from "react";
 import { ShieldCheck, WifiOff, Sparkles } from "lucide-react";
+import { GitHubIcon } from "@/components/icons/github-icon";
 
 import { LandingDropzone } from "./landing-dropzone";
 
@@ -31,10 +32,19 @@ export function LandingHero({ onVideoSelect }: LandingHeroProps): JSX.Element {
       <div className="mx-auto max-w-7xl px-6">
         {/* Pill badge */}
         <div className="flex justify-center lg:justify-start mb-5 animate-in fade-in slide-in-from-bottom-2 duration-500">
-          <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-4 py-1.5 text-xs font-medium text-slate-600 shadow-sm backdrop-blur-sm">
+          <a
+            href="https://github.com/deifos/basedsubtitles"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-4 py-1.5 text-xs font-medium text-slate-600 shadow-sm backdrop-blur-sm hover:border-slate-300 hover:text-slate-900 transition-colors"
+          >
             <Sparkles className="h-3.5 w-3.5 text-amber-500" strokeWidth={2} />
-            Free &middot; No sign-up &middot; No watermarks
-          </span>
+            Free &middot; No sign-up &middot; No watermarks &middot;{" "}
+            <span className="inline-flex items-center gap-1">
+              <GitHubIcon width={12} height={12} />
+              Open Source
+            </span>
+          </a>
         </div>
 
         {/* Two-column layout */}
@@ -79,6 +89,16 @@ export function LandingHero({ onVideoSelect }: LandingHeroProps): JSX.Element {
                   {text}
                 </span>
               ))}
+              <a
+                href="https://github.com/deifos/basedsubtitles"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-700 transition-colors"
+                style={{ fontFamily: "var(--font-outfit), sans-serif" }}
+              >
+                <GitHubIcon width={12} height={12} />
+                Open source on GitHub
+              </a>
             </div>
 
             {/* Dropzone */}

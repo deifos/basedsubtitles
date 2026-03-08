@@ -78,6 +78,7 @@ const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
   textFadeIn: false,
   brandingWatermark: true,
   splitSubtitleMode: "none",
+  verticalOffset: 0,
 };
 
 export function MainApp({

@@ -528,6 +528,7 @@ export function VideoCaption({
 
   const responsiveFontSize = `clamp(12px, ${style.fontSize * 0.06}vw, ${style.fontSize}px)`;
 
+  const verticalOffset = style.verticalOffset ?? 0;
   const position = style.position ?? "bottom";
   const positionClasses = (() => {
     const isPortrait = ratio === "9:16";
@@ -601,24 +602,28 @@ export function VideoCaption({
                 className={`absolute left-1/2 -translate-x-1/2 text-center pointer-events-none z-10 ${topClass} ${widthClass}`}
                 style={blockStyle}
               >
-                <div className="inline-block px-3 py-2" style={innerStyle}>
-                  <SplitWords
-                    wordTexts={splitWords.slice(0, splitPoint)}
-                    startIdx={0}
-                    {...sharedSplitWordsProps}
-                  />
+                <div style={{ transform: `translateY(${-verticalOffset}px)` }}>
+                  <div className="inline-block px-3 py-2" style={innerStyle}>
+                    <SplitWords
+                      wordTexts={splitWords.slice(0, splitPoint)}
+                      startIdx={0}
+                      {...sharedSplitWordsProps}
+                    />
+                  </div>
                 </div>
               </div>
               <div
                 className={`absolute left-1/2 -translate-x-1/2 text-center pointer-events-none z-10 ${bottomClass} ${widthClass}`}
                 style={blockStyle}
               >
-                <div className="inline-block px-3 py-2" style={innerStyle}>
-                  <SplitWords
-                    wordTexts={splitWords.slice(splitPoint)}
-                    startIdx={splitPoint}
-                    {...sharedSplitWordsProps}
-                  />
+                <div style={{ transform: `translateY(${verticalOffset}px)` }}>
+                  <div className="inline-block px-3 py-2" style={innerStyle}>
+                    <SplitWords
+                      wordTexts={splitWords.slice(splitPoint)}
+                      startIdx={splitPoint}
+                      {...sharedSplitWordsProps}
+                    />
+                  </div>
                 </div>
               </div>
             </>
@@ -689,40 +694,48 @@ export function VideoCaption({
         fontWeight: style.fontWeight,
       }}
     >
-      <div
-        className="inline-block px-3 py-2"
-        style={{
-          backgroundColor: style.backgroundColor,
-          borderRadius:
-            style.backgroundColor && style.backgroundColor !== "transparent"
-              ? "0.5rem"
-              : undefined,
-          ...(hasKnockout ? {} : { transform: "scale(1) translateY(0)" }),
-          opacity: isAnimating ? 1 : 0,
-        }}
-      >
-        <div className="flex flex-col gap-1">
-          {mode === "phrase" && shouldSplitText && !style.dynamicFollowWord ? (
-            <>
-              <span
-                style={{ ...baseTypographyStyles, ...metallicTypographyStyles }}
-              >
-                {line1}
-              </span>
-              {line2 && (
+      {/* Inner wrapper applies Y offset without disturbing Tailwind's translateX centering */}
+      <div style={{ transform: `translateY(${verticalOffset}px)` }}>
+        <div
+          className="inline-block px-3 py-2"
+          style={{
+            backgroundColor: style.backgroundColor,
+            borderRadius:
+              style.backgroundColor && style.backgroundColor !== "transparent"
+                ? "0.5rem"
+                : undefined,
+            ...(hasKnockout ? {} : { transform: "scale(1) translateY(0)" }),
+            opacity: isAnimating ? 1 : 0,
+          }}
+        >
+          <div className="flex flex-col gap-1">
+            {mode === "phrase" &&
+            shouldSplitText &&
+            !style.dynamicFollowWord ? (
+              <>
                 <span
                   style={{
                     ...baseTypographyStyles,
                     ...metallicTypographyStyles,
                   }}
                 >
-                  {line2}
+                  {line1}
                 </span>
-              )}
-            </>
-          ) : (
-            renderPhraseWithHighlight()
-          )}
+                {line2 && (
+                  <span
+                    style={{
+                      ...baseTypographyStyles,
+                      ...metallicTypographyStyles,
+                    }}
+                  >
+                    {line2}
+                  </span>
+                )}
+              </>
+            ) : (
+              renderPhraseWithHighlight()
+            )}
+          </div>
         </div>
       </div>
     </div>

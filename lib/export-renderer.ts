@@ -572,9 +572,10 @@ export function renderSplitSubtitleOnCanvas(
     return;
   }
 
+  const splitOffset = (style.verticalOffset ?? 0) * videoScale;
   if (splitMode === "above-below") {
-    const y1 = canvas.height * (isVerticalVideo ? 0.08 : 0.14);
-    const y2 = canvas.height * (isVerticalVideo ? 0.92 : 0.86);
+    const y1 = canvas.height * (isVerticalVideo ? 0.08 : 0.14) - splitOffset;
+    const y2 = canvas.height * (isVerticalVideo ? 0.92 : 0.86) + splitOffset;
     ctx.textAlign = "center";
     renderTextLine(ctx, line1, canvas.width / 2, y1, style, videoScale);
     renderTextLine(ctx, line2, canvas.width / 2, y2, style, videoScale);
@@ -582,7 +583,7 @@ export function renderSplitSubtitleOnCanvas(
     // left-right — position at eye level (~38% from top)
     const facePixelX = faceX * canvas.width;
     const gap = canvas.width * 0.07;
-    const y = canvas.height * 0.38;
+    const y = canvas.height * 0.38 + splitOffset;
     ctx.textAlign = "right";
     renderTextLine(ctx, line1, facePixelX - gap, y, style, videoScale);
     ctx.textAlign = "left";
@@ -679,17 +680,24 @@ export function renderSubtitle(
 
   // Compute baseY based on position
   const position = style.position ?? "bottom";
+  const scaledOffset = (style.verticalOffset ?? 0) * videoScale;
   let baseY: number;
   switch (position) {
     case "top":
-      baseY = canvas.height * (isVerticalVideo ? 0.06 : 0.12) + totalHeight / 2;
+      baseY =
+        canvas.height * (isVerticalVideo ? 0.06 : 0.12) +
+        totalHeight / 2 +
+        scaledOffset;
       break;
     case "middle":
-      baseY = canvas.height / 2;
+      baseY = canvas.height / 2 + scaledOffset;
       break;
     case "bottom":
     default:
-      baseY = canvas.height - canvas.height * (isVerticalVideo ? 0.08 : 0.16);
+      baseY =
+        canvas.height -
+        canvas.height * (isVerticalVideo ? 0.08 : 0.16) +
+        scaledOffset;
       break;
   }
 

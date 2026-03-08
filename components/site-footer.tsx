@@ -4,6 +4,7 @@ import type { JSX } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { APP_VERSION } from "@/lib/changelog";
+import { GitHubIcon } from "@/components/icons/github-icon";
 
 export function SiteFooter(): JSX.Element {
   return (
@@ -38,6 +39,17 @@ export function SiteFooter(): JSX.Element {
             >
               v{APP_VERSION}
             </Link>
+            <span className="hidden sm:inline text-black/20">&bull;</span>
+            <a
+              href="https://github.com/deifos/basedsubtitles"
+              className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-black/40 hover:text-black transition-colors"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="GitHub repository"
+            >
+              <GitHubIcon width={14} height={14} />
+              GitHub
+            </a>
           </div>
 
           <div className="flex flex-wrap items-center justify-center sm:justify-end gap-2 sm:gap-3">

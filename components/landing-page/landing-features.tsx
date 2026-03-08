@@ -10,6 +10,7 @@ import {
   BadgeCheck,
   Globe,
   Sparkles,
+  Eraser,
 } from "lucide-react";
 
 export function LandingFeatures(): JSX.Element {
@@ -145,6 +146,50 @@ export function LandingFeatures(): JSX.Element {
             >
               Split subtitles above and below the speaker, or left and right —
               powered by face tracking.
+            </p>
+          </div>
+
+          {/* Background Removal */}
+          <div className="group relative rounded-2xl border border-slate-200/80 bg-gradient-to-br from-rose-50 to-white p-6 shadow-sm transition-all hover:shadow-lg hover:shadow-rose-100/60 hover:-translate-y-0.5 overflow-hidden">
+            <div className="relative w-full h-28 rounded-xl bg-rose-100/50 flex items-center justify-center mb-4 overflow-hidden">
+              {/* Person silhouette with removed background effect */}
+              <div
+                className="absolute inset-0 rounded-xl"
+                style={{
+                  backgroundImage:
+                    "radial-gradient(circle, #fca5a5 1px, transparent 1px)",
+                  backgroundSize: "10px 10px",
+                  opacity: 0.4,
+                }}
+              />
+              <div className="relative z-10 flex items-center justify-center">
+                <div className="w-14 h-20 rounded-t-full bg-rose-300/60 flex items-end justify-center">
+                  <div className="w-10 h-12 bg-rose-400/50 rounded-t-lg" />
+                </div>
+              </div>
+              <Eraser
+                className="absolute bottom-2 right-3 h-5 w-5 text-rose-400/70"
+                strokeWidth={1.4}
+              />
+              <span
+                className="absolute bottom-2 left-3 text-[10px] font-bold text-rose-600/60 select-none"
+                style={{ fontFamily: "var(--font-geist-mono), monospace" }}
+              >
+                MODNet · local AI
+              </span>
+            </div>
+            <h3
+              className="text-sm font-bold text-slate-900"
+              style={{ fontFamily: "var(--font-outfit), sans-serif" }}
+            >
+              Background Removal
+            </h3>
+            <p
+              className="mt-1.5 text-xs text-slate-500 leading-relaxed"
+              style={{ fontFamily: "var(--font-outfit), sans-serif" }}
+            >
+              Remove or blur the background with AI — runs entirely in your
+              browser, no uploads.
             </p>
           </div>
 

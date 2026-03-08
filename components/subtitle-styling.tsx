@@ -68,6 +68,7 @@ export interface SubtitleStyle {
   textFadeIn: boolean; // letter-by-letter fade-in effect
   brandingWatermark: boolean; // show "basedsubs.getbasedapps.com" watermark
   splitSubtitleMode: "none" | "above-below" | "left-right"; // split subtitle around head
+  verticalOffset: number; // fine-tune vertical position in px, range -50..+50 (positive = down)
 }
 
 interface SubtitleStylingProps {
@@ -629,12 +630,9 @@ export function SubtitleStyling({
             <label className="text-sm font-medium block">Font Size</label>
             <Slider
               value={[fontSizeSliderIndex]}
-              onValueChange={(values) => {
-                onChange({
-                  ...style,
-                  fontSize: sliderIndexToFontSize(values[0]),
-                });
-              }}
+              onValueChange={([v]) =>
+                onChange({ ...style, fontSize: sliderIndexToFontSize(v) })
+              }
               min={0}
               max={2}
               step={1}
@@ -690,9 +688,9 @@ export function SubtitleStyling({
               </div>
               <Slider
                 value={[style.dynamicFontSize]}
-                onValueChange={(values) => {
-                  onChange({ ...style, dynamicFontSize: values[0] });
-                }}
+                onValueChange={([v]) =>
+                  onChange({ ...style, dynamicFontSize: v })
+                }
                 min={30}
                 max={160}
                 step={2}
@@ -713,9 +711,9 @@ export function SubtitleStyling({
               </div>
               <Slider
                 value={[style.dynamicYPosition]}
-                onValueChange={(values) => {
-                  onChange({ ...style, dynamicYPosition: values[0] });
-                }}
+                onValueChange={([v]) =>
+                  onChange({ ...style, dynamicYPosition: v })
+                }
                 min={5}
                 max={95}
                 step={1}
@@ -742,9 +740,9 @@ export function SubtitleStyling({
                 </div>
                 <Slider
                   value={[style.dynamicFrontFontSize]}
-                  onValueChange={(values) => {
-                    onChange({ ...style, dynamicFrontFontSize: values[0] });
-                  }}
+                  onValueChange={([v]) =>
+                    onChange({ ...style, dynamicFrontFontSize: v })
+                  }
                   min={16}
                   max={80}
                   step={2}
@@ -767,9 +765,9 @@ export function SubtitleStyling({
                 </div>
                 <Slider
                   value={[style.dynamicFrontYPosition]}
-                  onValueChange={(values) => {
-                    onChange({ ...style, dynamicFrontYPosition: values[0] });
-                  }}
+                  onValueChange={([v]) =>
+                    onChange({ ...style, dynamicFrontYPosition: v })
+                  }
                   min={30}
                   max={95}
                   step={1}
@@ -807,6 +805,28 @@ export function SubtitleStyling({
                 );
               })}
             </div>
+          </div>
+        )}
+
+        {/* Vertical offset fine-tune */}
+        {!style.dynamicEnabled && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium">Vertical Offset</label>
+              <span className="text-sm text-muted-foreground tabular-nums">
+                {(style.verticalOffset ?? 0) > 0
+                  ? `+${style.verticalOffset}`
+                  : (style.verticalOffset ?? 0)}
+                px
+              </span>
+            </div>
+            <Slider
+              value={[style.verticalOffset ?? 0]}
+              onValueChange={([v]) => onChange({ ...style, verticalOffset: v })}
+              min={-50}
+              max={50}
+              step={1}
+            />
           </div>
         )}
 
@@ -862,9 +882,9 @@ export function SubtitleStyling({
             </div>
             <Slider
               value={[style.maxWordsPerLine]}
-              onValueChange={(values) => {
-                onChange({ ...style, maxWordsPerLine: values[0] });
-              }}
+              onValueChange={([v]) =>
+                onChange({ ...style, maxWordsPerLine: v })
+              }
               min={1}
               max={8}
               step={1}
@@ -929,9 +949,7 @@ export function SubtitleStyling({
           </label>
           <Slider
             value={[style.borderWidth]}
-            onValueChange={(values) =>
-              onChange({ ...style, borderWidth: values[0] })
-            }
+            onValueChange={([v]) => onChange({ ...style, borderWidth: v })}
             min={0}
             max={20}
             step={1}
@@ -958,9 +976,7 @@ export function SubtitleStyling({
           </label>
           <Slider
             value={[Math.round(style.dropShadowIntensity * 100)]}
-            onValueChange={(values) =>
-              handleDropShadowIntensityChange(values[0] / 100)
-            }
+            onValueChange={([v]) => handleDropShadowIntensityChange(v / 100)}
             min={0}
             max={100}
             step={1}
