@@ -312,6 +312,59 @@ export function drawWordText(
   ctx.restore();
 }
 
+function measurePhraseLineWidth(
+  ctx: CanvasRenderingContext2D,
+  words: WordTiming[],
+  style: SubtitleStyle,
+  currentTime: number,
+  finalFontSize: number,
+) {
+  if (words.length === 0) {
+    return 0;
+  }
+
+  const globalFontFamily = resolveFontFamily(style.fontFamily);
+  const globalFont = `${style.fontWeight} ${finalFontSize}px ${globalFontFamily}`;
+  const displayTexts = words.map((word) =>
+    word.styleOverride?.emoji
+      ? word.styleOverride.emoji
+      : word.text.toUpperCase(),
+  );
+  const spaceWidth = 0.35 * finalFontSize;
+
+  const baseWidths = displayTexts.map((value, index) => {
+    const word = words[index];
+    if (word.styleOverride?.fontFamily || word.styleOverride?.fontSize) {
+      ctx.font = buildWordFont(
+        style,
+        finalFontSize,
+        globalFontFamily,
+        word.styleOverride,
+      );
+      const width = ctx.measureText(value).width;
+      ctx.font = globalFont;
+      return width;
+    }
+    return ctx.measureText(value).width;
+  });
+
+  const scaledWidths = baseWidths.map((width, index) => {
+    const word = words[index];
+    const scale =
+      currentTime >= word.timestamp[0] &&
+      currentTime <= word.timestamp[1] &&
+      style.wordEmphasisEnabled
+        ? 1.18
+        : 1;
+    return width * scale;
+  });
+
+  return (
+    scaledWidths.reduce((total, width) => total + width, 0) +
+    spaceWidth * Math.max(0, words.length - 1)
+  );
+}
+
 export function renderPhraseLineWithEmphasis(
   ctx: CanvasRenderingContext2D,
   words: WordTiming[],
@@ -518,11 +571,13 @@ export function renderPhraseLineWithEmphasis(
 // Split subtitle: render two halves around the person's head
 export function renderSplitSubtitleOnCanvas(
   ctx: CanvasRenderingContext2D,
-  text: string,
+  chunk: TranscriptChunk,
   style: SubtitleStyle,
   canvas: HTMLCanvasElement,
   splitMode: "above-below" | "left-right",
   faceX: number,
+  mode: "word" | "phrase",
+  currentTime: number,
 ) {
   const isVerticalVideo = canvas.height > canvas.width;
   const videoScale = canvas.height / 500;
@@ -531,6 +586,7 @@ export function renderSplitSubtitleOnCanvas(
   ctx.font = `${style.fontWeight} ${finalFontSize}px ${fontFamily}`;
   ctx.textBaseline = "middle";
 
+  const text = chunk.text;
   const words = text.split(" ");
   if (words.length < 2) {
     ctx.textAlign = "center";
@@ -544,6 +600,8 @@ export function renderSplitSubtitleOnCanvas(
     );
     return;
   }
+
+  const phraseWords = Array.isArray(chunk.words) ? chunk.words : undefined;
 
   const mid = Math.ceil(words.length / 2);
   let splitPoint = mid;
@@ -572,23 +630,101 @@ export function renderSplitSubtitleOnCanvas(
     return;
   }
 
-  const splitOffset = (style.verticalOffset ?? 0) * videoScale;
+  const verticalOffset = style.verticalOffset ?? 0;
+  const line1Words = phraseWords?.slice(0, splitPoint);
+  const line2Words = phraseWords?.slice(splitPoint);
+  const canEmphasizeSplit =
+    (style.wordEmphasisEnabled ||
+      style.textFadeIn ||
+      style.dynamicFollowWord) &&
+    mode === "phrase" &&
+    line1Words &&
+    line1Words.length > 0 &&
+    line2Words &&
+    line2Words.length > 0 &&
+    Number.isFinite(currentTime);
+  const chunkEndTime = chunk.timestamp[1];
+
   if (splitMode === "above-below") {
-    const y1 = canvas.height * (isVerticalVideo ? 0.08 : 0.14) - splitOffset;
-    const y2 = canvas.height * (isVerticalVideo ? 0.92 : 0.86) + splitOffset;
+    const y1 = canvas.height * (isVerticalVideo ? 0.08 : 0.14) - verticalOffset;
+    const y2 = canvas.height * (isVerticalVideo ? 0.92 : 0.86) + verticalOffset;
     ctx.textAlign = "center";
-    renderTextLine(ctx, line1, canvas.width / 2, y1, style, videoScale);
-    renderTextLine(ctx, line2, canvas.width / 2, y2, style, videoScale);
+    if (canEmphasizeSplit) {
+      renderPhraseLineWithEmphasis(
+        ctx,
+        line1Words,
+        canvas.width / 2,
+        y1,
+        style,
+        videoScale,
+        currentTime,
+        finalFontSize,
+        chunkEndTime,
+      );
+      renderPhraseLineWithEmphasis(
+        ctx,
+        line2Words,
+        canvas.width / 2,
+        y2,
+        style,
+        videoScale,
+        currentTime,
+        finalFontSize,
+        chunkEndTime,
+      );
+    } else {
+      renderTextLine(ctx, line1, canvas.width / 2, y1, style, videoScale);
+      renderTextLine(ctx, line2, canvas.width / 2, y2, style, videoScale);
+    }
   } else {
     // left-right — position at eye level (~38% from top)
     const facePixelX = faceX * canvas.width;
     const gap = canvas.width * 0.07;
-    const y = canvas.height * 0.38 + splitOffset;
-    ctx.textAlign = "right";
-    renderTextLine(ctx, line1, facePixelX - gap, y, style, videoScale);
-    ctx.textAlign = "left";
-    renderTextLine(ctx, line2, facePixelX + gap, y, style, videoScale);
-    ctx.textAlign = "center";
+    const y = canvas.height * 0.38;
+    if (canEmphasizeSplit) {
+      const line1Width = measurePhraseLineWidth(
+        ctx,
+        line1Words,
+        style,
+        currentTime,
+        finalFontSize,
+      );
+      const line2Width = measurePhraseLineWidth(
+        ctx,
+        line2Words,
+        style,
+        currentTime,
+        finalFontSize,
+      );
+      renderPhraseLineWithEmphasis(
+        ctx,
+        line1Words,
+        facePixelX - gap - line1Width / 2,
+        y,
+        style,
+        videoScale,
+        currentTime,
+        finalFontSize,
+        chunkEndTime,
+      );
+      renderPhraseLineWithEmphasis(
+        ctx,
+        line2Words,
+        facePixelX + gap + line2Width / 2,
+        y,
+        style,
+        videoScale,
+        currentTime,
+        finalFontSize,
+        chunkEndTime,
+      );
+    } else {
+      ctx.textAlign = "right";
+      renderTextLine(ctx, line1, facePixelX - gap, y, style, videoScale);
+      ctx.textAlign = "left";
+      renderTextLine(ctx, line2, facePixelX + gap, y, style, videoScale);
+      ctx.textAlign = "center";
+    }
   }
 }
 
@@ -609,11 +745,13 @@ export function renderSubtitle(
   if (splitMode !== "none") {
     renderSplitSubtitleOnCanvas(
       ctx,
-      chunk.text,
+      chunk,
       style,
       canvas,
       splitMode,
       faceX,
+      mode,
+      currentTime,
     );
     return;
   }
@@ -680,24 +818,24 @@ export function renderSubtitle(
 
   // Compute baseY based on position
   const position = style.position ?? "bottom";
-  const scaledOffset = (style.verticalOffset ?? 0) * videoScale;
+  const verticalOffset = style.verticalOffset ?? 0;
   let baseY: number;
   switch (position) {
     case "top":
       baseY =
         canvas.height * (isVerticalVideo ? 0.06 : 0.12) +
         totalHeight / 2 +
-        scaledOffset;
+        verticalOffset;
       break;
     case "middle":
-      baseY = canvas.height / 2 + scaledOffset;
+      baseY = canvas.height / 2 + verticalOffset;
       break;
     case "bottom":
     default:
       baseY =
         canvas.height -
         canvas.height * (isVerticalVideo ? 0.08 : 0.16) +
-        scaledOffset;
+        verticalOffset;
       break;
   }
 

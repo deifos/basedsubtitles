@@ -157,7 +157,7 @@ function renderSplitSubtitleToCanvas(
   }
 
   if (splitMode === "above-below") {
-    const splitOffset = (style.verticalOffset ?? 0) * videoScale;
+    const splitOffset = style.verticalOffset ?? 0;
     const y1 = canvasHeight * (isVerticalVideo ? 0.08 : 0.14) - splitOffset;
     const y2 = canvasHeight * (isVerticalVideo ? 0.92 : 0.86) + splitOffset;
     ctx.textAlign = "center";
@@ -738,24 +738,24 @@ function renderChunkToCanvas(
     lines.length * lineHeight + Math.max(0, lines.length - 1) * lineGap;
 
   const position = style.position ?? "bottom";
-  const scaledOffset = (style.verticalOffset ?? 0) * videoScale;
+  const verticalOffset = style.verticalOffset ?? 0;
   let baseY: number;
   switch (position) {
     case "top":
       baseY =
         canvasHeight * (isVerticalVideo ? 0.06 : 0.12) +
         totalHeight / 2 +
-        scaledOffset;
+        verticalOffset;
       break;
     case "middle":
-      baseY = canvasHeight / 2 + scaledOffset;
+      baseY = canvasHeight / 2 + verticalOffset;
       break;
     case "bottom":
     default:
       baseY =
         canvasHeight -
         canvasHeight * (isVerticalVideo ? 0.08 : 0.16) +
-        scaledOffset;
+        verticalOffset;
       break;
   }
 
