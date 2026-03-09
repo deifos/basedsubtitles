@@ -768,7 +768,7 @@ export function MainApp({
                 {/* Word chip bar for per-word editing in phrase mode */}
                 {mode === "phrase" && (
                   <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5 px-2 min-h-[28px]">
-                    {currentPhraseWords.length > 1 && (
+                    {currentPhraseWords.length > 0 && (
                       <>
                         <span className="text-xs text-muted-foreground mr-1 font-medium">
                           Edit word:
