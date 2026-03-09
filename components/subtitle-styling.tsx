@@ -831,45 +831,43 @@ export function SubtitleStyling({
         )}
 
         {/* Split Subtitle - always available, face tracking starts when enabled */}
-        {!style.dynamicEnabled && (
-          <div className="space-y-2 rounded-lg border border-border/40 bg-muted/40 p-3">
-            <h4 className="text-sm font-medium">Split Subtitle</h4>
-            <p className="text-xs text-muted-foreground">
-              Split the phrase around the person&apos;s head
-            </p>
-            <div className="grid grid-cols-3 gap-2">
-              {(
-                [
-                  { value: "none" as const, label: "Off" },
-                  { value: "above-below" as const, label: "Top / Bottom" },
-                  { value: "left-right" as const, label: "Left / Right" },
-                ] as const
-              ).map(({ value, label }) => {
-                const disabled = value === "left-right" && ratio === "9:16";
-                const isActive = (style.splitSubtitleMode ?? "none") === value;
-                return (
-                  <button
-                    key={value}
-                    disabled={disabled}
-                    onClick={() =>
-                      !disabled &&
-                      onChange({ ...style, splitSubtitleMode: value })
-                    }
-                    className={`rounded-lg border px-2 py-2 text-xs font-medium transition-all ${
-                      isActive
-                        ? "border-amber-500/70 bg-amber-50 text-amber-700"
-                        : disabled
-                          ? "border-border/30 bg-background/50 text-muted-foreground/40 cursor-not-allowed opacity-50"
-                          : "border-border/50 bg-background text-muted-foreground hover:border-border hover:text-foreground"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
+        <div className="space-y-2 rounded-lg border border-border/40 bg-muted/40 p-3">
+          <h4 className="text-sm font-medium">Split Subtitle</h4>
+          <p className="text-xs text-muted-foreground">
+            Split the phrase around the person&apos;s head
+          </p>
+          <div className="grid grid-cols-3 gap-2">
+            {(
+              [
+                { value: "none" as const, label: "Off" },
+                { value: "above-below" as const, label: "Top / Bottom" },
+                { value: "left-right" as const, label: "Left / Right" },
+              ] as const
+            ).map(({ value, label }) => {
+              const disabled = value === "left-right" && ratio === "9:16";
+              const isActive = (style.splitSubtitleMode ?? "none") === value;
+              return (
+                <button
+                  key={value}
+                  disabled={disabled}
+                  onClick={() =>
+                    !disabled &&
+                    onChange({ ...style, splitSubtitleMode: value })
+                  }
+                  className={`rounded-lg border px-2 py-2 text-xs font-medium transition-all ${
+                    isActive
+                      ? "border-amber-500/70 bg-amber-50 text-amber-700"
+                      : disabled
+                        ? "border-border/30 bg-background/50 text-muted-foreground/40 cursor-not-allowed opacity-50"
+                        : "border-border/50 bg-background text-muted-foreground hover:border-border hover:text-foreground"
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
           </div>
-        )}
+        </div>
 
         {/* Max Words Per Line slider - phrase mode only */}
         {mode === "phrase" && (

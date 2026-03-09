@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - App Router metadata now includes a web app manifest, Apple web app settings, and service worker wiring required for installation
+- Split subtitle controls are now always visible in the styling panel, so top/bottom and left/right layouts can be selected without depending on 3D depth mode visibility
+
+### Fixed
+
+- Display-on-spoken subtitles in dynamic 3D preview and export now keep a stable layout — future words stay reserved in place and no longer cause earlier words to shift when they appear
+- Per-word editing chips now remain available for single-word phrase subtitles, so brief isolated words can still be selected and styled from the bottom editor bar
 
 ---
 

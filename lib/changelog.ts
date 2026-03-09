@@ -46,6 +46,21 @@ export const changelog: ChangelogEntry[] = [
         description:
           "App Router metadata now includes a web app manifest, Apple web app settings, and service worker wiring required for installation",
       },
+      {
+        type: "changed",
+        description:
+          "Split subtitle controls are now always visible in the styling panel, so top/bottom and left/right layouts can be selected without depending on 3D depth mode visibility",
+      },
+      {
+        type: "fixed",
+        description:
+          "Display-on-spoken subtitles in dynamic 3D preview and export now keep a stable layout — future words stay reserved in place and no longer cause earlier words to shift when they appear",
+      },
+      {
+        type: "fixed",
+        description:
+          "Per-word editing chips now remain available for single-word phrase subtitles, so brief isolated words can still be selected and styled from the bottom editor bar",
+      },
     ],
   },
   {
