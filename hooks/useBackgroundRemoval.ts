@@ -22,7 +22,7 @@ interface UseBackgroundRemovalReturn {
   ) => Promise<MaskData>;
 }
 
-const SAMPLE_FPS = 5;
+export const SAMPLE_FPS = 8;
 
 export function useBackgroundRemoval(): UseBackgroundRemovalReturn {
   const [isModelLoading, setIsModelLoading] = useState(false);
@@ -32,7 +32,7 @@ export function useBackgroundRemoval(): UseBackgroundRemovalReturn {
 
   const workerRef = useRef<Worker | null>(null);
   const modelReadyRef = useRef(false);
-  const masksRef = useRef<Map<number, MaskData>>(new Map());
+  const masksRef = useRef<MaskData[]>([]);
   const pendingFramesRef = useRef<
     Map<
       number,
@@ -83,7 +83,7 @@ export function useBackgroundRemoval(): UseBackgroundRemovalReturn {
             };
 
             // Store in ref for immediate access
-            masksRef.current.set(frameIndex, maskData);
+            masksRef.current[frameIndex] = maskData;
 
             // Resolve pending promise
             const pending = pendingFramesRef.current.get(frameIndex);
@@ -154,7 +154,7 @@ export function useBackgroundRemoval(): UseBackgroundRemovalReturn {
       setIsProcessing(true);
       setProgress(0);
       setIsReady(false);
-      masksRef.current = new Map();
+      masksRef.current = [];
 
       try {
         // Load model first
@@ -166,9 +166,16 @@ export function useBackgroundRemoval(): UseBackgroundRemovalReturn {
         }
 
         const totalFrames = Math.ceil(duration * SAMPLE_FPS);
+
+        // Cap processing resolution to reduce RAM usage.
+        // Masks don't need to be full HD — 640px max dimension is plenty for compositing.
+        const MAX_PROCESS_DIM = 640;
+        const srcW = videoElement.videoWidth;
+        const srcH = videoElement.videoHeight;
+        const scale = Math.min(1, MAX_PROCESS_DIM / Math.max(srcW, srcH));
         const canvas = document.createElement("canvas");
-        canvas.width = videoElement.videoWidth;
-        canvas.height = videoElement.videoHeight;
+        canvas.width = Math.round(srcW * scale);
+        canvas.height = Math.round(srcH * scale);
         const ctx = canvas.getContext("2d", { willReadFrequently: true });
 
         if (!ctx) {
@@ -243,36 +250,21 @@ export function useBackgroundRemoval(): UseBackgroundRemovalReturn {
   const getMaskAtTime = useCallback(
     (time: number, fps: number = SAMPLE_FPS): MaskData | null => {
       const currentMasks = masksRef.current;
-      if (currentMasks.size === 0) return null;
+      if (currentMasks.length === 0) return null;
 
-      // Find nearest frame index
-      const frameIndex = Math.round(time * fps);
-
-      // Try exact match first
-      if (currentMasks.has(frameIndex)) {
-        return currentMasks.get(frameIndex)!;
-      }
-
-      // Find closest frame
-      let closest: number | null = null;
-      let closestDist = Infinity;
-
-      for (const key of currentMasks.keys()) {
-        const dist = Math.abs(key - frameIndex);
-        if (dist < closestDist) {
-          closestDist = dist;
-          closest = key;
-        }
-      }
-
-      return closest !== null ? currentMasks.get(closest)! : null;
+      // Clamp to valid range — frames are dense so direct indexing always works
+      const frameIndex = Math.max(
+        0,
+        Math.min(Math.round(time * fps), currentMasks.length - 1),
+      );
+      return currentMasks[frameIndex] ?? null;
     },
     [],
   );
 
   // Reset all state
   const reset = useCallback(() => {
-    masksRef.current = new Map();
+    masksRef.current = [];
     pendingFramesRef.current = new Map();
     setIsReady(false);
     setIsProcessing(false);

@@ -13,7 +13,7 @@ import { VideoCaption } from "./video-caption";
 import { SubtitleStyle } from "./subtitle-styling";
 import { UploadIcon, Play, Pause, Volume2, VolumeX } from "lucide-react";
 import { toast } from "sonner";
-import type { MaskData } from "@/hooks/useBackgroundRemoval";
+import { SAMPLE_FPS as SAMPLE_MASK_FPS, type MaskData } from "@/hooks/useBackgroundRemoval";
 import {
   renderSubtitleToCanvas,
   renderDynamicBehindText,
@@ -342,6 +342,8 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
       let cachedMaskImageData: ImageData | null = null;
       let lastMaskW = 0;
       let lastMaskH = 0;
+      // Track last mask reference — skip expensive pixel conversion when mask hasn't changed (5fps cache)
+      let lastMask: ReturnType<typeof getMaskAtTime> = null;
 
       // Track last rendered time to skip redundant draws when paused
       let lastRenderedTime = -1;
@@ -369,7 +371,9 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
           canvas.height = displayHeight;
         }
 
-        const mask = getMaskAtTime!(time);
+        // Look ahead by half a frame interval so the mask is centered around the
+        // current time rather than always lagging behind (reduces perceived lag by ~50%).
+        const mask = getMaskAtTime!(time + 0.5 / SAMPLE_MASK_FPS);
 
         // Compute center-crop region when canvas AR differs from video AR
         // (e.g. landscape video shown in a 9:16 container with object-cover)
@@ -454,30 +458,40 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
             maskCanvas.height = mask.height;
           }
 
-          // Reuse ImageData if dimensions match, otherwise create new one
-          if (lastMaskW !== mask.width || lastMaskH !== mask.height) {
-            cachedMaskImageData = maskCtx.createImageData(
-              mask.width,
-              mask.height,
-            );
-            lastMaskW = mask.width;
-            lastMaskH = mask.height;
+          // Only re-process mask pixels when the mask reference changes (5fps cache → skip ~55/60 frames)
+          if (mask !== lastMask) {
+            lastMask = mask;
+
+            if (lastMaskW !== mask.width || lastMaskH !== mask.height) {
+              cachedMaskImageData = maskCtx.createImageData(
+                mask.width,
+                mask.height,
+              );
+              lastMaskW = mask.width;
+              lastMaskH = mask.height;
+            }
+
+            const maskImageData = cachedMaskImageData!;
+            const pixels = maskImageData.data;
+            for (let i = 0; i < mask.data.length; i++) {
+              const idx = i * 4;
+              pixels[idx] = 255; // R
+              pixels[idx + 1] = 255; // G
+              pixels[idx + 2] = 255; // B
+              pixels[idx + 3] = mask.data[i]; // A = mask alpha
+            }
+            maskCtx.putImageData(maskImageData, 0, 0);
           }
 
-          const maskImageData = cachedMaskImageData!;
-          const pixels = maskImageData.data;
-          for (let i = 0; i < mask.data.length; i++) {
-            const idx = i * 4;
-            pixels[idx] = 255; // R
-            pixels[idx + 1] = 255; // G
-            pixels[idx + 2] = 255; // B
-            pixels[idx + 3] = mask.data[i]; // A = mask alpha
-          }
-          maskCtx.putImageData(maskImageData, 0, 0);
-
-          // Use destination-in to clip the video frame to the mask shape
+          // Use destination-in to clip the video frame to the mask shape.
+          // Apply the same crop as the video so the mask aligns with the
+          // visible region (e.g. landscape → portrait center/face-track crop).
           fgCtx.globalCompositeOperation = "destination-in";
-          fgCtx.drawImage(maskCanvas, 0, 0, w, h);
+          const msx = (sx / vw) * maskCanvas.width;
+          const msy = (sy / vh) * maskCanvas.height;
+          const msw = (sw / vw) * maskCanvas.width;
+          const msh = (sh / vh) * maskCanvas.height;
+          fgCtx.drawImage(maskCanvas, msx, msy, msw, msh, 0, 0, w, h);
           fgCtx.globalCompositeOperation = "source-over";
 
           // Draw masked foreground onto main canvas

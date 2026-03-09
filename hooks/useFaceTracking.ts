@@ -32,6 +32,7 @@ export function useFaceTracking(): UseFaceTrackingReturn {
   const lastTimeRef = useRef<number>(-1);
   const timelineRef = useRef<PositionKeyframe[]>([]);
   const trackingActiveRef = useRef(false);
+  const trackedSrcRef = useRef<string>("");
 
   const ensureDetector = useCallback(async (): Promise<FaceDetector> => {
     if (detectorRef.current) return detectorRef.current;
@@ -128,9 +129,13 @@ export function useFaceTracking(): UseFaceTrackingReturn {
     (videoElement: HTMLVideoElement) => {
       if (trackingActiveRef.current) return;
       trackingActiveRef.current = true;
-      smoothedCenterXRef.current = 0.5;
-      lastTimeRef.current = -1;
-      timelineRef.current = [];
+      // Only reset timeline when the video source changes (not on ratio/setting changes)
+      if (videoElement.src !== trackedSrcRef.current) {
+        trackedSrcRef.current = videoElement.src;
+        smoothedCenterXRef.current = 0.5;
+        lastTimeRef.current = -1;
+        timelineRef.current = [];
+      }
 
       ensureDetector().then((detector) => {
         if (!trackingActiveRef.current) return;
@@ -186,15 +191,21 @@ export function useFaceTracking(): UseFaceTrackingReturn {
 
   const buildExportTimeline = useCallback(
     async (videoElement: HTMLVideoElement): Promise<PositionTimeline> => {
-      // If we already collected keyframes during preview, use those directly.
-      // They are already EMA-smoothed from the real-time tracking loop.
-      if (timelineRef.current.length > 0) {
-        return timelineRef.current;
+      const duration = videoElement.duration;
+
+      // Use preview timeline only if it covers at least 90% of the video.
+      // Partial data (e.g. user watched first 5s of a 30s video) would cause
+      // the export crop to lock at the last tracked position for the rest.
+      const preview = timelineRef.current;
+      if (
+        preview.length > 0 &&
+        preview[preview.length - 1].time >= duration * 0.9
+      ) {
+        return preview;
       }
 
-      // Otherwise, scan the video at ~5fps
+      // Scan the video at ~5fps
       const detector = await ensureDetector();
-      const duration = videoElement.duration;
       const step = 1 / 5; // 5fps
       const timeline: PositionTimeline = [];
 
@@ -204,14 +215,18 @@ export function useFaceTracking(): UseFaceTrackingReturn {
       const savedTime = videoElement.currentTime;
 
       for (let t = 0; t < duration; t += step) {
-        videoElement.currentTime = t;
-        await new Promise<void>((resolve) => {
-          const onSeeked = () => {
-            videoElement.removeEventListener("seeked", onSeeked);
-            resolve();
-          };
-          videoElement.addEventListener("seeked", onSeeked);
-        });
+        // Add the seeked listener BEFORE setting currentTime so we never miss
+        // the event. Skip the seek entirely if already at the target time.
+        if (Math.abs(videoElement.currentTime - t) >= 0.01) {
+          await new Promise<void>((resolve) => {
+            const onSeeked = () => {
+              videoElement.removeEventListener("seeked", onSeeked);
+              resolve();
+            };
+            videoElement.addEventListener("seeked", onSeeked);
+            videoElement.currentTime = t;
+          });
+        }
 
         const tsMs = performance.now();
         const rawCx = extractCenterX(detector, videoElement, tsMs);
