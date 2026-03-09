@@ -545,7 +545,7 @@ export function SubtitleStyling({
 
   return (
     <div
-      className={`flex flex-col h-full overflow-hidden ${className}`}
+      className={`flex flex-col ${className}`}
       style={{ fontFamily: "var(--font-outfit), sans-serif" }}
     >
       {/* Mode Toggle at top */}
@@ -579,7 +579,7 @@ export function SubtitleStyling({
         </div>
       </div>
 
-      <div className="p-2 space-y-3 flex-1 overflow-y-auto">
+      <div className="p-2 space-y-3">
         {/* Style presets */}
         <div className="space-y-2 mb-2">
           <label className="text-sm font-medium block">Style Presets</label>

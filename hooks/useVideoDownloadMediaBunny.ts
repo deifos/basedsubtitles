@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import {
   Input,
   Output,
@@ -86,6 +86,7 @@ export function useVideoDownloadMediaBunny({
     output: Output | null;
     videoSource: CanvasSource | null;
   }>({ cancelRequested: false, output: null, videoSource: null });
+  const progressTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const downloadVideo = useCallback(async () => {
     if (!video?.src || transcriptChunks.length === 0) {
@@ -759,11 +760,11 @@ export function useVideoDownloadMediaBunny({
       cancelContextRef.current.videoSource = null;
       const wasCancelled = cancelled;
       setIsProcessing(false);
-      if (wasCancelled) {
-        setTimeout(() => setProgress(0), 500);
-      } else {
-        setTimeout(() => setProgress(0), 3000);
-      }
+      if (progressTimeoutRef.current) clearTimeout(progressTimeoutRef.current);
+      progressTimeoutRef.current = setTimeout(
+        () => setProgress(0),
+        wasCancelled ? 500 : 3000,
+      );
       cancelContextRef.current.cancelRequested = false;
     }
   }, [
@@ -798,6 +799,12 @@ export function useVideoDownloadMediaBunny({
       }
     }
   }, [isProcessing]);
+
+  useEffect(() => {
+    return () => {
+      if (progressTimeoutRef.current) clearTimeout(progressTimeoutRef.current);
+    };
+  }, []);
 
   return {
     downloadVideo,

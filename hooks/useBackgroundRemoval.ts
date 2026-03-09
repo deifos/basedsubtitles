@@ -214,6 +214,8 @@ export function useBackgroundRemoval(): UseBackgroundRemovalReturn {
         }
 
         // Cleanup processing video
+        processingVideo.onloadeddata = null;
+        processingVideo.onerror = null;
         processingVideo.src = "";
         processingVideo.load();
 

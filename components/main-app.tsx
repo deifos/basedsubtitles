@@ -704,11 +704,11 @@ export function MainApp({
               </>
             )}
 
-            <div className="flex flex-col lg:flex-row gap-6">
+            <div className="flex flex-col lg:flex-row lg:items-start gap-6">
               {/* Subtitle Styling Column - Hidden on mobile, shown on desktop */}
               {result && (
-                <div className="hidden lg:block w-full lg:w-96 h-[560px]">
-                  <ScrollArea className="rounded-2xl h-[560px] w-full border border-slate-200/80 bg-white p-2 shadow-lg shadow-slate-200/40">
+                <div className="hidden lg:block w-full lg:w-96">
+                  <div className="rounded-2xl h-[calc(100vh-11rem-20px)] overflow-y-auto w-full border border-slate-200/80 bg-white p-2 shadow-lg shadow-slate-200/40">
                     <div className="p-2 space-y-4">
                       <SubtitleStyling
                         style={subtitleStyle}
@@ -719,7 +719,7 @@ export function MainApp({
                         ratio={ratio}
                       />
                     </div>
-                  </ScrollArea>
+                  </div>
                 </div>
               )}
 
@@ -1021,11 +1021,11 @@ export function MainApp({
 
               {/* Transcript Sidebar - Hidden on mobile, shown on desktop */}
               {result && (
-                <div className="hidden lg:flex lg:flex-col w-full lg:w-96 h-[560px]">
-                  <ScrollArea
-                    className={`flex-1 w-full border border-slate-200/80 bg-white p-4 shadow-lg shadow-slate-200/40 ${isTranscribingBanner ? "rounded-t-2xl" : "rounded-2xl"}`}
+                <div className="hidden lg:flex lg:flex-col w-full lg:w-96 h-[calc(100vh-11rem-20px)]">
+                  <div
+                    className={`flex-1 min-h-0 flex flex-col w-full border border-slate-200/80 bg-white shadow-lg shadow-slate-200/40 ${isTranscribingBanner ? "rounded-t-2xl" : "rounded-2xl"}`}
                   >
-                    <div className="mb-4 pb-2 border-b border-slate-100">
+                    <div className="px-4 pt-4 pb-3 border-b border-slate-100 shrink-0">
                       <h4
                         className="text-base font-semibold text-slate-900"
                         style={{ fontFamily: "var(--font-outfit), sans-serif" }}
@@ -1040,6 +1040,7 @@ export function MainApp({
                       </p>
                     </div>
                     <TranscriptSidebar
+                      className="flex-1 min-h-0"
                       transcript={result}
                       currentTime={currentTime}
                       setCurrentTime={(time) => {
@@ -1060,7 +1061,7 @@ export function MainApp({
                       dynamicEnabled={subtitleStyle.dynamicEnabled}
                       videoFileName={uploadedFile?.name}
                     />
-                  </ScrollArea>
+                  </div>
                   {isTranscribingBanner && (
                     <div className="rounded-b-2xl border border-t-0 border-amber-200 bg-amber-50 shadow-lg shadow-slate-200/40 px-4 py-3 flex flex-col gap-2 shrink-0">
                       <div className="flex items-center justify-between">

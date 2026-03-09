@@ -73,6 +73,9 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
     const [videoSrc, setVideoSrc] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [isSkipping, setIsSkipping] = useState(false);
+    // Track the current blob URL so we can revoke it when it's no longer needed
+    const videoObjectUrlRef = useRef<string | null>(null);
+    const skipTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [duration, setDuration] = useState(0);
     const [isMuted, setIsMuted] = useState(false);
@@ -89,6 +92,21 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
     // Transient seeking state in refs — avoids re-renders during drag
     const seekingRef = useRef(false);
     const seekValueRef = useRef(0);
+
+    // Revoke the current blob URL and clear the ref
+    const revokeVideoObjectUrl = useCallback(() => {
+      if (videoObjectUrlRef.current) {
+        URL.revokeObjectURL(videoObjectUrlRef.current);
+        videoObjectUrlRef.current = null;
+      }
+    }, []);
+
+    // Clear pending timeouts on unmount
+    useEffect(() => {
+      return () => {
+        if (skipTimeoutRef.current) clearTimeout(skipTimeoutRef.current);
+      };
+    }, []);
 
     // Sync progress bar fill + time display from currentTime prop, skip while dragging.
     // Also syncs localTime so VideoCaption reflects external seeks (sidebar clicks, reset).
@@ -115,6 +133,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
       if (ref && typeof ref !== "function" && ref.current) {
         // Check if the video element has no source
         if (!ref.current.src || ref.current.src === window.location.href) {
+          revokeVideoObjectUrl();
           setVideoSrc(null);
         }
       }
@@ -144,17 +163,22 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
           const video = document.createElement("video");
           video.preload = "metadata";
 
+          // Revoke previous blob URL before creating a new one
+          revokeVideoObjectUrl();
+          const objectUrl = URL.createObjectURL(file);
+          videoObjectUrlRef.current = objectUrl;
+
           await new Promise((resolve, reject) => {
             video.onloadedmetadata = resolve;
             video.onerror = reject;
-            video.src = URL.createObjectURL(file);
+            video.src = objectUrl;
           });
 
           // Detect aspect ratio from video dimensions
           const detectedRatio: "16:9" | "9:16" =
             video.videoHeight > video.videoWidth ? "9:16" : "16:9";
 
-          setVideoSrc(video.src);
+          setVideoSrc(objectUrl);
           setError(null);
           onVideoSelect(file);
 
@@ -167,6 +191,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
             err instanceof Error ? err.message : "Error loading video";
           setError(message);
           toast.error(message);
+          revokeVideoObjectUrl();
           setVideoSrc(null);
         }
       },
@@ -275,7 +300,8 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
               video.currentTime = end + 0.1; // Add small buffer to avoid edge cases
 
               // Reset skipping flag after a short delay
-              setTimeout(() => {
+              if (skipTimeoutRef.current) clearTimeout(skipTimeoutRef.current);
+              skipTimeoutRef.current = setTimeout(() => {
                 setIsSkipping(false);
               }, 100);
               break;
@@ -627,7 +653,10 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
               )}
             >
               <div
-                className="relative flex justify-center"
+                className={cn(
+                  "relative flex justify-center",
+                  ratio === "16:9" && "max-h-[500px]",
+                )}
                 style={{
                   aspectRatio: ratio === "16:9" ? "16/9" : "9/16",
                 }}

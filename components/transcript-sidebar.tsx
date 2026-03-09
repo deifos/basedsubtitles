@@ -325,7 +325,7 @@ export function TranscriptSidebar({
   };
 
   return (
-    <div className={`flex flex-col h-full ${className}`}>
+    <div className={`flex flex-col ${className}`}>
       {/* Toolbar */}
       <div className="flex items-center justify-between px-2 pt-2 pb-1">
         <span className="text-xs text-muted-foreground">
@@ -343,10 +343,10 @@ export function TranscriptSidebar({
         {displayChunks.some((c) => c.disabled || c.subtitleHidden) && (
           <button
             onClick={() => setHideSkipped((v) => !v)}
-            className={`inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs transition-colors ${
+            className={`inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs font-medium transition-colors ${
               hideSkipped
                 ? "bg-slate-900 text-white"
-                : "bg-muted text-muted-foreground hover:text-foreground"
+                : "bg-yellow-100 text-yellow-800 hover:bg-yellow-200"
             }`}
             title={
               hideSkipped
@@ -361,7 +361,7 @@ export function TranscriptSidebar({
       </div>
 
       <div
-        className="flex-1 overflow-y-auto lg:max-h-96"
+        className="flex-1 min-h-0 overflow-y-auto"
         ref={transcriptContainerRef}
       >
         <div className="space-y-2 p-2">
