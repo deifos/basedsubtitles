@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.2.0] — 2026-03-09 — Background Removal Performance & Reliability
+
+### Added
+
+- Mask lookahead offset (+half frame interval) when looking up the bg-removal mask in the preview compositing loop — mask is now centered around the current video time instead of always lagging behind by a full interval
+- Export face timeline validation — `buildExportTimeline` now only uses the preview-collected timeline if it covers ≥90% of the video, preventing partial data (e.g. user watched first 5s of a 30s clip) from locking the crop to the last tracked position for the rest of the export
+
+### Changed
+
+- Background removal mask resolution capped at 640px (longest edge) during processing — reduces peak memory from ~300MB to ~34MB for a typical 1080p source at the same 8fps sampling rate
+- Mask sampling rate increased from 5fps to 8fps — reduces max temporal lag from 200ms to 125ms with the resolution cap keeping memory well under 100MB for most videos
+- Mask storage refactored from `Map<number, MaskData>` to `MaskData[]` — dense array with O(1) clamped-index lookup replaces the O(n) nearest-key scan
+
+### Fixed
+
+- Preview compositing was processing the full mask pixel array (up to 2MB) every rAF frame (~60fps) even though the mask only changes at 8fps — now skips the conversion and `putImageData` when the mask reference hasn't changed, cutting CPU work by ~87%
+- Mask crop alignment for 9:16 portrait with background removal was wrong when the source was landscape — the mask was drawn at full frame scale instead of being proportionally cropped to match the visible portrait region
+- Three memory leaks: null event handlers not cleared before resetting the processing video `src`, `skipTimeoutRef` setTimeout not cleared on unmount in `VideoUpload`, progress-reset timeout not cleared on unmount in `useVideoDownloadMediaBunny`
+- Video upload showed `ERR_FILE_NOT_FOUND` after the first upload in development — cleanup effects and mount effects were revoking the blob URL while the async `onloadedmetadata` promise was still pending (React StrictMode double-invoke). Revocations now happen only at explicit replacement/error/reset points
+- Face tracking was not applied during export — `startTracking` was resetting `timelineRef` on every call including ratio/settings changes, so `buildExportTimeline` always found an empty timeline and fell back to the fresh scan which often detected no faces. Fixed by preserving the timeline across re-runs when the video source hasn't changed (`trackedSrcRef`)
+- Face tracking export fresh scan could hang indefinitely if the video was already at `t=0` when the scan started — the `seeked` event listener is now registered before setting `currentTime`, and the seek is skipped entirely if already within 10ms of the target
+
+### Removed
+
+- "Generation time: X.XXs (WebGPU)" display below the background removal section — transcription stats (time taken and device) are now shown in the transcript sidebar banner
+- Transcription progress % was shown next to the GPU/CPU label, making it look like GPU usage — % now appears next to the timestamp (e.g. "Transcribing 0:42 · 73%") and the banner shows "Done in 1m 4s" after completion
+
+---
+
 ## [2.1.0] — 2026-03-08 — Streaming Transcription & Long Video Support
 
 ### Added
