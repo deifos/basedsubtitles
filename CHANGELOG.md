@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.3.0] — 2026-03-09 — Installable PWA & Home Screen Support
+
+### Added
+
+- Installable Progressive Web App support — Based Subtitles can now be added to the home screen and launched in standalone app mode
+- Generated branded app icons using the existing BS monogram for Android, desktop install prompts, and Apple touch devices
+- Install banner — shows a native install prompt on supported browsers and Add to Home Screen instructions on iPhone/iPad Safari
+
+### Changed
+
+- App Router metadata now includes a web app manifest, Apple web app settings, and service worker wiring required for installation
+
+---
+
 ## [2.2.0] — 2026-03-09 — Background Removal Performance & Reliability
 
 ### Added

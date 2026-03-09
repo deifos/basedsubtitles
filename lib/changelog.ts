@@ -8,7 +8,7 @@
  * - PATCH: Bug fixes and small improvements
  */
 
-export const APP_VERSION = "2.2.0";
+export const APP_VERSION = "2.3.0";
 
 export interface ChangelogEntry {
   version: string;
@@ -21,6 +21,33 @@ export interface ChangelogEntry {
 }
 
 export const changelog: ChangelogEntry[] = [
+  {
+    version: "2.3.0",
+    date: "2026-03-09",
+    title: "Installable PWA & Home Screen Support",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Installable Progressive Web App support — Based Subtitles can now be added to the home screen and launched in standalone app mode",
+      },
+      {
+        type: "added",
+        description:
+          "Generated branded app icons using the existing BS monogram for Android, desktop install prompts, and Apple touch devices",
+      },
+      {
+        type: "added",
+        description:
+          "Install banner — shows a native install prompt on supported browsers and Add to Home Screen instructions on iPhone/iPad Safari",
+      },
+      {
+        type: "changed",
+        description:
+          "App Router metadata now includes a web app manifest, Apple web app settings, and service worker wiring required for installation",
+      },
+    ],
+  },
   {
     version: "2.2.0",
     date: "2026-03-08",

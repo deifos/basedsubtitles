@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import {
   Geist,
@@ -29,6 +29,7 @@ import {
   Lilita_One,
 } from "next/font/google";
 import { Toaster } from "sonner";
+import { PwaInstallBanner } from "@/components/pwa-install-banner";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -209,7 +210,16 @@ const lilitaOne = Lilita_One({
   display: "swap",
 });
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#0f172a",
+  viewportFit: "cover",
+};
+
 export const metadata: Metadata = {
+  metadataBase: new URL("https://basedsubs.getbasedapps.com"),
+  applicationName: "Based Subtitles",
   title: {
     default: "Based Subtitles - AI Video Subtitle Generator",
     template: "%s | Based Subtitles",
@@ -230,6 +240,25 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: "deifosv", url: "https://x.com/deifosv" }],
   creator: "deifosv",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "Based Subtitles",
+    statusBarStyle: "default",
+  },
+  icons: {
+    icon: [
+      { url: "/icon-192", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [
+      {
+        url: "/apple-touch-icon",
+        sizes: "180x180",
+        type: "image/png",
+      },
+    ],
+  },
   openGraph: {
     type: "website",
     locale: "en_US",
@@ -283,6 +312,7 @@ export default function RootLayout({
       >
         <Toaster position="top-center" richColors />
         {children}
+        <PwaInstallBanner />
         <Script
           defer
           src="https://cloud.umami.is/script.js"

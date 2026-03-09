@@ -937,7 +937,6 @@ export function MainApp({
                       </div>
                     )}
 
-
                     {isLongVideo && !isDownloadProcessing && (
                       <div
                         className="w-full max-w-md rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 space-y-1"

@@ -13,7 +13,10 @@ import { VideoCaption } from "./video-caption";
 import { SubtitleStyle } from "./subtitle-styling";
 import { UploadIcon, Play, Pause, Volume2, VolumeX } from "lucide-react";
 import { toast } from "sonner";
-import { SAMPLE_FPS as SAMPLE_MASK_FPS, type MaskData } from "@/hooks/useBackgroundRemoval";
+import {
+  SAMPLE_FPS as SAMPLE_MASK_FPS,
+  type MaskData,
+} from "@/hooks/useBackgroundRemoval";
 import {
   renderSubtitleToCanvas,
   renderDynamicBehindText,
