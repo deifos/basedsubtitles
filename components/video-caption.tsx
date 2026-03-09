@@ -183,55 +183,43 @@ function PhraseWordList({
 }
 
 interface SplitWordsProps {
-  wordTexts: string[];
-  startIdx: number;
-  chunkWords: ProcessedWord[] | undefined;
+  fallbackText: string;
+  words: ProcessedWord[] | undefined;
+  currentWordInPhrase: ProcessedWord | undefined;
   currentTime: number;
-  dynamicFollowWord: boolean;
   mode: "word" | "phrase";
+  style: SubtitleStyle;
   baseTypographyStyles: React.CSSProperties;
   metallicTypographyStyles: React.CSSProperties;
 }
 
 function SplitWords({
-  wordTexts,
-  startIdx,
-  chunkWords,
+  fallbackText,
+  words,
+  currentWordInPhrase,
   currentTime,
-  dynamicFollowWord,
   mode,
+  style,
   baseTypographyStyles,
   metallicTypographyStyles,
 }: SplitWordsProps) {
-  if (!dynamicFollowWord || mode !== "phrase" || !chunkWords) {
+  if (mode !== "phrase" || !words || words.length === 0) {
     return (
       <span style={{ ...baseTypographyStyles, ...metallicTypographyStyles }}>
-        {wordTexts.join(" ")}
+        {fallbackText}
       </span>
     );
   }
+
   return (
-    <>
-      {wordTexts.map((w, i) => {
-        const wordData = chunkWords[startIdx + i];
-        const opacity =
-          wordData && currentTime >= wordData.timestamp[0] ? 1 : 0.2;
-        return (
-          <React.Fragment key={`${startIdx + i}-${w}`}>
-            <span
-              style={{
-                ...baseTypographyStyles,
-                ...metallicTypographyStyles,
-                opacity,
-              }}
-            >
-              {w}
-            </span>
-            {i < wordTexts.length - 1 && " "}
-          </React.Fragment>
-        );
-      })}
-    </>
+    <PhraseWordList
+      words={words}
+      currentWordInPhrase={currentWordInPhrase}
+      currentTime={currentTime}
+      style={style}
+      baseTypographyStyles={baseTypographyStyles}
+      metallicTypographyStyles={metallicTypographyStyles}
+    />
   );
 }
 
@@ -569,6 +557,8 @@ export function VideoCaption({
 
       const splitLine2 = splitWords.slice(splitPoint).join(" ");
       if (splitLine2) {
+        const line1Words = currentChunk.words?.slice(0, splitPoint);
+        const line2Words = currentChunk.words?.slice(splitPoint);
         const isPortrait = ratio === "9:16";
         const blockStyle: React.CSSProperties = {
           fontFamily: style.fontFamily,
@@ -584,10 +574,10 @@ export function VideoCaption({
           opacity: isAnimating ? 1 : 0,
         };
         const sharedSplitWordsProps = {
-          chunkWords: currentChunk.words,
+          currentWordInPhrase,
           currentTime,
-          dynamicFollowWord: style.dynamicFollowWord ?? false,
           mode,
+          style,
           baseTypographyStyles,
           metallicTypographyStyles,
         };
@@ -605,8 +595,8 @@ export function VideoCaption({
                 <div style={{ transform: `translateY(${-verticalOffset}px)` }}>
                   <div className="inline-block px-3 py-2" style={innerStyle}>
                     <SplitWords
-                      wordTexts={splitWords.slice(0, splitPoint)}
-                      startIdx={0}
+                      fallbackText={splitWords.slice(0, splitPoint).join(" ")}
+                      words={line1Words}
                       {...sharedSplitWordsProps}
                     />
                   </div>
@@ -619,8 +609,8 @@ export function VideoCaption({
                 <div style={{ transform: `translateY(${verticalOffset}px)` }}>
                   <div className="inline-block px-3 py-2" style={innerStyle}>
                     <SplitWords
-                      wordTexts={splitWords.slice(splitPoint)}
-                      startIdx={splitPoint}
+                      fallbackText={splitWords.slice(splitPoint).join(" ")}
+                      words={line2Words}
                       {...sharedSplitWordsProps}
                     />
                   </div>
@@ -648,8 +638,8 @@ export function VideoCaption({
               >
                 <div className="inline-block px-3 py-2" style={innerStyle}>
                   <SplitWords
-                    wordTexts={splitWords.slice(0, splitPoint)}
-                    startIdx={0}
+                    fallbackText={splitWords.slice(0, splitPoint).join(" ")}
+                    words={line1Words}
                     {...sharedSplitWordsProps}
                   />
                 </div>
@@ -667,8 +657,8 @@ export function VideoCaption({
               >
                 <div className="inline-block px-3 py-2" style={innerStyle}>
                   <SplitWords
-                    wordTexts={splitWords.slice(splitPoint)}
-                    startIdx={splitPoint}
+                    fallbackText={splitWords.slice(splitPoint).join(" ")}
+                    words={line2Words}
                     {...sharedSplitWordsProps}
                   />
                 </div>

@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Display-on-spoken subtitles in dynamic 3D preview and export now keep a stable layout — future words stay reserved in place and no longer cause earlier words to shift when they appear
 - Per-word editing chips now remain available for single-word phrase subtitles, so brief isolated words can still be selected and styled from the bottom editor bar
+- Split subtitle mode now preserves per-word emoji replacement and emoji overlay styling in both preview and exported video instead of dropping those overrides on split lines
 
 ---
 

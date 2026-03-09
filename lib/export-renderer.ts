@@ -633,10 +633,14 @@ export function renderSplitSubtitleOnCanvas(
   const verticalOffset = style.verticalOffset ?? 0;
   const line1Words = phraseWords?.slice(0, splitPoint);
   const line2Words = phraseWords?.slice(splitPoint);
+  const hasSplitOverrides =
+    !!line1Words?.some((word) => word.styleOverride) ||
+    !!line2Words?.some((word) => word.styleOverride);
   const canEmphasizeSplit =
     (style.wordEmphasisEnabled ||
       style.textFadeIn ||
-      style.dynamicFollowWord) &&
+      style.dynamicFollowWord ||
+      hasSplitOverrides) &&
     mode === "phrase" &&
     line1Words &&
     line1Words.length > 0 &&

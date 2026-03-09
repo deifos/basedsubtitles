@@ -61,6 +61,11 @@ export const changelog: ChangelogEntry[] = [
         description:
           "Per-word editing chips now remain available for single-word phrase subtitles, so brief isolated words can still be selected and styled from the bottom editor bar",
       },
+      {
+        type: "fixed",
+        description:
+          "Split subtitle mode now preserves per-word emoji replacement and emoji overlay styling in both preview and exported video instead of dropping those overrides on split lines",
+      },
     ],
   },
   {

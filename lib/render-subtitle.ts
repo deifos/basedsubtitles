@@ -77,12 +77,14 @@ export function renderSubtitleToCanvas(
   if (splitMode !== "none") {
     renderSplitSubtitleToCanvas(
       ctx,
-      currentChunk.text,
+      currentChunk,
       style,
       canvasWidth,
       canvasHeight,
       splitMode,
       faceX,
+      mode,
+      currentTime,
     );
     return;
   }
@@ -100,12 +102,14 @@ export function renderSubtitleToCanvas(
 
 function renderSplitSubtitleToCanvas(
   ctx: CanvasRenderingContext2D,
-  text: string,
+  chunk: { text: string; timestamp: [number, number]; words?: WordTiming[] },
   style: SubtitleStyle,
   canvasWidth: number,
   canvasHeight: number,
   splitMode: "above-below" | "left-right",
   faceX: number,
+  mode: "word" | "phrase",
+  currentTime: number,
 ) {
   const isVerticalVideo = canvasHeight > canvasWidth;
   const videoScale = canvasHeight / 500;
@@ -114,17 +118,17 @@ function renderSplitSubtitleToCanvas(
   ctx.font = `${style.fontWeight} ${finalFontSize}px ${fontFamily}`;
   ctx.textBaseline = "middle";
 
+  const text = chunk.text;
   const words = text.split(" ");
   if (words.length < 2) {
-    // Can't split — fall back to centered rendering
-    ctx.textAlign = "center";
-    renderTextLine(
+    renderChunkToCanvas(
       ctx,
-      text,
-      canvasWidth / 2,
-      canvasHeight * (isVerticalVideo ? 0.92 : 0.84),
+      chunk,
       style,
-      videoScale,
+      canvasWidth,
+      canvasHeight,
+      mode,
+      currentTime,
     );
     return;
   }
@@ -144,35 +148,117 @@ function renderSplitSubtitleToCanvas(
   const line1 = words.slice(0, splitPoint).join(" ");
   const line2 = words.slice(splitPoint).join(" ");
   if (!line2) {
-    ctx.textAlign = "center";
-    renderTextLine(
+    renderChunkToCanvas(
       ctx,
-      text,
-      canvasWidth / 2,
-      canvasHeight * (isVerticalVideo ? 0.92 : 0.84),
+      chunk,
       style,
-      videoScale,
+      canvasWidth,
+      canvasHeight,
+      mode,
+      currentTime,
     );
     return;
   }
+
+  const phraseWords = Array.isArray(chunk.words) ? chunk.words : undefined;
+  const line1Words = phraseWords?.slice(0, splitPoint);
+  const line2Words = phraseWords?.slice(splitPoint);
+  const hasSplitOverrides =
+    !!line1Words?.some((word) => word.styleOverride) ||
+    !!line2Words?.some((word) => word.styleOverride);
+  const canRenderSplitWordByWord =
+    (style.wordEmphasisEnabled ||
+      style.textFadeIn ||
+      style.dynamicFollowWord ||
+      hasSplitOverrides) &&
+    mode === "phrase" &&
+    line1Words &&
+    line1Words.length > 0 &&
+    line2Words &&
+    line2Words.length > 0 &&
+    Number.isFinite(currentTime);
+  const chunkEndTime = chunk.timestamp[1];
 
   if (splitMode === "above-below") {
     const splitOffset = style.verticalOffset ?? 0;
     const y1 = canvasHeight * (isVerticalVideo ? 0.08 : 0.14) - splitOffset;
     const y2 = canvasHeight * (isVerticalVideo ? 0.92 : 0.86) + splitOffset;
     ctx.textAlign = "center";
-    renderTextLine(ctx, line1, canvasWidth / 2, y1, style, videoScale);
-    renderTextLine(ctx, line2, canvasWidth / 2, y2, style, videoScale);
+    if (canRenderSplitWordByWord) {
+      renderPhraseLineWithEmphasis(
+        ctx,
+        line1Words,
+        canvasWidth / 2,
+        y1,
+        style,
+        videoScale,
+        currentTime,
+        finalFontSize,
+        chunkEndTime,
+      );
+      renderPhraseLineWithEmphasis(
+        ctx,
+        line2Words,
+        canvasWidth / 2,
+        y2,
+        style,
+        videoScale,
+        currentTime,
+        finalFontSize,
+        chunkEndTime,
+      );
+    } else {
+      renderTextLine(ctx, line1, canvasWidth / 2, y1, style, videoScale);
+      renderTextLine(ctx, line2, canvasWidth / 2, y2, style, videoScale);
+    }
   } else {
-    // left-right — position at eye level (~38% from top)
     const facePixelX = faceX * canvasWidth;
     const gap = canvasWidth * 0.07;
     const y = canvasHeight * 0.38;
-    ctx.textAlign = "right";
-    renderTextLine(ctx, line1, facePixelX - gap, y, style, videoScale);
-    ctx.textAlign = "left";
-    renderTextLine(ctx, line2, facePixelX + gap, y, style, videoScale);
-    ctx.textAlign = "center"; // restore default
+    if (canRenderSplitWordByWord) {
+      const line1Width = measurePhraseLineWidth(
+        ctx,
+        line1Words,
+        style,
+        currentTime,
+        finalFontSize,
+      );
+      const line2Width = measurePhraseLineWidth(
+        ctx,
+        line2Words,
+        style,
+        currentTime,
+        finalFontSize,
+      );
+      renderPhraseLineWithEmphasis(
+        ctx,
+        line1Words,
+        facePixelX - gap - line1Width / 2,
+        y,
+        style,
+        videoScale,
+        currentTime,
+        finalFontSize,
+        chunkEndTime,
+      );
+      renderPhraseLineWithEmphasis(
+        ctx,
+        line2Words,
+        facePixelX + gap + line2Width / 2,
+        y,
+        style,
+        videoScale,
+        currentTime,
+        finalFontSize,
+        chunkEndTime,
+      );
+    } else {
+      ctx.textAlign = "right";
+      renderTextLine(ctx, line1, facePixelX - gap, y, style, videoScale);
+      ctx.textAlign = "left";
+      renderTextLine(ctx, line2, facePixelX + gap, y, style, videoScale);
+      ctx.textAlign = "center";
+    }
   }
 }
 
@@ -950,6 +1036,53 @@ function renderTextLine(
   ctx.fillStyle = fillStyle;
   ctx.fillText(upperText, x, y);
   ctx.restore();
+}
+
+function measurePhraseLineWidth(
+  ctx: CanvasRenderingContext2D,
+  words: WordTiming[],
+  style: SubtitleStyle,
+  currentTime: number,
+  finalFontSize: number,
+) {
+  if (words.length === 0) {
+    return 0;
+  }
+
+  const globalFont = `${style.fontWeight} ${finalFontSize}px ${resolveFontFamily(style.fontFamily)}`;
+  const displayTexts = words.map((word) =>
+    word.styleOverride?.emoji
+      ? word.styleOverride.emoji
+      : word.text.toUpperCase(),
+  );
+  const spaceWidth = 0.35 * finalFontSize;
+
+  const baseWidths = displayTexts.map((value, index) => {
+    const word = words[index];
+    if (word.styleOverride?.fontFamily || word.styleOverride?.fontSize) {
+      ctx.font = buildWordFont(style, finalFontSize, word.styleOverride);
+      const width = ctx.measureText(value).width;
+      ctx.font = globalFont;
+      return width;
+    }
+    return ctx.measureText(value).width;
+  });
+
+  const scaledWidths = baseWidths.map((width, index) => {
+    const word = words[index];
+    const scale =
+      currentTime >= word.timestamp[0] &&
+      currentTime <= word.timestamp[1] &&
+      style.wordEmphasisEnabled
+        ? 1.18
+        : 1;
+    return width * scale;
+  });
+
+  return (
+    scaledWidths.reduce((total, width) => total + width, 0) +
+    spaceWidth * Math.max(0, words.length - 1)
+  );
 }
 
 /** Build a font string, optionally applying per-word overrides. */
