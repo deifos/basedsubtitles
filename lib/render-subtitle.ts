@@ -243,13 +243,9 @@ export function renderDynamicBehindText(
 
   if (!currentChunk || !currentChunk.words) return;
 
-  // Filter only "behind" words, with progressive reveal if enabled
-  let behindWords = currentChunk.words.filter(
+  const behindWords = currentChunk.words.filter(
     (w) => w.dynamicPosition === "behind",
   );
-  if (style.dynamicFollowWord) {
-    behindWords = behindWords.filter((w) => currentTime >= w.timestamp[0]);
-  }
   if (behindWords.length === 0) return;
 
   const behindText = behindWords.map((w) => w.text).join(" ");
@@ -300,13 +296,9 @@ export function renderDynamicFrontText(
 
   if (!currentChunk || !currentChunk.words) return;
 
-  // Filter only "front" words, with progressive reveal if enabled
-  let frontWords = currentChunk.words.filter(
+  const frontWords = currentChunk.words.filter(
     (w) => w.dynamicPosition === "front",
   );
-  if (style.dynamicFollowWord) {
-    frontWords = frontWords.filter((w) => currentTime >= w.timestamp[0]);
-  }
   if (frontWords.length === 0) return;
 
   const frontText = frontWords.map((w) => w.text).join(" ");
@@ -412,6 +404,8 @@ function renderDynamicTextBlock(
 
   const useTextFade =
     (style.textFadeIn ?? false) && wordTimings && currentTime != null;
+  const useSpokenWordOpacity =
+    (style.dynamicFollowWord ?? false) && wordTimings && currentTime != null;
   const fadeOutDuration = 0.25;
   const chunkFadeOut =
     useTextFade && chunkEndTime != null
@@ -422,7 +416,8 @@ function renderDynamicTextBlock(
       : 1;
 
   // Need word-by-word rendering when we have overrides OR textFadeIn
-  const needsWordByWord = (hasOverrides || useTextFade) && wordTimings;
+  const needsWordByWord =
+    (hasOverrides || useTextFade || useSpokenWordOpacity) && wordTimings;
 
   for (let i = 0; i < lines.length; i++) {
     const lineY = startY + i * lineHeight;
@@ -486,8 +481,13 @@ function renderDynamicTextBlock(
           }
         }
 
+        const isSpoken = w.timing
+          ? currentTime! >= w.timing.timestamp[0]
+          : true;
+        const wordAlpha = useSpokenWordOpacity && !isSpoken ? 0.2 : 1;
+
         ctx.save();
-        if (!charAlphas) ctx.globalAlpha = chunkFadeOut;
+        ctx.globalAlpha = wordAlpha * chunkFadeOut;
         renderDynamicWord(
           ctx,
           w.text,
