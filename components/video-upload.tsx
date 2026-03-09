@@ -137,7 +137,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
           setVideoSrc(null);
         }
       }
-    }, [ref]);
+    }, [ref, revokeVideoObjectUrl]);
 
     // Reset state when component is mounted
     useEffect(() => {
@@ -195,7 +195,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
           setVideoSrc(null);
         }
       },
-      [onVideoSelect, onAspectRatioDetected],
+      [onVideoSelect, onAspectRatioDetected, revokeVideoObjectUrl],
     );
 
     const handleDrop = useCallback(

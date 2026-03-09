@@ -14,6 +14,7 @@ import {
   ZoomOut,
   ScanFace,
   Loader2,
+  CheckCircle2,
 } from "lucide-react";
 import { TranscriptSidebar } from "@/components/transcript-sidebar";
 import { SubtitleStyling, SubtitleStyle } from "@/components/subtitle-styling";
@@ -669,27 +670,18 @@ export function MainApp({
                               Transcribing
                               {latestTranscribedTime !== null
                                 ? ` ${formatTime(latestTranscribedTime)}`
-                                : ""}
+                                : ""}{" "}
+                              · {Math.round(progress)}%
                             </span>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`text-xs font-medium ${device === "webgpu" ? "text-green-600" : "text-slate-400"}`}
-                              style={{
-                                fontFamily: "var(--font-outfit), sans-serif",
-                              }}
-                            >
-                              {device === "webgpu" ? "WebGPU" : "CPU"}
-                            </span>
-                            <span
-                              className="text-sm font-bold text-amber-700"
-                              style={{
-                                fontFamily: "var(--font-outfit), sans-serif",
-                              }}
-                            >
-                              {Math.round(progress)}%
-                            </span>
-                          </div>
+                          <span
+                            className={`text-xs font-medium ${device === "webgpu" ? "text-green-600" : "text-slate-400"}`}
+                            style={{
+                              fontFamily: "var(--font-outfit), sans-serif",
+                            }}
+                          >
+                            {device === "webgpu" ? "WebGPU" : "CPU"}
+                          </span>
                         </div>
                         <div className="w-full bg-amber-100 rounded-full h-1.5 overflow-hidden">
                           <div
@@ -945,16 +937,7 @@ export function MainApp({
                       </div>
                     )}
 
-                    {result.generationTime && (
-                      <div
-                        className="text-xs text-slate-400"
-                        style={{ fontFamily: "var(--font-outfit), sans-serif" }}
-                      >
-                        Generation time:{" "}
-                        {(result.generationTime / 1000).toFixed(2)}s (
-                        {device === "webgpu" ? "WebGPU" : "WASM"})
-                      </div>
-                    )}
+
                     {isLongVideo && !isDownloadProcessing && (
                       <div
                         className="w-full max-w-md rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 space-y-1"
@@ -1023,7 +1006,7 @@ export function MainApp({
               {result && (
                 <div className="hidden lg:flex lg:flex-col w-full lg:w-96 h-[calc(100vh-11rem-20px)]">
                   <div
-                    className={`flex-1 min-h-0 flex flex-col w-full border border-slate-200/80 bg-white shadow-lg shadow-slate-200/40 ${isTranscribingBanner ? "rounded-t-2xl" : "rounded-2xl"}`}
+                    className={`flex-1 min-h-0 flex flex-col w-full border border-slate-200/80 bg-white shadow-lg shadow-slate-200/40 ${isTranscribingBanner || result?.generationTime ? "rounded-t-2xl" : "rounded-2xl"}`}
                   >
                     <div className="px-4 pt-4 pb-3 border-b border-slate-100 shrink-0">
                       <h4
@@ -1062,48 +1045,60 @@ export function MainApp({
                       videoFileName={uploadedFile?.name}
                     />
                   </div>
-                  {isTranscribingBanner && (
+                  {(isTranscribingBanner || result?.generationTime) && (
                     <div className="rounded-b-2xl border border-t-0 border-amber-200 bg-amber-50 shadow-lg shadow-slate-200/40 px-4 py-3 flex flex-col gap-2 shrink-0">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <Loader2 className="h-4 w-4 animate-spin text-amber-600 shrink-0" />
+                          {isTranscribingBanner ? (
+                            <Loader2 className="h-4 w-4 animate-spin text-amber-600 shrink-0" />
+                          ) : (
+                            <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+                          )}
                           <span
                             className="text-sm text-amber-800 font-semibold"
                             style={{
                               fontFamily: "var(--font-outfit), sans-serif",
                             }}
                           >
-                            Transcribing
-                            {latestTranscribedTime !== null
-                              ? ` ${formatTime(latestTranscribedTime)}`
-                              : ""}
+                            {isTranscribingBanner ? (
+                              <>
+                                Transcribing
+                                {latestTranscribedTime !== null
+                                  ? ` ${formatTime(latestTranscribedTime)}`
+                                  : ""}{" "}
+                                · {Math.round(progress)}%
+                              </>
+                            ) : (
+                              <>
+                                Done in{" "}
+                                {(() => {
+                                  const s = Math.round(
+                                    (result.generationTime ?? 0) / 1000,
+                                  );
+                                  const m = Math.floor(s / 60);
+                                  return m > 0 ? `${m}m ${s % 60}s` : `${s}s`;
+                                })()}
+                              </>
+                            )}
                           </span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`text-xs font-medium ${device === "webgpu" ? "text-green-600" : "text-slate-400"}`}
-                            style={{
-                              fontFamily: "var(--font-outfit), sans-serif",
-                            }}
-                          >
-                            {device === "webgpu" ? "WebGPU" : "CPU"}
-                          </span>
-                          <span
-                            className="text-sm font-bold text-amber-700"
-                            style={{
-                              fontFamily: "var(--font-outfit), sans-serif",
-                            }}
-                          >
-                            {Math.round(progress)}%
-                          </span>
+                        <span
+                          className={`text-xs font-medium ${device === "webgpu" ? "text-green-600" : "text-slate-400"}`}
+                          style={{
+                            fontFamily: "var(--font-outfit), sans-serif",
+                          }}
+                        >
+                          {device === "webgpu" ? "WebGPU" : "CPU"}
+                        </span>
+                      </div>
+                      {isTranscribingBanner && (
+                        <div className="w-full bg-amber-100 rounded-full h-1.5 overflow-hidden">
+                          <div
+                            className="bg-amber-500 h-1.5 rounded-full transition-all duration-500"
+                            style={{ width: `${progress}%` }}
+                          />
                         </div>
-                      </div>
-                      <div className="w-full bg-amber-100 rounded-full h-1.5 overflow-hidden">
-                        <div
-                          className="bg-amber-500 h-1.5 rounded-full transition-all duration-500"
-                          style={{ width: `${progress}%` }}
-                        />
-                      </div>
+                      )}
                     </div>
                   )}
                 </div>
