@@ -18,6 +18,7 @@ export interface UseFaceTrackingReturn {
   getCenterX: () => number;
   buildExportTimeline: (
     videoElement: HTMLVideoElement,
+    onProgress?: (percent: number) => void,
   ) => Promise<PositionTimeline>;
 }
 
@@ -190,7 +191,10 @@ export function useFaceTracking(): UseFaceTrackingReturn {
   }, []);
 
   const buildExportTimeline = useCallback(
-    async (videoElement: HTMLVideoElement): Promise<PositionTimeline> => {
+    async (
+      videoElement: HTMLVideoElement,
+      onProgress?: (percent: number) => void,
+    ): Promise<PositionTimeline> => {
       const duration = videoElement.duration;
 
       // Use preview timeline only if it covers at least 90% of the video.
@@ -204,9 +208,12 @@ export function useFaceTracking(): UseFaceTrackingReturn {
         return preview;
       }
 
-      // Scan the video at ~5fps
+      // Scan the video at 2fps — face positions change slowly and the
+      // timeline is interpolated/smoothed, so 2fps is plenty while being
+      // 2.5× faster than the previous 5fps scan.
       const detector = await ensureDetector();
-      const step = 1 / 5; // 5fps
+      const step = 1 / 2; // 2fps
+      const totalSteps = Math.ceil(duration / step);
       const timeline: PositionTimeline = [];
 
       // Save and pause
@@ -214,7 +221,14 @@ export function useFaceTracking(): UseFaceTrackingReturn {
       if (wasPlaying) videoElement.pause();
       const savedTime = videoElement.currentTime;
 
+      let stepIndex = 0;
       for (let t = 0; t < duration; t += step) {
+        // Report progress
+        if (onProgress && stepIndex % 4 === 0) {
+          onProgress(Math.min(100, (stepIndex / totalSteps) * 100));
+        }
+        stepIndex++;
+
         // Add the seeked listener BEFORE setting currentTime so we never miss
         // the event. Skip the seek entirely if already at the target time.
         if (Math.abs(videoElement.currentTime - t) >= 0.01) {

@@ -6,7 +6,7 @@ import {
   AudioBufferSource,
   Mp4OutputFormat,
   WebMOutputFormat,
-  BufferTarget,
+  StreamTarget,
   BlobSource,
   VideoSampleSink,
   VideoSample,
@@ -16,6 +16,7 @@ import {
   QUALITY_LOW,
   QUALITY_VERY_HIGH,
 } from "mediabunny";
+import type { StreamTargetChunk } from "mediabunny";
 import { SubtitleStyle } from "@/components/subtitle-styling";
 import { processTranscriptChunks } from "@/lib/utils";
 import { estimateFaceFromMask, type FaceBounds } from "@/lib/render-subtitle";
@@ -53,6 +54,7 @@ interface UseVideoDownloadMediaBunnyProps {
   getMaskAtTime?: (time: number, fps?: number) => MaskData | null;
   buildExportTimeline?: (
     videoElement: HTMLVideoElement,
+    onProgress?: (percent: number) => void,
   ) => Promise<PositionTimeline>;
 }
 
@@ -63,6 +65,27 @@ const qualityMap = {
   high: QUALITY_HIGH,
   very_high: QUALITY_VERY_HIGH,
 } as const;
+
+/** Binary search for the subtitle chunk active at `time`. Assumes chunks are sorted by start time. */
+function findChunkAtTime(
+  chunks: TranscriptChunk[],
+  time: number,
+): TranscriptChunk | undefined {
+  let lo = 0;
+  let hi = chunks.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >>> 1;
+    const [start, end] = chunks[mid].timestamp;
+    if (time < start) {
+      hi = mid - 1;
+    } else if (time > end) {
+      lo = mid + 1;
+    } else {
+      return chunks[mid];
+    }
+  }
+  return undefined;
+}
 
 export function useVideoDownloadMediaBunny({
   video,
@@ -105,13 +128,17 @@ export function useVideoDownloadMediaBunny({
 
     // Declare reusable buffers outside try so finally can null them for GC
     let reusableBlurCanvas: HTMLCanvasElement | null = null;
-    let reusableFgCanvas: HTMLCanvasElement | null = null;
-    let reusableMaskCanvas: HTMLCanvasElement | null = null;
+    let reusableBlurCtx: CanvasRenderingContext2D | null = null;
+    let reusableFgCanvas: OffscreenCanvas | null = null;
+    let reusableFgCtx: OffscreenCanvasRenderingContext2D | null = null;
+    let reusableMaskCanvas: OffscreenCanvas | null = null;
     let reusableMaskImageData: ImageData | null = null;
-    let reusableFrameCanvas: HTMLCanvasElement | null = null;
-    let reusableFrameCtx: CanvasRenderingContext2D | null = null;
-    let decodeCanvas: HTMLCanvasElement | null = null;
-    let decodeCtx: CanvasRenderingContext2D | null = null;
+    let lastMaskW = 0;
+    let lastMaskH = 0;
+    let reusableFrameCanvas: OffscreenCanvas | null = null;
+    let reusableFrameCtx: OffscreenCanvasRenderingContext2D | null = null;
+    let decodeCanvas: OffscreenCanvas | null = null;
+    let decodeCtx: OffscreenCanvasRenderingContext2D | null = null;
 
     try {
       // Create canvas matching video dimensions, capped on mobile to prevent
@@ -119,7 +146,7 @@ export function useVideoDownloadMediaBunny({
       // the export pipeline creates multiple full-res offscreen canvases
       // (main + frame + blur + fg + mask) which can silently degrade quality
       // when exceeding the budget (e.g. 5× 4K canvases ≈ 165 MB).
-      const canvas = document.createElement("canvas");
+      const canvas = new OffscreenCanvas(1, 1);
       let exportWidth = video.videoWidth;
       let exportHeight = video.videoHeight;
       const srcW = video.videoWidth;
@@ -179,19 +206,31 @@ export function useVideoDownloadMediaBunny({
       let faceTimeline: PositionTimeline | null = null;
       if (needsFaceTimeline && buildExportTimeline) {
         setStatus("Analyzing face positions...");
-        faceTimeline = await buildExportTimeline(video);
+        faceTimeline = await buildExportTimeline(video, (percent) => {
+          setProgress(percent);
+          setStatus(
+            `Analyzing face positions... ${Math.round(percent)}%`,
+          );
+        });
       }
 
       // For crop mode, sample.draw() doesn't support source crop, so decode
       // to a full-resolution canvas first, then blit the cropped region.
       if (needsCrop) {
-        decodeCanvas = document.createElement("canvas");
-        decodeCanvas.width = srcW;
-        decodeCanvas.height = srcH;
-        decodeCtx = decodeCanvas.getContext("2d");
+        decodeCanvas = new OffscreenCanvas(srcW, srcH);
+        decodeCtx = decodeCanvas.getContext("2d", {
+          alpha: false,
+        }) as OffscreenCanvasRenderingContext2D;
       }
 
-      const ctx = canvas.getContext("2d");
+      // Cast to CanvasRenderingContext2D — OffscreenCanvasRenderingContext2D is
+      // API-compatible for all 2D drawing ops, but export-renderer functions
+      // expect the DOM type. This avoids changing signatures across the codebase.
+      const ctx = canvas.getContext("2d", {
+        alpha: false,
+      }) as unknown as CanvasRenderingContext2D;
+      // Alias for render functions that expect HTMLCanvasElement (only .width/.height used)
+      const canvasForRender = canvas as unknown as HTMLCanvasElement;
 
       if (!ctx) {
         throw new Error("Failed to create canvas context");
@@ -210,13 +249,36 @@ export function useVideoDownloadMediaBunny({
       const originalVideoTrack = await input.getPrimaryVideoTrack();
       const originalAudioTrack = await input.getPrimaryAudioTrack();
 
+      // Accumulate encoded data via StreamTarget — avoids holding one giant
+      // contiguous buffer (BufferTarget) which can OOM on long videos.
+      let outputBuffer = new Uint8Array(4 * 1024 * 1024); // start 4 MB
+      let outputSize = 0;
+      const streamTarget = new StreamTarget(
+        new WritableStream<StreamTargetChunk>({
+          write(chunk) {
+            const end = chunk.position + chunk.data.byteLength;
+            // Grow buffer if needed (double until large enough)
+            if (end > outputBuffer.byteLength) {
+              let newLen = outputBuffer.byteLength;
+              while (newLen < end) newLen *= 2;
+              const grown = new Uint8Array(newLen);
+              grown.set(outputBuffer);
+              outputBuffer = grown;
+            }
+            outputBuffer.set(chunk.data, chunk.position);
+            if (end > outputSize) outputSize = end;
+          },
+        }),
+        { chunked: true },
+      );
+
       const outputFormat =
         format === "webm"
           ? new WebMOutputFormat()
           : new Mp4OutputFormat({ fastStart: "in-memory" });
       const output = new Output({
         format: outputFormat,
-        target: new BufferTarget(),
+        target: streamTarget,
       });
       cancelContextRef.current.output = output;
 
@@ -315,6 +377,13 @@ export function useVideoDownloadMediaBunny({
         }
       }
 
+      // Pre-compute whether compositing will be needed (for clearRect optimization)
+      const needsCompositingGlobal =
+        (subtitleStyle.dynamicEnabled && bgRemovalReady && bgProcessFrame) ||
+        (bgRemovalReady &&
+          subtitleStyle.backgroundRemovalEnabled &&
+          bgProcessFrame);
+
       const totalFrames = Math.ceil(duration * fps);
       setStatus("Rendering video frames...");
 
@@ -362,8 +431,11 @@ export function useVideoDownloadMediaBunny({
             )
           : cropX;
 
-        // Clear canvas
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // Clear canvas only when compositing or cropping — in the normal
+        // full-frame path the drawImage overwrites every pixel anyway.
+        if (needsCompositingGlobal || needsCrop) {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
 
         // Draw video frame using iterator to avoid repeated decoder setup
         if (videoSampleSink && sampleIterator) {
@@ -427,11 +499,8 @@ export function useVideoDownloadMediaBunny({
           }
         }
 
-        // Find current subtitle chunk
-        const currentChunk = enabledChunks.find((chunk) => {
-          const [start, end] = chunk.timestamp;
-          return time >= start && time <= end;
-        });
+        // Find current subtitle chunk (binary search — O(log n) vs O(n) per frame)
+        const currentChunk = findChunkAtTime(enabledChunks, time);
 
         // Face X for left-right split: frozen per-phrase, not interpolated per-frame.
         // This keeps text stationary for the phrase duration so it's easy to read.
@@ -451,10 +520,13 @@ export function useVideoDownloadMediaBunny({
           // Compositing at full resolution (bg removal or dynamic mode)
           // Save current frame to offscreen canvas via GPU blit (fast, no ImageData needed for restore)
           if (!reusableFrameCanvas) {
-            reusableFrameCanvas = document.createElement("canvas");
-            reusableFrameCanvas.width = canvas.width;
-            reusableFrameCanvas.height = canvas.height;
-            reusableFrameCtx = reusableFrameCanvas.getContext("2d");
+            reusableFrameCanvas = new OffscreenCanvas(
+              canvas.width,
+              canvas.height,
+            );
+            reusableFrameCtx = reusableFrameCanvas.getContext("2d", {
+              alpha: false,
+            }) as OffscreenCanvasRenderingContext2D;
           }
           reusableFrameCtx!.drawImage(canvas, 0, 0);
 
@@ -484,7 +556,7 @@ export function useVideoDownloadMediaBunny({
                 ctx,
                 currentChunk,
                 subtitleStyle,
-                canvas,
+                canvasForRender,
                 mode,
                 time,
                 frameFaceX,
@@ -508,18 +580,23 @@ export function useVideoDownloadMediaBunny({
             // Dynamic mode: keep original video as background (GPU blit)
             ctx.drawImage(reusableFrameCanvas!, 0, 0);
           } else if (subtitleStyle.backgroundType === "blur") {
-            // Reuse blurCanvas across frames
+            // Reuse blurCanvas across frames — stays as DOM canvas because
+            // ctx.filter is not supported on OffscreenCanvas in all browsers.
             if (!reusableBlurCanvas) {
               reusableBlurCanvas = document.createElement("canvas");
+              reusableBlurCanvas.width = canvas.width;
+              reusableBlurCanvas.height = canvas.height;
+              reusableBlurCtx = reusableBlurCanvas.getContext("2d", {
+                alpha: false,
+              });
             }
-            reusableBlurCanvas.width = canvas.width;
-            reusableBlurCanvas.height = canvas.height;
-            const blurCtx = reusableBlurCanvas.getContext("2d");
-            if (blurCtx) {
-              blurCtx.drawImage(reusableFrameCanvas!, 0, 0);
-              ctx.filter = "blur(20px)";
-              ctx.drawImage(reusableBlurCanvas, 0, 0);
-              ctx.filter = "none";
+            if (reusableBlurCtx) {
+              // Apply blur on the DOM canvas context (OffscreenCanvas may not
+              // support ctx.filter in all browsers), then blit to main canvas.
+              reusableBlurCtx.filter = "blur(20px)";
+              reusableBlurCtx.drawImage(reusableFrameCanvas!, 0, 0);
+              reusableBlurCtx.filter = "none";
+              ctx.drawImage(reusableBlurCanvas!, 0, 0);
             }
           } else {
             ctx.fillStyle = subtitleStyle.solidBackgroundColor;
@@ -533,26 +610,38 @@ export function useVideoDownloadMediaBunny({
               ctx,
               currentChunk,
               subtitleStyle,
-              canvas,
+              canvasForRender,
               time,
             );
           }
 
           // Step 3: Draw masked foreground (reuse canvases across frames)
           if (!reusableFgCanvas) {
-            reusableFgCanvas = document.createElement("canvas");
+            reusableFgCanvas = new OffscreenCanvas(
+              canvas.width,
+              canvas.height,
+            );
+            reusableFgCtx = reusableFgCanvas.getContext(
+              "2d",
+            ) as OffscreenCanvasRenderingContext2D;
           }
           if (!reusableMaskCanvas) {
-            reusableMaskCanvas = document.createElement("canvas");
+            reusableMaskCanvas = new OffscreenCanvas(mask.width, mask.height);
+            lastMaskW = mask.width;
+            lastMaskH = mask.height;
           }
-          reusableFgCanvas.width = canvas.width;
-          reusableFgCanvas.height = canvas.height;
-          const fgCtx = reusableFgCanvas.getContext("2d");
-          if (fgCtx) {
-            fgCtx.drawImage(reusableFrameCanvas!, 0, 0);
+          // Clear fg canvas instead of resetting dimensions (avoids context state reset)
+          reusableFgCtx!.clearRect(0, 0, canvas.width, canvas.height);
+          if (reusableFgCtx) {
+            reusableFgCtx.drawImage(reusableFrameCanvas!, 0, 0);
 
-            reusableMaskCanvas.width = mask.width;
-            reusableMaskCanvas.height = mask.height;
+            // Only resize mask canvas when dimensions actually change
+            if (lastMaskW !== mask.width || lastMaskH !== mask.height) {
+              reusableMaskCanvas.width = mask.width;
+              reusableMaskCanvas.height = mask.height;
+              lastMaskW = mask.width;
+              lastMaskH = mask.height;
+            }
             const maskCtx = reusableMaskCanvas.getContext("2d");
             if (maskCtx) {
               // Reuse ImageData if mask dimensions haven't changed
@@ -576,14 +665,14 @@ export function useVideoDownloadMediaBunny({
               }
               maskCtx.putImageData(reusableMaskImageData, 0, 0);
 
-              fgCtx.globalCompositeOperation = "destination-in";
+              reusableFgCtx.globalCompositeOperation = "destination-in";
               if (needsCrop && cachedMask) {
                 // Cached masks cover the full video frame — crop to match
                 const msx = (frameCropX / srcW) * mask.width;
                 const msy = (cropY / srcH) * mask.height;
                 const msw = (cropW / srcW) * mask.width;
                 const msh = (cropH / srcH) * mask.height;
-                fgCtx.drawImage(
+                reusableFgCtx.drawImage(
                   reusableMaskCanvas,
                   msx,
                   msy,
@@ -595,7 +684,7 @@ export function useVideoDownloadMediaBunny({
                   canvas.height,
                 );
               } else {
-                fgCtx.drawImage(
+                reusableFgCtx.drawImage(
                   reusableMaskCanvas,
                   0,
                   0,
@@ -603,7 +692,7 @@ export function useVideoDownloadMediaBunny({
                   canvas.height,
                 );
               }
-              fgCtx.globalCompositeOperation = "source-over";
+              reusableFgCtx.globalCompositeOperation = "source-over";
             }
 
             ctx.drawImage(reusableFgCanvas, 0, 0);
@@ -637,7 +726,7 @@ export function useVideoDownloadMediaBunny({
               ctx,
               currentChunk,
               subtitleStyle,
-              canvas,
+              canvasForRender,
               faceBounds,
               time,
             );
@@ -646,7 +735,7 @@ export function useVideoDownloadMediaBunny({
               ctx,
               currentChunk,
               subtitleStyle,
-              canvas,
+              canvasForRender,
               mode,
               time,
               frameFaceX,
@@ -659,7 +748,7 @@ export function useVideoDownloadMediaBunny({
               ctx,
               currentChunk,
               subtitleStyle,
-              canvas,
+              canvasForRender,
               mode,
               time,
               frameFaceX,
@@ -717,16 +806,15 @@ export function useVideoDownloadMediaBunny({
         setStatus("Finalizing video...");
         await output.finalize();
 
-        // Download file
-        const bufferTarget = output.target as BufferTarget;
-        const buffer = bufferTarget.buffer;
-
-        if (!buffer) {
+        // Build download blob from StreamTarget buffer
+        if (outputSize === 0) {
           throw new Error("Failed to generate video buffer");
         }
 
         const mimeType = format === "webm" ? "video/webm" : "video/mp4";
-        const blob = new Blob([buffer], { type: mimeType });
+        const blob = new Blob([outputBuffer.slice(0, outputSize)], {
+          type: mimeType,
+        });
         const url = URL.createObjectURL(blob);
 
         const a = document.createElement("a");
@@ -748,7 +836,9 @@ export function useVideoDownloadMediaBunny({
     } finally {
       // Release all reusable canvases and buffers to free memory
       reusableBlurCanvas = null;
+      reusableBlurCtx = null;
       reusableFgCanvas = null;
+      reusableFgCtx = null;
       reusableMaskCanvas = null;
       reusableMaskImageData = null;
       reusableFrameCanvas = null;

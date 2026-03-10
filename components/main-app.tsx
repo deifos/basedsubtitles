@@ -229,6 +229,10 @@ export function MainApp({
     }
   }, [status, showLanguageModal]);
 
+  const [exportQuality, setExportQuality] = useState<"medium" | "high">(
+    "medium",
+  );
+
   const {
     downloadVideo,
     cancelDownload,
@@ -242,7 +246,7 @@ export function MainApp({
     mode,
     ratio,
     format: "mp4",
-    quality: "high",
+    quality: exportQuality,
     fps: 30,
     bgRemovalReady,
     processFrame: bgProcessFrame,
@@ -953,17 +957,37 @@ export function MainApp({
                         </p>
                       </div>
                     )}
-                    <Button
-                      onClick={downloadVideo}
-                      className="flex items-center gap-2 rounded-lg bg-slate-900 text-white font-semibold hover:bg-slate-800 shadow-sm"
+                    <div
+                      className="flex items-center gap-2 w-full max-w-md"
                       style={{ fontFamily: "var(--font-outfit), sans-serif" }}
-                      disabled={isDownloadProcessing}
                     >
-                      <Download className="w-4 h-4" />
-                      {isDownloadProcessing
-                        ? "Processing..."
-                        : "Download Video with Subtitles"}
-                    </Button>
+                      <Button
+                        onClick={downloadVideo}
+                        className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-slate-900 text-white font-semibold hover:bg-slate-800 shadow-sm"
+                        disabled={isDownloadProcessing}
+                      >
+                        <Download className="w-4 h-4" />
+                        {isDownloadProcessing
+                          ? "Processing..."
+                          : "Download Video"}
+                      </Button>
+                      <div className="flex rounded-lg border border-slate-200 overflow-hidden shrink-0">
+                        {(["medium", "high"] as const).map((q) => (
+                          <button
+                            key={q}
+                            onClick={() => setExportQuality(q)}
+                            disabled={isDownloadProcessing}
+                            className={`px-2.5 py-2 text-xs font-semibold transition-colors ${
+                              exportQuality === q
+                                ? "bg-slate-900 text-white"
+                                : "bg-white text-slate-500 hover:bg-slate-50"
+                            } ${isDownloadProcessing ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                          >
+                            {q === "medium" ? "MD" : "HQ"}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
 
                     {isDownloadProcessing && (
                       <div className="w-full max-w-md space-y-2">

@@ -8,7 +8,7 @@
  * - PATCH: Bug fixes and small improvements
  */
 
-export const APP_VERSION = "2.3.0";
+export const APP_VERSION = "2.4.0";
 
 export interface ChangelogEntry {
   version: string;
@@ -21,6 +21,43 @@ export interface ChangelogEntry {
 }
 
 export const changelog: ChangelogEntry[] = [
+  {
+    version: "2.4.0",
+    date: "2026-03-09",
+    title: "Faster Export & Quality Selector",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Export quality selector — choose between Medium (smaller file, closer to source bitrate) and High Quality before downloading",
+      },
+      {
+        type: "changed",
+        description:
+          "Export pipeline now uses OffscreenCanvas, alpha-free contexts, and StreamTarget for reduced memory usage and faster frame rendering",
+      },
+      {
+        type: "changed",
+        description:
+          "Default export quality lowered from High to Medium so output file sizes match the original video more closely",
+      },
+      {
+        type: "changed",
+        description:
+          "Face position analysis before 9:16 export now runs at 2fps instead of 5fps (2.5x faster) and shows a live progress percentage",
+      },
+      {
+        type: "fixed",
+        description:
+          "Canvas context state (transforms, composite ops) no longer resets every frame during compositing export — blur, foreground, and mask canvases are sized once and cleared instead of recreated",
+      },
+      {
+        type: "fixed",
+        description:
+          "Subtitle chunk lookup during export uses binary search instead of linear scan, eliminating per-frame overhead on long videos with many subtitles",
+      },
+    ],
+  },
   {
     version: "2.3.0",
     date: "2026-03-09",
