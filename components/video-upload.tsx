@@ -92,6 +92,8 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
     const blurCanvasRef = useRef<HTMLCanvasElement | null>(null);
     const seekBarFillRef = useRef<HTMLDivElement>(null);
     const timeDisplayRef = useRef<HTMLSpanElement>(null);
+    const videoContainerRef = useRef<HTMLDivElement>(null);
+    const [containerWidth, setContainerWidth] = useState(0);
     // Transient seeking state in refs — avoids re-renders during drag
     const seekingRef = useRef(false);
     const seekValueRef = useRef(0);
@@ -109,6 +111,17 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
       return () => {
         if (skipTimeoutRef.current) clearTimeout(skipTimeoutRef.current);
       };
+    }, []);
+
+    // Track video container width for responsive subtitle sizing
+    useEffect(() => {
+      const el = videoContainerRef.current;
+      if (!el) return;
+      const ro = new ResizeObserver(([entry]) => {
+        setContainerWidth(entry.contentRect.width);
+      });
+      ro.observe(el);
+      return () => ro.disconnect();
     }, []);
 
     // Sync progress bar fill + time display from currentTime prop, skip while dragging.
@@ -670,6 +683,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
               )}
             >
               <div
+                ref={videoContainerRef}
                 className={cn(
                   "relative flex justify-center",
                   ratio === "16:9" && "max-h-[500px]",
@@ -790,6 +804,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
                     mode={mode}
                     ratio={ratio}
                     getFaceX={getCenterX}
+                    containerWidth={containerWidth}
                   />
                 )}
               </div>

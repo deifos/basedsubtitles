@@ -247,6 +247,8 @@ interface VideoCaptionProps {
   mode: "word" | "phrase";
   ratio: "16:9" | "9:16";
   getFaceX?: () => number;
+  /** Measured width of the video container in px, used for proportional font sizing. */
+  containerWidth?: number;
 }
 
 export function VideoCaption({
@@ -256,6 +258,7 @@ export function VideoCaption({
   mode,
   ratio,
   getFaceX,
+  containerWidth,
 }: VideoCaptionProps) {
   const splitMode = style.splitSubtitleMode ?? "none";
   // Frozen face X for left-right split: captured once per phrase, not per frame
@@ -514,7 +517,20 @@ export function VideoCaption({
     line2 = words.slice(splitPoint).join(" ");
   }
 
-  const responsiveFontSize = `clamp(12px, ${style.fontSize * 0.06}vw, ${style.fontSize}px)`;
+  // Scale font relative to the actual video container width. The canvas
+  // renderer uses canvasHeight / 500 as its baseline. The DOM equivalent:
+  // at max-h-500 the 16:9 container is ~889px wide, 9:16 is ~281px.
+  // Scale linearly from that baseline so mobile and desktop stay proportional.
+  // On small screens (<500px) we apply a 1.4× boost so subtitles stay readable
+  // on the tiny preview — the exported video renders at full resolution anyway.
+  const refWidth = ratio === "9:16" ? 281 : 889;
+  const mobileBoost =
+    containerWidth && containerWidth < 500 ? 1.4 : 1;
+  const scaledFontSize =
+    containerWidth && containerWidth > 0
+      ? Math.round(style.fontSize * (containerWidth / refWidth) * mobileBoost)
+      : style.fontSize;
+  const responsiveFontSize = `${Math.max(12, scaledFontSize)}px`;
 
   const verticalOffset = style.verticalOffset ?? 0;
   const position = style.position ?? "bottom";
