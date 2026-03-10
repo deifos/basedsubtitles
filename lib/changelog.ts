@@ -56,6 +56,11 @@ export const changelog: ChangelogEntry[] = [
         description:
           "Subtitle chunk lookup during export uses binary search instead of linear scan, eliminating per-frame overhead on long videos with many subtitles",
       },
+      {
+        type: "fixed",
+        description:
+          "Subtitle preview text on mobile now scales relative to the video container width instead of the viewport, with a readability boost on small screens so text stays legible even on compact previews",
+      },
     ],
   },
   {
