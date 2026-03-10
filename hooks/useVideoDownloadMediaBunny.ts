@@ -146,7 +146,10 @@ export function useVideoDownloadMediaBunny({
       // the export pipeline creates multiple full-res offscreen canvases
       // (main + frame + blur + fg + mask) which can silently degrade quality
       // when exceeding the budget (e.g. 5× 4K canvases ≈ 165 MB).
-      const canvas = new OffscreenCanvas(1, 1);
+      // Main canvas stays as DOM canvas — CanvasSource reads from it to
+      // encode frames, and OffscreenCanvas causes playback stutters on some
+      // mobile browsers. Intermediate canvases use OffscreenCanvas for speed.
+      const canvas = document.createElement("canvas");
       let exportWidth = video.videoWidth;
       let exportHeight = video.videoHeight;
       const srcW = video.videoWidth;
@@ -223,14 +226,7 @@ export function useVideoDownloadMediaBunny({
         }) as OffscreenCanvasRenderingContext2D;
       }
 
-      // Cast to CanvasRenderingContext2D — OffscreenCanvasRenderingContext2D is
-      // API-compatible for all 2D drawing ops, but export-renderer functions
-      // expect the DOM type. This avoids changing signatures across the codebase.
-      const ctx = canvas.getContext("2d", {
-        alpha: false,
-      }) as unknown as CanvasRenderingContext2D;
-      // Alias for render functions that expect HTMLCanvasElement (only .width/.height used)
-      const canvasForRender = canvas as unknown as HTMLCanvasElement;
+      const ctx = canvas.getContext("2d", { alpha: false });
 
       if (!ctx) {
         throw new Error("Failed to create canvas context");
@@ -410,9 +406,10 @@ export function useVideoDownloadMediaBunny({
 
         const time = frameIndex / fps;
 
-        // Update progress (convert to percentage 0-100)
+        // Update progress ~once per second (every fps frames) to avoid
+        // excessive React re-renders which freeze mobile devices.
         const progressPercent = Math.min(100, (frameIndex / totalFrames) * 100);
-        if (frameIndex % 3 === 0 || frameIndex === totalFrames - 1) {
+        if (frameIndex % fps === 0 || frameIndex === totalFrames - 1) {
           setProgress(progressPercent);
           setStatus(
             `Rendering: ${Math.round(time)}s / ${Math.round(duration)}s (${Math.round(progressPercent)}%)`,
@@ -556,7 +553,7 @@ export function useVideoDownloadMediaBunny({
                 ctx,
                 currentChunk,
                 subtitleStyle,
-                canvasForRender,
+                canvas,
                 mode,
                 time,
                 frameFaceX,
@@ -610,7 +607,7 @@ export function useVideoDownloadMediaBunny({
               ctx,
               currentChunk,
               subtitleStyle,
-              canvasForRender,
+              canvas,
               time,
             );
           }
@@ -726,7 +723,7 @@ export function useVideoDownloadMediaBunny({
               ctx,
               currentChunk,
               subtitleStyle,
-              canvasForRender,
+              canvas,
               faceBounds,
               time,
             );
@@ -735,7 +732,7 @@ export function useVideoDownloadMediaBunny({
               ctx,
               currentChunk,
               subtitleStyle,
-              canvasForRender,
+              canvas,
               mode,
               time,
               frameFaceX,
@@ -748,7 +745,7 @@ export function useVideoDownloadMediaBunny({
               ctx,
               currentChunk,
               subtitleStyle,
-              canvasForRender,
+              canvas,
               mode,
               time,
               frameFaceX,
