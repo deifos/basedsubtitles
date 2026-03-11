@@ -371,13 +371,6 @@ export function useVideoDownloadMediaBunny({
         }
       }
 
-      // Pre-compute whether compositing will be needed (for clearRect optimization)
-      const needsCompositingGlobal =
-        (subtitleStyle.dynamicEnabled && bgRemovalReady && bgProcessFrame) ||
-        (bgRemovalReady &&
-          subtitleStyle.backgroundRemovalEnabled &&
-          bgProcessFrame);
-
       const totalFrames = Math.ceil(duration * fps);
       setStatus("Rendering video frames...");
 
@@ -426,11 +419,10 @@ export function useVideoDownloadMediaBunny({
             )
           : cropX;
 
-        // Clear canvas only when compositing or cropping — in the normal
-        // full-frame path the drawImage overwrites every pixel anyway.
-        if (needsCompositingGlobal || needsCrop) {
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-        }
+        // Clear canvas every frame — skipping this causes duplicate-frame
+        // stutters when a decode silently fails (catch block below skips the
+        // draw but the encoder still reads the stale canvas content).
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         // Draw video frame using iterator to avoid repeated decoder setup
         if (videoSampleSink && sampleIterator) {
