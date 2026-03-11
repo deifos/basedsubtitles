@@ -67,6 +67,11 @@ export const changelog: ChangelogEntry[] = [
           "Face position analysis before 9:16 export now runs at 2fps instead of 5fps (2.5x faster) and shows a live progress percentage",
       },
       {
+        type: "changed",
+        description:
+          "Mobile MP4 export now uses more conservative compatibility settings during the playback-freeze investigation, including explicit AVC settings on mobile, lighter mobile export caps, and on-screen export diagnostics for codec, MIME type, bitrate, and source-track details",
+      },
+      {
         type: "fixed",
         description:
           "Canvas context state (transforms, composite ops) no longer resets every frame during compositing export — blur, foreground, and mask canvases are sized once and cleared instead of recreated",
@@ -89,7 +94,7 @@ export const changelog: ChangelogEntry[] = [
       {
         type: "fixed",
         description:
-          "Mobile export playback no longer hitches every few seconds from missed decode frames — the exporter now clears the canvas every frame, falls back to the source video when a decoded sample is unavailable, and uses a shorter keyframe interval for smoother playback",
+          "Export frame extraction now clears the canvas every frame, falls back to the source video when a decoded sample is unavailable, and detects HEVC phone-camera sources so they can use sequential decoded-frame reads instead of sparse timestamp lookups during export",
       },
     ],
   },

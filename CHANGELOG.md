@@ -19,11 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Default subtitle styling now starts with the `Formal` look, `3` max words per line, active-word recolor enabled, display-on-spoken disabled, and a `-10px` vertical offset
 - Active-word emphasis is now split into independent `resize` and `recolor` controls
 - Light and transparent preset buttons now use stronger contrast so the active `Formal` preset stays visible in the styling panel
+- Mobile MP4 export now uses more conservative compatibility settings during the playback-freeze investigation, including explicit AVC settings on mobile, lighter mobile export caps, and on-screen export diagnostics for codec, MIME type, bitrate, and source-track details
 
 ### Fixed
 
 - Export rendering now respects the new active-word recolor styling so spoken-word emphasis matches the preview
-- Mobile export playback no longer hitches every few seconds from missed decode frames — the exporter now clears the canvas every frame, falls back to the source video when a decoded sample is unavailable, and uses a shorter keyframe interval for smoother playback
+- Export frame extraction now clears the canvas every frame, falls back to the source video when a decoded sample is unavailable, and detects HEVC phone-camera sources so they can use sequential decoded-frame reads instead of sparse timestamp lookups during export
 
 ---
 

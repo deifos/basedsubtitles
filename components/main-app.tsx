@@ -242,6 +242,7 @@ export function MainApp({
   const {
     downloadVideo,
     cancelDownload,
+    exportDiagnostics,
     isProcessing: isDownloadProcessing,
     progress: downloadProgress,
     status: downloadStatus,
@@ -1014,6 +1015,69 @@ export function MainApp({
                             }}
                           />
                         </div>
+                        {exportDiagnostics && (
+                          <div
+                            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-600 space-y-1"
+                            style={{
+                              fontFamily: "var(--font-outfit), sans-serif",
+                            }}
+                          >
+                            <div className="font-semibold text-slate-700">
+                              Export diagnostics
+                            </div>
+                            <div>
+                              Codec:{" "}
+                              {exportDiagnostics.resolvedCodecString ??
+                                exportDiagnostics.encoderCodec ??
+                                exportDiagnostics.requestedCodec ??
+                                "pending"}
+                            </div>
+                            <div>
+                              MIME: {exportDiagnostics.mimeType ?? "pending"}
+                            </div>
+                            <div>
+                              Source:{" "}
+                              {exportDiagnostics.sourceCodec ?? "unknown"} /{" "}
+                              {exportDiagnostics.sourceIsHevc
+                                ? "HEVC"
+                                : "non-HEVC"}{" "}
+                              /{" "}
+                              {exportDiagnostics.sourceCanDecode === undefined
+                                ? "decode unknown"
+                                : exportDiagnostics.sourceCanDecode
+                                  ? "decodable"
+                                  : "not decodable"}
+                            </div>
+                            <div>
+                              Output: {exportDiagnostics.width}×
+                              {exportDiagnostics.height} @{" "}
+                              {exportDiagnostics.frameRate}fps
+                            </div>
+                            <div>
+                              Bitrate: {String(exportDiagnostics.bitrate)}
+                            </div>
+                            <div>
+                              Mode: {exportDiagnostics.format} /{" "}
+                              {exportDiagnostics.quality} /{" "}
+                              {exportDiagnostics.ratio} /{" "}
+                              {exportDiagnostics.isMobile
+                                ? "mobile"
+                                : "desktop"}
+                            </div>
+                            {(exportDiagnostics.bitrateMode ??
+                              exportDiagnostics.latencyMode) && (
+                              <div>
+                                Encoder:{" "}
+                                {[
+                                  exportDiagnostics.bitrateMode,
+                                  exportDiagnostics.latencyMode,
+                                ]
+                                  .filter(Boolean)
+                                  .join(" / ")}
+                              </div>
+                            )}
+                          </div>
+                        )}
                         <Button
                           variant="outline"
                           size="sm"

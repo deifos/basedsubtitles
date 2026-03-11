@@ -58,6 +58,26 @@ interface UseVideoDownloadMediaBunnyProps {
   ) => Promise<PositionTimeline>;
 }
 
+interface ExportDiagnostics {
+  bitrate: number | string;
+  bitrateMode?: string;
+  encoderCodec?: string;
+  format: "mp4" | "webm";
+  frameRate: number;
+  height: number;
+  isMobile: boolean;
+  latencyMode?: string;
+  mimeType?: string;
+  quality: "low" | "medium" | "high" | "very_high";
+  ratio: "16:9" | "9:16";
+  requestedCodec?: string;
+  resolvedCodecString?: string;
+  sourceCanDecode?: boolean;
+  sourceCodec?: string;
+  sourceIsHevc?: boolean;
+  width: number;
+}
+
 // Quality mapping
 const qualityMap = {
   low: QUALITY_LOW,
@@ -104,6 +124,8 @@ export function useVideoDownloadMediaBunny({
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState<string>("");
+  const [exportDiagnostics, setExportDiagnostics] =
+    useState<ExportDiagnostics | null>(null);
   const cancelContextRef = useRef<{
     cancelRequested: boolean;
     output: Output | null;
@@ -120,6 +142,7 @@ export function useVideoDownloadMediaBunny({
     setIsProcessing(true);
     setProgress(0);
     setStatus("Initializing MediaBunny...");
+    setExportDiagnostics(null);
     cancelContextRef.current.cancelRequested = false;
     cancelContextRef.current.output = null;
     cancelContextRef.current.videoSource = null;
@@ -139,6 +162,10 @@ export function useVideoDownloadMediaBunny({
     let reusableFrameCtx: OffscreenCanvasRenderingContext2D | null = null;
     let decodeCanvas: OffscreenCanvas | null = null;
     let decodeCtx: OffscreenCanvasRenderingContext2D | null = null;
+    let sampleIterator: AsyncIterator<VideoSample | null> | null = null;
+    let sequentialSampleIterator: AsyncIterator<VideoSample> | null = null;
+    let activeSequentialSample: VideoSample | null = null;
+    let queuedSequentialSample: VideoSample | null = null;
 
     try {
       // Create canvas matching video dimensions, capped on mobile to prevent
@@ -243,6 +270,19 @@ export function useVideoDownloadMediaBunny({
       const duration = await input.computeDuration();
       const originalVideoTrack = await input.getPrimaryVideoTrack();
       const originalAudioTrack = await input.getPrimaryAudioTrack();
+      const originalVideoDecoderConfig = originalVideoTrack
+        ? await originalVideoTrack.getDecoderConfig()
+        : null;
+      const originalVideoCodecString =
+        (originalVideoTrack &&
+          (await originalVideoTrack.getCodecParameterString())) ||
+        undefined;
+      const sourceCodec =
+        originalVideoDecoderConfig?.codec ?? originalVideoCodecString;
+      const sourceCanDecode = originalVideoTrack
+        ? await originalVideoTrack.canDecode()
+        : false;
+      const sourceIsHevc = /^(hvc1|hev1|hevc)/i.test(sourceCodec ?? "");
 
       // Accumulate encoded data via StreamTarget — avoids holding one giant
       // contiguous buffer (BufferTarget) which can OOM on long videos.
@@ -285,19 +325,71 @@ export function useVideoDownloadMediaBunny({
         high: 4_000_000,
         very_high: 6_000_000,
       } as const;
+      const selectedVideoBitrate =
+        isMobile && videoCodec === "avc"
+          ? mobileAvcBitrateMap[quality]
+          : qualityMap[quality];
+      const baseExportDiagnostics: ExportDiagnostics = {
+        bitrate:
+          typeof selectedVideoBitrate === "number"
+            ? selectedVideoBitrate
+            : quality,
+        format,
+        frameRate: exportFps,
+        height: exportHeight,
+        isMobile,
+        quality,
+        ratio,
+        requestedCodec: videoCodec,
+        sourceCanDecode,
+        sourceCodec,
+        sourceIsHevc,
+        width: exportWidth,
+      };
       const videoSource = new CanvasSource(canvas, {
         codec: videoCodec,
-        bitrate:
-          isMobile && videoCodec === "avc"
-            ? mobileAvcBitrateMap[quality]
-            : qualityMap[quality],
+        bitrate: selectedVideoBitrate,
         ...(videoCodec === "avc"
           ? {
               bitrateMode: "constant",
+              fullCodecString: isMobile ? "avc1.42001f" : undefined,
               latencyMode: "realtime",
+              onEncoderConfig: (config) => {
+                setExportDiagnostics((previous) => ({
+                  ...(previous ?? baseExportDiagnostics),
+                  bitrateMode: "constant",
+                  encoderCodec: config.codec,
+                  latencyMode: "realtime",
+                  resolvedCodecString: config.codec,
+                }));
+                console.info("[MediaBunny export] Video encoder config", {
+                  config,
+                  exportFps,
+                  exportHeight,
+                  exportWidth,
+                  format,
+                  isMobile,
+                  quality,
+                  ratio,
+                  selectedVideoBitrate,
+                  sourceCanDecode,
+                  sourceCodec,
+                  sourceIsHevc,
+                  videoCodec,
+                });
+              },
             }
           : {}),
       });
+      setExportDiagnostics(
+        videoCodec === "avc"
+          ? {
+              ...baseExportDiagnostics,
+              bitrateMode: "constant",
+              latencyMode: "realtime",
+            }
+          : baseExportDiagnostics,
+      );
       output.addVideoTrack(videoSource, { frameRate: exportFps });
       cancelContextRef.current.videoSource = videoSource;
 
@@ -339,8 +431,29 @@ export function useVideoDownloadMediaBunny({
         await output.start();
       }
 
+      const outputMimeType = await output.getMimeType();
+      console.info("[MediaBunny export] Output started", {
+        exportFps,
+        exportHeight,
+        exportWidth,
+        format,
+        isMobile,
+        mimeType: outputMimeType,
+        quality,
+        ratio,
+        selectedVideoBitrate,
+        sourceCanDecode,
+        sourceCodec,
+        sourceIsHevc,
+        videoCodec,
+      });
+      setExportDiagnostics((previous) => ({
+        ...(previous ?? baseExportDiagnostics),
+        mimeType: outputMimeType,
+      }));
+
       let videoSampleSink: VideoSampleSink | null = null;
-      if (originalVideoTrack && (await originalVideoTrack.canDecode())) {
+      if (originalVideoTrack && sourceCanDecode) {
         videoSampleSink = new VideoSampleSink(originalVideoTrack);
       }
 
@@ -397,9 +510,19 @@ export function useVideoDownloadMediaBunny({
         }
       })();
 
-      const sampleIterator = videoSampleSink
+      sampleIterator = videoSampleSink
         ? videoSampleSink.samplesAtTimestamps(timestampIterator)
         : null;
+      const useSequentialSourceSamples = sourceIsHevc && !!videoSampleSink;
+      const sourceFrameTolerance = 1 / (exportFps * 2);
+      sequentialSampleIterator =
+        useSequentialSourceSamples && videoSampleSink
+          ? videoSampleSink.samples()
+          : null;
+      if (sequentialSampleIterator) {
+        const initialSequentialResult = await sequentialSampleIterator.next();
+        queuedSequentialSample = initialSequentialResult.value ?? null;
+      }
       let iteratorResult: IteratorResult<VideoSample | null> | undefined;
 
       const drawFrameFromVideoElement = async (
@@ -432,6 +555,24 @@ export function useVideoDownloadMediaBunny({
           );
         } else {
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        }
+      };
+      const drawSampleToCanvas = (sample: VideoSample, frameCropX: number) => {
+        if (needsCrop && decodeCanvas && decodeCtx) {
+          sample.draw(decodeCtx, 0, 0, srcW, srcH);
+          ctx.drawImage(
+            decodeCanvas,
+            frameCropX,
+            cropY,
+            cropW,
+            cropH,
+            0,
+            0,
+            canvas.width,
+            canvas.height,
+          );
+        } else {
+          sample.draw(ctx, 0, 0, canvas.width, canvas.height);
         }
       };
 
@@ -476,28 +617,40 @@ export function useVideoDownloadMediaBunny({
 
         // Draw video frame using iterator to avoid repeated decoder setup
         let drewSourceFrame = false;
-        if (videoSampleSink && sampleIterator) {
+        if (sequentialSampleIterator) {
+          try {
+            while (
+              queuedSequentialSample &&
+              queuedSequentialSample.timestamp <= time + sourceFrameTolerance
+            ) {
+              if (
+                activeSequentialSample &&
+                activeSequentialSample !== queuedSequentialSample
+              ) {
+                activeSequentialSample.close();
+              }
+              activeSequentialSample = queuedSequentialSample;
+              const nextSequentialResult =
+                await sequentialSampleIterator.next();
+              queuedSequentialSample = nextSequentialResult.value ?? null;
+            }
+            const sequentialSample =
+              activeSequentialSample ?? queuedSequentialSample;
+            if (sequentialSample) {
+              drawSampleToCanvas(sequentialSample, frameCropX);
+              drewSourceFrame = true;
+            }
+          } catch {}
+          if (!drewSourceFrame) {
+            await drawFrameFromVideoElement(time, frameCropX);
+            drewSourceFrame = true;
+          }
+        } else if (videoSampleSink && sampleIterator) {
           try {
             iteratorResult = await sampleIterator.next();
             const sample = iteratorResult.value ?? null;
             if (sample) {
-              if (needsCrop && decodeCanvas && decodeCtx) {
-                // Decode at full resolution, then crop the center region
-                sample.draw(decodeCtx, 0, 0, srcW, srcH);
-                ctx.drawImage(
-                  decodeCanvas,
-                  frameCropX,
-                  cropY,
-                  cropW,
-                  cropH,
-                  0,
-                  0,
-                  canvas.width,
-                  canvas.height,
-                );
-              } else {
-                sample.draw(ctx, 0, 0, canvas.width, canvas.height);
-              }
+              drawSampleToCanvas(sample, frameCropX);
               drewSourceFrame = true;
               sample.close();
             }
@@ -854,6 +1007,29 @@ export function useVideoDownloadMediaBunny({
       reusableFrameCtx = null;
       decodeCanvas = null;
       decodeCtx = null;
+      if (sampleIterator) {
+        try {
+          await sampleIterator.return?.();
+        } catch {}
+      }
+      if (sequentialSampleIterator) {
+        try {
+          await sequentialSampleIterator.return?.();
+        } catch {}
+      }
+      if (activeSequentialSample) {
+        try {
+          activeSequentialSample.close();
+        } catch {}
+      }
+      if (
+        queuedSequentialSample &&
+        queuedSequentialSample !== activeSequentialSample
+      ) {
+        try {
+          queuedSequentialSample.close();
+        } catch {}
+      }
 
       cancelContextRef.current.output = null;
       cancelContextRef.current.videoSource = null;
@@ -908,6 +1084,7 @@ export function useVideoDownloadMediaBunny({
   return {
     downloadVideo,
     cancelDownload,
+    exportDiagnostics,
     isProcessing,
     progress,
     status,
