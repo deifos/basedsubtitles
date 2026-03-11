@@ -278,9 +278,18 @@ export function useVideoDownloadMediaBunny({
 
       // Add video track
       const videoCodec = format === "webm" ? "vp9" : "avc";
+      const mobileAvcBitrateMap = {
+        low: 1_500_000,
+        medium: 2_500_000,
+        high: 4_000_000,
+        very_high: 6_000_000,
+      } as const;
       const videoSource = new CanvasSource(canvas, {
         codec: videoCodec,
-        bitrate: qualityMap[quality],
+        bitrate:
+          isMobile && videoCodec === "avc"
+            ? mobileAvcBitrateMap[quality]
+            : qualityMap[quality],
         ...(videoCodec === "avc"
           ? {
               bitrateMode: "constant",
