@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- New `Formal` subtitle style preset using Playfair Display with white text plus a subtle dark outline/shadow treatment
+- Separate active-word emphasis recolor control with a configurable highlight color in both preview and export
+
+### Changed
+
+- Default subtitle styling now starts with the `Formal` look, `3` max words per line, active-word recolor enabled, display-on-spoken disabled, and a `-10px` vertical offset
+- Active-word emphasis is now split into independent `resize` and `recolor` controls
+- Light and transparent preset buttons now use stronger contrast so the active `Formal` preset stays visible in the styling panel
+
+### Fixed
+
+- Export rendering now respects the new active-word recolor styling so spoken-word emphasis matches the preview
+
+---
+
 ## [2.3.0] — 2026-03-09 — Installable PWA & Home Screen Support
 
 ### Added

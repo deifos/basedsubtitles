@@ -65,8 +65,11 @@ function PhraseWordList({
         const emphasisBgColor = textIsLight
           ? "rgba(0, 0, 0, 0.65)"
           : "rgba(255, 255, 255, 0.85)";
-        const emphasisTextColor = textIsLight ? "#FFFFFF" : "#000000";
-        const isActive = isCurrentWord && (style.wordEmphasisEnabled ?? false);
+        const emphasisTextColor = style.wordEmphasisColor ?? "#F2D21B";
+        const resizeActive =
+          !!isCurrentWord && (style.wordEmphasisEnabled ?? false);
+        const recolorActive =
+          !!isCurrentWord && (style.wordEmphasisColorEnabled ?? false);
 
         const isKnockout = word.styleOverride?.effect === "knockout";
         const overrideStyles: React.CSSProperties = {};
@@ -98,11 +101,11 @@ function PhraseWordList({
 
         const baseWordStyles: React.CSSProperties = {
           ...baseTypographyStyles,
-          ...(isActive ? {} : metallicTypographyStyles),
+          ...(recolorActive ? {} : metallicTypographyStyles),
           display: "inline-block",
           transition: isKnockout
             ? "none"
-            : "transform 0.18s ease, background-color 0.18s ease",
+            : "transform 0.18s ease, background-color 0.18s ease, color 0.18s ease",
           padding: "0 0.15em",
           borderRadius: "0.35em",
           transform: isKnockout ? "none" : "scale(1)",
@@ -111,24 +114,30 @@ function PhraseWordList({
           ...overrideStyles,
         };
 
-        const activeWordStyles: React.CSSProperties = isActive
-          ? isKnockout
-            ? {
-                mixBlendMode: "difference" as const,
-                color: "#FFFFFF",
-                WebkitTextFillColor: "#FFFFFF",
-                WebkitTextStroke: "none",
-                filter: "none",
-              }
-            : {
-                transform: "scale(1.18)",
-                backgroundColor: emphasisBgColor,
-                color: word.styleOverride?.color ?? emphasisTextColor,
-                WebkitTextStroke: "none",
-                WebkitBackgroundClip: "initial",
-                WebkitTextFillColor: "inherit",
-              }
-          : {};
+        const activeWordStyles: React.CSSProperties =
+          resizeActive || recolorActive
+            ? isKnockout
+              ? {
+                  mixBlendMode: "difference" as const,
+                  color: "#FFFFFF",
+                  WebkitTextFillColor: "#FFFFFF",
+                  WebkitTextStroke: "none",
+                  filter: "none",
+                }
+              : {
+                  transform: resizeActive ? "scale(1.18)" : "scale(1)",
+                  backgroundColor: resizeActive
+                    ? emphasisBgColor
+                    : "transparent",
+                  color: recolorActive
+                    ? emphasisTextColor
+                    : (word.styleOverride?.color ?? wordColor),
+                  WebkitBackgroundClip: "initial",
+                  WebkitTextFillColor: recolorActive
+                    ? emphasisTextColor
+                    : "inherit",
+                }
+            : {};
 
         const hasEmojiOverlay = !!word.styleOverride?.emojiOverlay;
         const positionStyles: React.CSSProperties = hasEmojiOverlay
@@ -524,8 +533,7 @@ export function VideoCaption({
   // On small screens (<500px) we apply a 1.4× boost so subtitles stay readable
   // on the tiny preview — the exported video renders at full resolution anyway.
   const refWidth = ratio === "9:16" ? 281 : 889;
-  const mobileBoost =
-    containerWidth && containerWidth < 500 ? 1.4 : 1;
+  const mobileBoost = containerWidth && containerWidth < 500 ? 1.4 : 1;
   const scaledFontSize =
     containerWidth && containerWidth > 0
       ? Math.round(style.fontSize * (containerWidth / refWidth) * mobileBoost)

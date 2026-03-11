@@ -350,12 +350,9 @@ function measurePhraseLineWidth(
 
   const scaledWidths = baseWidths.map((width, index) => {
     const word = words[index];
-    const scale =
-      currentTime >= word.timestamp[0] &&
-      currentTime <= word.timestamp[1] &&
-      style.wordEmphasisEnabled
-        ? 1.18
-        : 1;
+    const isCurrentWord =
+      currentTime >= word.timestamp[0] && currentTime <= word.timestamp[1];
+    const scale = isCurrentWord && style.wordEmphasisEnabled ? 1.18 : 1;
     return width * scale;
   });
 
@@ -432,7 +429,7 @@ export function renderPhraseLineWithEmphasis(
   const emphasisBgColor = textIsLight
     ? "rgba(0, 0, 0, 0.65)"
     : "rgba(255, 255, 255, 0.85)";
-  const emphasisTextColor = textIsLight ? "#FFFFFF" : "#000000";
+  const emphasisTextColor = style.wordEmphasisColor ?? "#F2D21B";
 
   // Fade constants
   const fadeOutDuration = 0.25; // 250ms chunk fade-out
@@ -443,7 +440,10 @@ export function renderPhraseLineWithEmphasis(
     const scale = scales[index];
     const scaledWidth = scaledWidths[index];
     const baseWidth = baseWidths[index];
-    const isActive = scale > 1;
+    const isCurrentWord =
+      currentTime >= word.timestamp[0] && currentTime <= word.timestamp[1];
+    const resizeActive = isCurrentWord && style.wordEmphasisEnabled;
+    const recolorActive = isCurrentWord && style.wordEmphasisColorEnabled;
     const wordCenterX = cursor + scaledWidth / 2;
     const isKnockout = word.styleOverride?.effect === "knockout";
     const hasEmojiReplace = !!word.styleOverride?.emoji;
@@ -463,7 +463,7 @@ export function renderPhraseLineWithEmphasis(
     ctx.save();
     ctx.globalAlpha = wordAlpha;
 
-    if (isActive) {
+    if (resizeActive) {
       const boxWidth = scaledWidth + highlightPaddingX * 2;
       const wordFontSize = word.styleOverride?.fontSize
         ? Math.round(finalFontSize * word.styleOverride.fontSize)
@@ -483,7 +483,9 @@ export function renderPhraseLineWithEmphasis(
     }
 
     const wordColor = word.styleOverride?.color;
-    const fillColor = isActive ? emphasisTextColor : (wordColor ?? style.color);
+    const fillColor = recolorActive
+      ? emphasisTextColor
+      : (wordColor ?? style.color);
 
     // Set per-word font if override exists
     if (word.styleOverride?.fontFamily || word.styleOverride?.fontSize) {
@@ -638,6 +640,7 @@ export function renderSplitSubtitleOnCanvas(
     !!line2Words?.some((word) => word.styleOverride);
   const canEmphasizeSplit =
     (style.wordEmphasisEnabled ||
+      style.wordEmphasisColorEnabled ||
       style.textFadeIn ||
       style.dynamicFollowWord ||
       hasSplitOverrides) &&
@@ -650,8 +653,14 @@ export function renderSplitSubtitleOnCanvas(
   const chunkEndTime = chunk.timestamp[1];
 
   if (splitMode === "above-below") {
-    const y1 = canvas.height * (isVerticalVideo ? 0.08 : 0.14) - verticalOffset;
-    const y2 = canvas.height * (isVerticalVideo ? 0.92 : 0.86) + verticalOffset;
+    const y1 =
+      canvas.height * (isVerticalVideo ? 0.08 : 0.14) +
+      finalFontSize / 2 -
+      verticalOffset;
+    const y2 =
+      canvas.height * (isVerticalVideo ? 0.92 : 0.86) -
+      finalFontSize / 2 +
+      verticalOffset;
     ctx.textAlign = "center";
     if (canEmphasizeSplit) {
       renderPhraseLineWithEmphasis(
@@ -839,7 +848,8 @@ export function renderSubtitle(
       baseY =
         canvas.height -
         canvas.height * (isVerticalVideo ? 0.08 : 0.16) +
-        verticalOffset;
+        verticalOffset -
+        totalHeight / 2;
       break;
   }
 
@@ -873,6 +883,7 @@ export function renderSubtitle(
   const phraseWords = Array.isArray(chunkWords) ? chunkWords : undefined;
   const canEmphasize =
     (style.wordEmphasisEnabled ||
+      style.wordEmphasisColorEnabled ||
       style.textFadeIn ||
       style.dynamicFollowWord) &&
     mode === "phrase" &&

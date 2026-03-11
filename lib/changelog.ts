@@ -23,9 +23,29 @@ export interface ChangelogEntry {
 export const changelog: ChangelogEntry[] = [
   {
     version: "2.4.0",
-    date: "2026-03-09",
-    title: "Faster Export & Quality Selector",
+    date: "2026-03-10",
+    title: "Formal Subtitle Styling & Faster Export",
     changes: [
+      {
+        type: "added",
+        description:
+          "New Formal subtitle preset using Playfair Display with white text, a subtle dark outline/shadow treatment, and stronger preset button contrast for light styles",
+      },
+      {
+        type: "added",
+        description:
+          "Separate active-word recolor emphasis control with a configurable highlight color, supported in both preview and export rendering",
+      },
+      {
+        type: "changed",
+        description:
+          "Default subtitle styling now starts with the Formal look, 3 max words per line, display-on-spoken disabled, active-word recolor enabled, and a -10px vertical offset",
+      },
+      {
+        type: "changed",
+        description:
+          "Active-word emphasis is now split into independent resize and recolor controls so each effect can be toggled separately",
+      },
       {
         type: "added",
         description:
@@ -60,6 +80,11 @@ export const changelog: ChangelogEntry[] = [
         type: "fixed",
         description:
           "Subtitle preview text on mobile now scales relative to the video container width instead of the viewport, with a readability boost on small screens so text stays legible even on compact previews",
+      },
+      {
+        type: "fixed",
+        description:
+          "Export subtitle positioning now matches the preview baseline, so vertical offset and default bottom placement render at the expected height in downloaded videos",
       },
     ],
   },

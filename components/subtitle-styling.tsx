@@ -53,6 +53,8 @@ export interface SubtitleStyle {
   borderColor: string;
   dropShadowIntensity: number;
   wordEmphasisEnabled: boolean;
+  wordEmphasisColorEnabled: boolean;
+  wordEmphasisColor: string;
   position: "top" | "middle" | "bottom";
   maxWordsPerLine: number;
   backgroundRemovalEnabled: boolean;
@@ -253,7 +255,7 @@ const fontWeightOptions = [
   { value: "700", label: "Bold" },
 ];
 
-type SubtitlePresetName = "green" | "gold" | "subtitle" | "gamer";
+type SubtitlePresetName = "green" | "gold" | "subtitle" | "gamer" | "formal";
 
 interface SubtitlePreset {
   name: SubtitlePresetName;
@@ -264,6 +266,31 @@ interface SubtitlePreset {
 }
 
 const PRESETS: SubtitlePreset[] = [
+  {
+    name: "formal",
+    label: "Formal",
+    previewText: "FORMAL",
+    style: {
+      fontFamily: FONT_FAMILIES.playfairDisplay.value,
+      fontSize: 22,
+      fontWeight: "600",
+      color: "#FFFFFF",
+      backgroundColor: "transparent",
+      borderWidth: 1,
+      borderColor: "#1A1A1A",
+      dropShadowIntensity: 0.55,
+      position: "bottom",
+      maxWordsPerLine: 3,
+    },
+    inactiveStyles: {
+      color: "#FFFFFF",
+      backgroundColor: "rgba(24, 24, 27, 0.9)",
+      borderRadius: "0.5rem",
+      paddingInline: "0.75rem",
+      paddingBlock: "0.35rem",
+      boxShadow: "0 0 0 1px rgba(255,255,255,0.2)",
+    },
+  },
   {
     name: "green",
     label: "Green",
@@ -389,12 +416,16 @@ function PresetButton({ preset, isActive, onApply }: PresetButtonProps) {
       style={
         isActive
           ? {
-              backgroundColor: preset.style.backgroundColor || "var(--primary)",
+              backgroundColor: isTransparentColor(
+                preset.style.backgroundColor ?? "",
+              )
+                ? "#111111"
+                : (preset.style.backgroundColor ?? "var(--primary)"),
               color: preset.style.color,
               boxShadow:
                 preset.style.borderWidth && preset.style.borderWidth > 0
-                  ? `0 0 0 ${preset.style.borderWidth}px ${preset.style.borderColor}`
-                  : "0 0 0 2px rgba(255,255,255,0.7)",
+                  ? `inset 0 0 0 1px #000000, 0 0 0 ${preset.style.borderWidth}px ${preset.style.borderColor}`
+                  : "inset 0 0 0 1px #000000, 0 0 0 2px rgba(255,255,255,0.7)",
               ...fontStyles,
             }
           : { ...preset.inactiveStyles, ...fontStyles }
@@ -414,6 +445,7 @@ function PresetButton({ preset, isActive, onApply }: PresetButtonProps) {
 
 function isPresetActive(style: SubtitleStyle, preset: SubtitlePreset) {
   return Object.entries(preset.style).every(([key, value]) => {
+    if (key === "fontSize") return true;
     const styleValue = style[key as keyof SubtitleStyle];
     return styleValue === value;
   });
@@ -506,6 +538,14 @@ export function SubtitleStyling({
     onChange({ ...style, wordEmphasisEnabled: value });
   };
 
+  const handleWordEmphasisColorToggle = (value: boolean) => {
+    onChange({ ...style, wordEmphasisColorEnabled: value });
+  };
+
+  const handleWordEmphasisColorChange = (color: string) => {
+    onChange({ ...style, wordEmphasisColor: color });
+  };
+
   const applyPreset = (preset: SubtitlePreset) => {
     // Preserve the user's current font size — presets define visual style, not size
     onChange({ ...style, ...preset.style, fontSize: style.fontSize });
@@ -541,6 +581,8 @@ export function SubtitleStyling({
   }, [style]);
 
   const wordEmphasisEnabled = style.wordEmphasisEnabled ?? false;
+  const wordEmphasisColorEnabled = style.wordEmphasisColorEnabled ?? false;
+  const wordEmphasisColor = style.wordEmphasisColor ?? "#F2D21B";
   const fontSizeSliderIndex = fontSizeToSliderIndex(style.fontSize);
 
   return (
@@ -988,21 +1030,68 @@ export function SubtitleStyling({
 
         {/* Word emphasis - hidden when dynamic is active */}
         {!style.dynamicEnabled && (
-          <div className="flex items-center justify-between rounded-lg border border-border/50 px-3 py-2">
-            <div>
-              <p className="text-sm font-medium">Active word emphasis</p>
-              <p className="text-xs text-muted-foreground">
-                {mode === "word"
-                  ? "Only available in phrase mode"
-                  : "Scale the spoken word and add a subtle dark backdrop."}
-              </p>
+          <div className="space-y-3 rounded-lg border border-border/40 bg-muted/40 p-3">
+            <div className="flex items-center justify-between rounded-lg border border-border/50 px-3 py-2">
+              <div>
+                <p className="text-sm font-medium">
+                  Active word emphasis resize
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {mode === "word"
+                    ? "Only available in phrase mode"
+                    : "Scale the spoken word and keep the subtle emphasis backdrop."}
+                </p>
+              </div>
+              <Switch
+                checked={wordEmphasisEnabled}
+                onCheckedChange={handleWordEmphasisToggle}
+                disabled={mode === "word"}
+                aria-label="Toggle active word emphasis resize"
+              />
             </div>
-            <Switch
-              checked={wordEmphasisEnabled}
-              onCheckedChange={handleWordEmphasisToggle}
-              disabled={mode === "word"}
-              aria-label="Toggle active word emphasis"
-            />
+
+            <div className="flex items-center justify-between rounded-lg border border-border/50 px-3 py-2">
+              <div>
+                <p className="text-sm font-medium">
+                  Active word emphasis recolor
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {mode === "word"
+                    ? "Only available in phrase mode"
+                    : "Recolor the spoken word with a custom color."}
+                </p>
+              </div>
+              <Switch
+                checked={wordEmphasisColorEnabled}
+                onCheckedChange={handleWordEmphasisColorToggle}
+                disabled={mode === "word"}
+                aria-label="Toggle active word emphasis recolor"
+              />
+            </div>
+
+            {wordEmphasisColorEnabled && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium block">
+                  Active Word Color
+                </label>
+                <div className="flex items-center gap-2">
+                  <DebouncedColorInput
+                    value={wordEmphasisColor}
+                    onChange={handleWordEmphasisColorChange}
+                    className="w-10 h-10 rounded cursor-pointer"
+                  />
+                  <input
+                    type="text"
+                    value={wordEmphasisColor}
+                    onChange={(event) =>
+                      handleWordEmphasisColorChange(event.target.value)
+                    }
+                    className="flex-1 rounded-md border border-border px-3 py-2 text-sm bg-background"
+                    placeholder="#F2D21B"
+                  />
+                </div>
+              </div>
+            )}
           </div>
         )}
 

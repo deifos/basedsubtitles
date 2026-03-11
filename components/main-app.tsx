@@ -17,7 +17,11 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { TranscriptSidebar } from "@/components/transcript-sidebar";
-import { SubtitleStyling, SubtitleStyle } from "@/components/subtitle-styling";
+import {
+  FONT_FAMILIES,
+  SubtitleStyling,
+  SubtitleStyle,
+} from "@/components/subtitle-styling";
 import { WordStylePopover } from "@/components/word-style-popover";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -56,17 +60,19 @@ interface MainAppProps {
 
 // Default subtitle style - Gold preset
 const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
-  fontFamily: "var(--font-bangers), 'Bangers', cursive",
+  fontFamily: FONT_FAMILIES.playfairDisplay.value,
   fontSize: 22,
   fontWeight: "600",
-  color: "#00FF41",
+  color: "#FFFFFF",
   backgroundColor: "transparent",
-  borderWidth: 0,
-  borderColor: "#000000",
-  dropShadowIntensity: 0.4,
+  borderWidth: 1,
+  borderColor: "#1A1A1A",
+  dropShadowIntensity: 0.55,
   wordEmphasisEnabled: false,
+  wordEmphasisColorEnabled: true,
+  wordEmphasisColor: "#F2D21B",
   position: "bottom",
-  maxWordsPerLine: 6,
+  maxWordsPerLine: 3,
   backgroundRemovalEnabled: false,
   backgroundType: "solid",
   solidBackgroundColor: "#000000",
@@ -75,11 +81,11 @@ const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
   dynamicYPosition: 35,
   dynamicFrontFontSize: 40,
   dynamicFrontYPosition: 75,
-  dynamicFollowWord: true,
+  dynamicFollowWord: false,
   textFadeIn: false,
   brandingWatermark: true,
   splitSubtitleMode: "none",
-  verticalOffset: 0,
+  verticalOffset: -10,
 };
 
 export function MainApp({
