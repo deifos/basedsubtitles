@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Export rendering now respects the new active-word recolor styling so spoken-word emphasis matches the preview
+- Mobile export playback no longer hitches every few seconds from missed decode frames — the exporter now clears the canvas every frame, falls back to the source video when a decoded sample is unavailable, and uses a shorter keyframe interval for smoother playback
 
 ---
 

@@ -86,6 +86,11 @@ export const changelog: ChangelogEntry[] = [
         description:
           "Export subtitle positioning now matches the preview baseline, so vertical offset and default bottom placement render at the expected height in downloaded videos",
       },
+      {
+        type: "fixed",
+        description:
+          "Mobile export playback no longer hitches every few seconds from missed decode frames — the exporter now clears the canvas every frame, falls back to the source video when a decoded sample is unavailable, and uses a shorter keyframe interval for smoother playback",
+      },
     ],
   },
   {
