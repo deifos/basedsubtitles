@@ -280,6 +280,7 @@ export function useVideoDownloadMediaBunny({
       const videoSource = new CanvasSource(canvas, {
         codec: format === "webm" ? "vp9" : "avc",
         bitrate: qualityMap[quality],
+        keyFrameInterval: 2,
       });
       output.addVideoTrack(videoSource, { frameRate: fps });
       cancelContextRef.current.videoSource = videoSource;
@@ -385,6 +386,39 @@ export function useVideoDownloadMediaBunny({
         : null;
       let iteratorResult: IteratorResult<VideoSample | null> | undefined;
 
+      const drawFrameFromVideoElement = async (
+        time: number,
+        frameCropX: number,
+      ) => {
+        video.currentTime = time;
+        await new Promise<void>((resolve) => {
+          const onSeeked = () => {
+            video.removeEventListener("seeked", onSeeked);
+            resolve();
+          };
+          video.addEventListener("seeked", onSeeked);
+          if (Math.abs(video.currentTime - time) < 0.01) {
+            video.removeEventListener("seeked", onSeeked);
+            resolve();
+          }
+        });
+        if (needsCrop) {
+          ctx.drawImage(
+            video,
+            frameCropX,
+            cropY,
+            cropW,
+            cropH,
+            0,
+            0,
+            canvas.width,
+            canvas.height,
+          );
+        } else {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        }
+      };
+
       // Reusable canvases/buffers are declared before try block for cleanup in finally
 
       // Render each frame
@@ -425,6 +459,7 @@ export function useVideoDownloadMediaBunny({
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         // Draw video frame using iterator to avoid repeated decoder setup
+        let drewSourceFrame = false;
         if (videoSampleSink && sampleIterator) {
           try {
             iteratorResult = await sampleIterator.next();
@@ -447,43 +482,17 @@ export function useVideoDownloadMediaBunny({
               } else {
                 sample.draw(ctx, 0, 0, canvas.width, canvas.height);
               }
+              drewSourceFrame = true;
               sample.close();
             }
-          } catch {
-            // Skip failed frames silently
+          } catch {}
+          if (!drewSourceFrame) {
+            await drawFrameFromVideoElement(time, frameCropX);
+            drewSourceFrame = true;
           }
         } else {
-          // Fallback: seek the video element and draw the frame directly.
-          // This is slower but prevents a black video on mobile browsers
-          // where WebCodecs decoding is unavailable (canDecode() === false).
-          video.currentTime = time;
-          await new Promise<void>((resolve) => {
-            const onSeeked = () => {
-              video.removeEventListener("seeked", onSeeked);
-              resolve();
-            };
-            video.addEventListener("seeked", onSeeked);
-            // If already at the target time, seeked won't fire
-            if (Math.abs(video.currentTime - time) < 0.01) {
-              video.removeEventListener("seeked", onSeeked);
-              resolve();
-            }
-          });
-          if (needsCrop) {
-            ctx.drawImage(
-              video,
-              frameCropX,
-              cropY,
-              cropW,
-              cropH,
-              0,
-              0,
-              canvas.width,
-              canvas.height,
-            );
-          } else {
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          }
+          await drawFrameFromVideoElement(time, frameCropX);
+          drewSourceFrame = true;
         }
 
         // Find current subtitle chunk (binary search — O(log n) vs O(n) per frame)
