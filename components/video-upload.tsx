@@ -8,7 +8,8 @@ import {
   memo,
   useRef,
 } from "react";
-import { cn, formatTime, type WordStyleOverride } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { formatTime, type WordStyleOverride } from "@/lib/transcript-utils";
 import { VideoCaption } from "./video-caption";
 import { SubtitleStyle } from "./subtitle-styling";
 import { UploadIcon, Play, Pause, Volume2, VolumeX } from "lucide-react";
@@ -665,7 +666,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
     return (
       <div
         className={cn(
-          "relative border-2 border-dashed rounded-lg transition-colors overflow-hidden",
+          "relative border-0 lg:border-2 lg:border-dashed rounded-lg transition-colors overflow-hidden",
           videoSrc ? "" : "min-h-[300px]",
           className,
         )}
@@ -686,7 +687,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
                 ref={videoContainerRef}
                 className={cn(
                   "relative flex justify-center",
-                  ratio === "16:9" && "max-h-[500px]",
+                  ratio === "16:9" && "max-h-[45vh] lg:max-h-[500px]",
                 )}
                 style={{
                   aspectRatio: ratio === "16:9" ? "16/9" : "9/16",
@@ -699,10 +700,10 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
                   preload="auto"
                   className={cn(
                     ratio === "16:9"
-                      ? "object-cover w-full max-w-4xl max-h-[500px]"
+                      ? "object-contain w-full max-w-4xl max-h-[45vh] lg:max-h-[500px]"
                       : ratio === "9:16" && !zoomPortrait
-                        ? "object-cover h-[500px] max-h-[500px]"
-                        : "object-contain h-[500px] max-h-[500px]",
+                        ? "object-cover h-[45vh] max-h-[45vh] lg:h-[500px] lg:max-h-[500px]"
+                        : "object-contain h-[45vh] max-h-[45vh] lg:h-[500px] lg:max-h-[500px]",
                     needsFaceTrackCanvas && "invisible",
                   )}
                   onTimeUpdate={handleTimeUpdate}
@@ -723,7 +724,6 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
                   }}
                   style={{
                     aspectRatio: ratio === "16:9" ? "16/9" : "9/16",
-                    cursor: "pointer",
                   }}
                 />
                 {/* Canvas overlay for background removal compositing */}
@@ -733,10 +733,10 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
                     className={cn(
                       "absolute inset-0 cursor-pointer",
                       ratio === "16:9"
-                        ? "w-full max-w-4xl max-h-[500px] mx-auto"
+                        ? "w-full max-w-4xl max-h-[45vh] lg:max-h-[500px] mx-auto"
                         : ratio === "9:16" && zoomPortrait
-                          ? "h-[500px] max-h-[500px] mx-auto"
-                          : "h-[500px] max-h-[500px] mx-auto",
+                          ? "h-[45vh] max-h-[45vh] lg:h-[500px] lg:max-h-[500px] mx-auto"
+                          : "h-[45vh] max-h-[45vh] lg:h-[500px] lg:max-h-[500px] mx-auto",
                     )}
                     style={{
                       aspectRatio: ratio === "16:9" ? "16/9" : "9/16",
@@ -758,8 +758,8 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
                     className={cn(
                       "absolute inset-0 cursor-pointer",
                       ratio === "9:16" && zoomPortrait
-                        ? "h-[500px] max-h-[500px] mx-auto"
-                        : "h-[500px] max-h-[500px] mx-auto",
+                        ? "h-[45vh] max-h-[45vh] lg:h-[500px] lg:max-h-[500px] mx-auto"
+                        : "h-[45vh] max-h-[45vh] lg:h-[500px] lg:max-h-[500px] mx-auto",
                     )}
                     style={{
                       aspectRatio: "9/16",

@@ -25,8 +25,8 @@ export function LandingHero({ onVideoSelect }: LandingHeroProps): JSX.Element {
 
       {/* Fade edges */}
       <div className="pointer-events-none absolute inset-0 -z-10">
-        <div className="absolute inset-0 bg-gradient-to-b from-white via-transparent to-white" />
-        <div className="absolute inset-0 bg-gradient-to-r from-white via-transparent to-white" />
+        <div className="absolute inset-0 bg-gradient-to-b from-background via-transparent to-background" />
+        <div className="absolute inset-0 bg-gradient-to-r from-background via-transparent to-background" />
       </div>
 
       <div className="mx-auto max-w-7xl px-6">
@@ -36,7 +36,7 @@ export function LandingHero({ onVideoSelect }: LandingHeroProps): JSX.Element {
             href="https://github.com/deifos/basedsubtitles"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-4 py-1.5 text-xs font-medium text-slate-600 shadow-sm backdrop-blur-sm hover:border-slate-300 hover:text-slate-900 transition-colors"
+            className="inline-flex items-center gap-2 rounded-full border border-border bg-background/80 px-4 py-1.5 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur-sm hover:border-border hover:text-foreground transition-colors"
           >
             <Sparkles className="h-3.5 w-3.5 text-amber-500" strokeWidth={2} />
             Free &middot; No sign-up &middot; No watermarks &middot;{" "}
@@ -52,7 +52,7 @@ export function LandingHero({ onVideoSelect }: LandingHeroProps): JSX.Element {
           {/* Left: copy + dropzone */}
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100">
             <h1
-              className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight text-slate-900 leading-[1.05]"
+              className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight text-foreground leading-[1.05]"
               style={{ fontFamily: "var(--font-outfit), sans-serif" }}
             >
               Subtitles that run{" "}
@@ -66,7 +66,7 @@ export function LandingHero({ onVideoSelect }: LandingHeroProps): JSX.Element {
             </h1>
 
             <p
-              className="mt-4 text-base sm:text-lg text-slate-500 max-w-xl leading-relaxed"
+              className="mt-4 text-base sm:text-lg text-muted-foreground max-w-xl leading-relaxed"
               style={{ fontFamily: "var(--font-outfit), sans-serif" }}
             >
               Drop a video. Get AI-generated subtitles in seconds. Everything
@@ -82,7 +82,7 @@ export function LandingHero({ onVideoSelect }: LandingHeroProps): JSX.Element {
               ].map(({ icon: Icon, text }) => (
                 <span
                   key={text}
-                  className="inline-flex items-center gap-1.5 text-xs text-slate-400"
+                  className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"
                   style={{ fontFamily: "var(--font-outfit), sans-serif" }}
                 >
                   <Icon className="h-3 w-3" strokeWidth={1.5} />
@@ -93,7 +93,7 @@ export function LandingHero({ onVideoSelect }: LandingHeroProps): JSX.Element {
                 href="https://github.com/deifos/basedsubtitles"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-700 transition-colors"
+                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
                 style={{ fontFamily: "var(--font-outfit), sans-serif" }}
               >
                 <GitHubIcon width={12} height={12} />
@@ -106,7 +106,7 @@ export function LandingHero({ onVideoSelect }: LandingHeroProps): JSX.Element {
               id="dropzone"
               className="mt-8 animate-in fade-in zoom-in-95 duration-700 delay-200"
             >
-              <div className="rounded-2xl bg-white shadow-xl shadow-slate-200/50 ring-1 ring-slate-100">
+              <div className="rounded-2xl bg-background shadow-xl ring-1 ring-border">
                 <LandingDropzone onVideoSelect={onVideoSelect} />
               </div>
             </div>
@@ -114,7 +114,7 @@ export function LandingHero({ onVideoSelect }: LandingHeroProps): JSX.Element {
 
           {/* Right: app screenshot */}
           <div className="hidden lg:block animate-in fade-in slide-in-from-right-8 duration-700 delay-200 lg:-mr-12">
-            <div className="rounded-2xl overflow-hidden shadow-2xl shadow-slate-300/40 ring-1 ring-slate-200">
+            <div className="rounded-2xl overflow-hidden shadow-2xl ring-1 ring-border">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/hero-image.webp"

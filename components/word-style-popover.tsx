@@ -21,7 +21,8 @@ import {
   Smile,
   ALargeSmall,
 } from "lucide-react";
-import { cn, type WordStyleOverride } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { type WordStyleOverride } from "@/lib/transcript-utils";
 import { DebouncedColorInput } from "@/components/ui/debounced-color-input";
 import dynamic from "next/dynamic";
 
@@ -165,13 +166,15 @@ export function WordStylePopover({
 
   const renderFontSection = () => (
     <div className="space-y-1.5">
-      {!compact && <p className="text-xs font-medium text-slate-600">Font</p>}
+      {!compact && (
+        <p className="text-xs font-medium text-muted-foreground">Font</p>
+      )}
       <Select
         value={override.fontFamily ?? "__none__"}
         onValueChange={handleFontFamilyChange}
       >
         <SelectTrigger
-          className="w-full rounded-md border-slate-200 bg-white px-3 py-1.5 text-xs shadow-sm"
+          className="w-full rounded-md border-border bg-background px-3 py-1.5 text-xs shadow-sm"
           style={currentFontCss ? { fontFamily: currentFontCss } : undefined}
         >
           <SelectValue placeholder="Same as global" />
@@ -200,8 +203,10 @@ export function WordStylePopover({
   const renderSizeSection = () => (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        {!compact && <p className="text-xs font-medium text-slate-600">Size</p>}
-        <span className="text-xs text-slate-400 tabular-nums">
+        {!compact && (
+          <p className="text-xs font-medium text-muted-foreground">Size</p>
+        )}
+        <span className="text-xs text-muted-foreground tabular-nums">
           {sizePercent}%
         </span>
       </div>
@@ -213,7 +218,7 @@ export function WordStylePopover({
         step={10}
         className="w-full"
       />
-      <div className="flex justify-between text-[10px] text-slate-400">
+      <div className="flex justify-between text-[10px] text-muted-foreground">
         <span>50%</span>
         <span>100%</span>
         <span>200%</span>
@@ -223,27 +228,29 @@ export function WordStylePopover({
 
   const renderColorSection = () => (
     <div className="space-y-1.5">
-      {!compact && <p className="text-xs font-medium text-slate-600">Color</p>}
+      {!compact && (
+        <p className="text-xs font-medium text-muted-foreground">Color</p>
+      )}
       <div className="flex items-center gap-2">
         <DebouncedColorInput
           value={override.color ?? "#FFFFFF"}
           onChange={handleColorChange}
-          className="w-8 h-8 rounded cursor-pointer border border-slate-200"
+          className="w-8 h-8 rounded cursor-pointer border border-border"
         />
         {override.color ? (
           <div className="flex items-center gap-1.5 flex-1">
-            <span className="text-xs uppercase text-slate-500">
+            <span className="text-xs uppercase text-muted-foreground">
               {override.color}
             </span>
             <button
               onClick={handleClearColor}
-              className="text-xs text-slate-400 hover:text-slate-600 underline"
+              className="text-xs text-muted-foreground hover:text-foreground underline"
             >
               reset
             </button>
           </div>
         ) : (
-          <span className="text-xs text-slate-400">Same as global</span>
+          <span className="text-xs text-muted-foreground">Same as global</span>
         )}
       </div>
     </div>
@@ -251,14 +258,16 @@ export function WordStylePopover({
 
   const renderEffectSection = () => (
     <div className="space-y-1.5">
-      {!compact && <p className="text-xs font-medium text-slate-600">Effect</p>}
+      {!compact && (
+        <p className="text-xs font-medium text-muted-foreground">Effect</p>
+      )}
       <button
         onClick={handleToggleKnockout}
         className={cn(
           "w-full text-xs px-3 py-1.5 rounded-md border transition-colors text-left",
           override.effect === "knockout"
-            ? "bg-slate-900 text-white border-slate-900"
-            : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50",
+            ? "bg-primary text-primary-foreground border-primary"
+            : "bg-background text-foreground border-border hover:bg-muted",
         )}
       >
         Knockout
@@ -271,7 +280,9 @@ export function WordStylePopover({
       {/* Emoji Replace */}
       <div className="space-y-1.5">
         {!compact && (
-          <p className="text-xs font-medium text-slate-600">Emoji Replace</p>
+          <p className="text-xs font-medium text-muted-foreground">
+            Emoji Replace
+          </p>
         )}
         <div className="flex items-center gap-2">
           <button
@@ -283,14 +294,16 @@ export function WordStylePopover({
             className={cn(
               "flex-1 text-xs px-3 py-1.5 rounded-md border transition-colors text-left",
               override.emoji
-                ? "bg-slate-50 border-slate-300"
-                : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50",
+                ? "bg-muted border-border"
+                : "bg-background text-foreground border-border hover:bg-muted",
             )}
           >
             {override.emoji ? (
               <span className="text-base">
                 {override.emoji}{" "}
-                <span className="text-xs text-slate-500">replacing text</span>
+                <span className="text-xs text-muted-foreground">
+                  replacing text
+                </span>
               </span>
             ) : (
               "Replace with emoji..."
@@ -299,7 +312,7 @@ export function WordStylePopover({
           {override.emoji && (
             <button
               onClick={handleClearEmoji}
-              className="text-xs text-slate-400 hover:text-slate-600 underline shrink-0"
+              className="text-xs text-muted-foreground hover:text-foreground underline shrink-0"
             >
               clear
             </button>
@@ -310,7 +323,7 @@ export function WordStylePopover({
       {/* Emoji Overlay */}
       <div className="space-y-1.5">
         {!compact && (
-          <label className="text-xs font-medium text-slate-600 block">
+          <label className="text-xs font-medium text-muted-foreground block">
             Emoji Overlay
           </label>
         )}
@@ -324,14 +337,16 @@ export function WordStylePopover({
             className={cn(
               "flex-1 text-xs px-3 py-1.5 rounded-md border transition-colors text-left",
               override.emojiOverlay
-                ? "bg-slate-50 border-slate-300"
-                : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50",
+                ? "bg-muted border-border"
+                : "bg-background text-foreground border-border hover:bg-muted",
             )}
           >
             {override.emojiOverlay ? (
               <span className="text-base">
                 {override.emojiOverlay}{" "}
-                <span className="text-xs text-slate-500">above word</span>
+                <span className="text-xs text-muted-foreground">
+                  above word
+                </span>
               </span>
             ) : (
               "Add emoji above..."
@@ -340,7 +355,7 @@ export function WordStylePopover({
           {override.emojiOverlay && (
             <button
               onClick={handleClearEmojiOverlay}
-              className="text-xs text-slate-400 hover:text-slate-600 underline shrink-0"
+              className="text-xs text-muted-foreground hover:text-foreground underline shrink-0"
             >
               clear
             </button>
@@ -352,10 +367,10 @@ export function WordStylePopover({
       {hasEmoji && (
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <label className="text-xs font-medium text-slate-600">
+            <label className="text-xs font-medium text-muted-foreground">
               Emoji Size
             </label>
-            <span className="text-xs text-slate-400 tabular-nums">
+            <span className="text-xs text-muted-foreground tabular-nums">
               {emojiScalePercent}%
             </span>
           </div>
@@ -367,7 +382,7 @@ export function WordStylePopover({
             step={10}
             className="w-full"
           />
-          <div className="flex justify-between text-[10px] text-slate-400">
+          <div className="flex justify-between text-[10px] text-muted-foreground">
             <span>50%</span>
             <span>100%</span>
             <span>200%</span>
@@ -440,7 +455,7 @@ export function WordStylePopover({
     return (
       <div
         className={cn(
-          "bg-white border border-slate-200 rounded-xl shadow-xl p-3",
+          "bg-background border border-border rounded-xl shadow-xl p-3",
           className,
         )}
         style={{ fontFamily: "var(--font-outfit), sans-serif" }}
@@ -450,14 +465,14 @@ export function WordStylePopover({
       >
         {/* Header */}
         <div className="flex items-center justify-between mb-2">
-          <h4 className="text-xs font-semibold text-slate-900 truncate flex-1 mr-2">
+          <h4 className="text-xs font-semibold text-foreground truncate flex-1 mr-2">
             &ldquo;{wordText}&rdquo;
           </h4>
           <div className="flex items-center gap-1">
             {hasOverrides && (
               <button
                 onClick={onReset}
-                className="p-1 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+                className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                 title="Reset to global"
               >
                 <RotateCcw className="h-3.5 w-3.5" />
@@ -465,7 +480,7 @@ export function WordStylePopover({
             )}
             <button
               onClick={onClose}
-              className="p-1 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+              className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -481,10 +496,10 @@ export function WordStylePopover({
               className={cn(
                 "flex-1 flex flex-col items-center gap-0.5 py-1.5 rounded-lg border text-[10px] font-medium transition-colors",
                 activeSection === s.key
-                  ? "bg-slate-900 text-white border-slate-900"
+                  ? "bg-primary text-primary-foreground border-primary"
                   : s.hasValue
                     ? "bg-amber-50 text-amber-700 border-amber-300 hover:bg-amber-100"
-                    : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100",
+                    : "bg-muted text-muted-foreground border-border hover:bg-muted",
               )}
             >
               {s.icon}
@@ -508,7 +523,7 @@ export function WordStylePopover({
   return (
     <div
       className={cn(
-        "bg-white border border-slate-200 rounded-xl shadow-xl p-4 w-72",
+        "bg-background border border-border rounded-xl shadow-xl p-4 w-72",
         className,
       )}
       style={{
@@ -520,12 +535,12 @@ export function WordStylePopover({
     >
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
-        <h4 className="text-sm font-semibold text-slate-900 truncate flex-1 mr-2">
+        <h4 className="text-sm font-semibold text-foreground truncate flex-1 mr-2">
           Style: &ldquo;{wordText}&rdquo;
         </h4>
         <button
           onClick={onClose}
-          className="p-1 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+          className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
         >
           <X className="h-4 w-4" />
         </button>

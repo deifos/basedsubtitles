@@ -19,7 +19,7 @@ import {
 } from "mediabunny";
 import type { StreamTargetChunk } from "mediabunny";
 import { SubtitleStyle } from "@/components/subtitle-styling";
-import { processTranscriptChunks } from "@/lib/utils";
+import { processTranscriptChunks } from "@/lib/transcript-utils";
 import { estimateFaceFromMask, type FaceBounds } from "@/lib/render-subtitle";
 import type { MaskData } from "@/hooks/useBackgroundRemoval";
 import {
@@ -188,7 +188,7 @@ export function useVideoDownloadMediaBunny({
       let cropX = 0;
       const cropY = 0;
       let cropW = srcW;
-      const cropH = srcH;
+      let cropH = srcH;
       if (ratio === "9:16" && isLandscape) {
         // Target aspect ratio 9:16 — crop width to match, keep full height
         const targetW = Math.round(srcH * (9 / 16));
@@ -197,7 +197,6 @@ export function useVideoDownloadMediaBunny({
         exportWidth = cropW;
         exportHeight = cropH;
       }
-
       const isMobile =
         /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
         (navigator.maxTouchPoints > 0 && window.innerWidth < 1024);

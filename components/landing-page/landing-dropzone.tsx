@@ -81,7 +81,7 @@ export function LandingDropzone({
       className={`group relative rounded-xl border-2 border-dashed p-4 shadow-sm transition-all focus-within:outline-none ${
         isDragOver
           ? "border-amber-400 bg-amber-50/60 scale-[1.02]"
-          : "border-slate-300 bg-white hover:border-slate-400"
+          : "border-border bg-background hover:border-border"
       }`}
       onDrop={handleDrop}
       onDragOver={handleDragOver}
@@ -89,7 +89,7 @@ export function LandingDropzone({
       onDragLeave={handleDragLeave}
     >
       <div
-        className={`absolute inset-0 -z-10 rounded-xl transition-colors ${isDragOver ? "bg-amber-50/40" : "bg-slate-50"}`}
+        className={`absolute inset-0 -z-10 rounded-xl transition-colors ${isDragOver ? "bg-amber-50/40" : "bg-muted"}`}
       />
 
       {showCamera ? (
@@ -102,23 +102,23 @@ export function LandingDropzone({
         />
       ) : (
         <div className="flex flex-col items-center justify-center py-5 text-center">
-          <div className="relative flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700">
+          <div className="relative flex h-11 w-11 items-center justify-center rounded-lg border border-border bg-background text-foreground">
             <Film className="h-5 w-5" strokeWidth={1.5} />
-            <div className="pointer-events-none absolute -bottom-1.5 -right-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-white shadow-sm ring-2 ring-white">
+            <div className="pointer-events-none absolute -bottom-1.5 -right-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm ring-2 ring-background">
               <Plus className="h-3 w-3" strokeWidth={1.5} />
             </div>
           </div>
-          <h2 className="mt-3 text-base font-semibold tracking-tight text-slate-900">
+          <h2 className="mt-3 text-base font-semibold tracking-tight text-foreground">
             Drop a video here
           </h2>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-muted-foreground">
             MP4, MOV, WebM • processed locally in your browser
           </p>
           <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
             <button
               type="button"
               onClick={openFilePicker}
-              className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
+              className="inline-flex items-center gap-2 rounded-md bg-primary px-3.5 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               <FolderOpen className="h-4 w-4" strokeWidth={1.5} />
               Browse files
@@ -126,12 +126,14 @@ export function LandingDropzone({
             <button
               type="button"
               onClick={() => setShowCamera(true)}
-              className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
+              className="inline-flex items-center gap-2 rounded-md border border-border bg-background px-3.5 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               <Video className="h-4 w-4" strokeWidth={1.5} />
               Record video
             </button>
-            <span className="text-xs text-slate-500">or drag & drop</span>
+            <span className="text-xs text-muted-foreground">
+              or drag & drop
+            </span>
           </div>
         </div>
       )}

@@ -130,9 +130,9 @@ export function PwaInstallBanner(): JSX.Element | null {
 
   return (
     <div className="fixed inset-x-0 bottom-4 z-50 px-4">
-      <div className="mx-auto max-w-xl overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-2xl backdrop-blur">
+      <div className="mx-auto max-w-xl overflow-hidden rounded-2xl border border-border bg-background/95 shadow-2xl backdrop-blur">
         <div className="flex items-start gap-3 p-4 sm:p-5">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-900 text-sm font-extrabold tracking-tight text-white">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-foreground text-sm font-extrabold tracking-tight text-background">
             BS
           </div>
           <div
@@ -141,15 +141,15 @@ export function PwaInstallBanner(): JSX.Element | null {
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold text-slate-900">{title}</p>
-                <p className="mt-1 text-sm leading-5 text-slate-600">
+                <p className="text-sm font-semibold text-foreground">{title}</p>
+                <p className="mt-1 text-sm leading-5 text-muted-foreground">
                   {description}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={dismissBanner}
-                className="rounded-full p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                className="rounded-full p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 aria-label="Dismiss install banner"
               >
                 <X className="h-4 w-4" />
@@ -160,14 +160,14 @@ export function PwaInstallBanner(): JSX.Element | null {
                 <div className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-900">
                   <Share2 className="h-3.5 w-3.5" />
                   Share
-                  <span className="text-slate-300">→</span>
+                  <span className="text-muted-foreground">→</span>
                   Add to Home Screen
                 </div>
               ) : (
                 <Button
                   onClick={handleInstall}
                   disabled={isInstalling}
-                  className="bg-slate-900 text-white hover:bg-slate-800"
+                  className="bg-primary text-primary-foreground hover:bg-primary/80"
                   style={{ fontFamily: "var(--font-outfit), sans-serif" }}
                 >
                   <Download className="h-4 w-4" />

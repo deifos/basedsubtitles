@@ -15,7 +15,7 @@ import {
 
 export function LandingFeatures(): JSX.Element {
   return (
-    <section className="relative py-16 sm:py-24 bg-white">
+    <section className="relative py-16 sm:py-24 bg-background">
       <div className="mx-auto max-w-7xl px-6">
         {/* Section header */}
         <div className="max-w-2xl mb-12">
@@ -26,7 +26,7 @@ export function LandingFeatures(): JSX.Element {
             Features
           </span>
           <h2
-            className="mt-3 text-3xl sm:text-4xl font-bold tracking-tight text-slate-900"
+            className="mt-3 text-3xl sm:text-4xl font-bold tracking-tight text-foreground"
             style={{ fontFamily: "var(--font-outfit), sans-serif" }}
           >
             Everything you need,
@@ -38,7 +38,7 @@ export function LandingFeatures(): JSX.Element {
         {/* Feature grid — playful bento with visual representations */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* AI Subtitle Generation — Large hero card */}
-          <div className="sm:col-span-2 lg:col-span-2 group relative rounded-2xl border border-slate-200/80 bg-gradient-to-br from-blue-50 to-white p-6 shadow-sm transition-all hover:shadow-lg hover:shadow-blue-100/60 hover:-translate-y-0.5 overflow-hidden">
+          <div className="sm:col-span-2 lg:col-span-2 group relative rounded-2xl border border-border bg-gradient-to-br from-blue-50 to-background p-6 shadow-sm transition-all hover:shadow-lg hover:shadow-blue-100/60 hover:-translate-y-0.5 overflow-hidden">
             <div className="flex flex-col items-center sm:flex-row sm:items-center gap-6">
               <div className="relative shrink-0">
                 {/* Big visual: subtitle text over waveform-like bars */}
@@ -57,13 +57,13 @@ export function LandingFeatures(): JSX.Element {
               </div>
               <div className="text-center sm:text-left">
                 <h3
-                  className="text-lg font-bold text-slate-900"
+                  className="text-lg font-bold text-foreground"
                   style={{ fontFamily: "var(--font-outfit), sans-serif" }}
                 >
                   AI Subtitle Generation
                 </h3>
                 <p
-                  className="mt-2 text-sm text-slate-500 leading-relaxed max-w-sm"
+                  className="mt-2 text-sm text-muted-foreground leading-relaxed max-w-sm"
                   style={{ fontFamily: "var(--font-outfit), sans-serif" }}
                 >
                   Powered by Whisper.js running entirely in your browser.
@@ -83,7 +83,7 @@ export function LandingFeatures(): JSX.Element {
           </div>
 
           {/* Face Tracking Subtitle Placement */}
-          <div className="group relative rounded-2xl border border-slate-200/80 bg-gradient-to-br from-violet-50 to-white p-6 shadow-sm transition-all hover:shadow-lg hover:shadow-violet-100/60 hover:-translate-y-0.5 overflow-hidden">
+          <div className="group relative rounded-2xl border border-border bg-gradient-to-br from-violet-50 to-background p-6 shadow-sm transition-all hover:shadow-lg hover:shadow-violet-100/60 hover:-translate-y-0.5 overflow-hidden">
             <div className="relative w-full h-28 rounded-xl bg-violet-100/50 flex items-center justify-center mb-4">
               <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-violet-200/30 via-transparent to-violet-200/30" />
               <ScanFace
@@ -98,13 +98,13 @@ export function LandingFeatures(): JSX.Element {
               </span>
             </div>
             <h3
-              className="text-sm font-bold text-slate-900"
+              className="text-sm font-bold text-foreground"
               style={{ fontFamily: "var(--font-outfit), sans-serif" }}
             >
               Smart Face Tracking
             </h3>
             <p
-              className="mt-1.5 text-xs text-slate-500 leading-relaxed"
+              className="mt-1.5 text-xs text-muted-foreground leading-relaxed"
               style={{ fontFamily: "var(--font-outfit), sans-serif" }}
             >
               Subtitles follow the speaker. Face detection keeps text away from
@@ -113,7 +113,7 @@ export function LandingFeatures(): JSX.Element {
           </div>
 
           {/* Split Subtitle Mode */}
-          <div className="group relative rounded-2xl border border-slate-200/80 bg-gradient-to-br from-amber-50 to-white p-6 shadow-sm transition-all hover:shadow-lg hover:shadow-amber-100/60 hover:-translate-y-0.5 overflow-hidden">
+          <div className="group relative rounded-2xl border border-border bg-gradient-to-br from-amber-50 to-background p-6 shadow-sm transition-all hover:shadow-lg hover:shadow-amber-100/60 hover:-translate-y-0.5 overflow-hidden">
             <div className="relative w-full h-28 rounded-xl bg-amber-100/50 flex items-center justify-center mb-4">
               <div className="flex flex-col items-center justify-between h-full w-full px-4 py-3">
                 <span
@@ -135,13 +135,13 @@ export function LandingFeatures(): JSX.Element {
               </div>
             </div>
             <h3
-              className="text-sm font-bold text-slate-900"
+              className="text-sm font-bold text-foreground"
               style={{ fontFamily: "var(--font-outfit), sans-serif" }}
             >
               Split Subtitle Mode
             </h3>
             <p
-              className="mt-1.5 text-xs text-slate-500 leading-relaxed"
+              className="mt-1.5 text-xs text-muted-foreground leading-relaxed"
               style={{ fontFamily: "var(--font-outfit), sans-serif" }}
             >
               Split subtitles above and below the speaker, or left and right —
@@ -150,7 +150,7 @@ export function LandingFeatures(): JSX.Element {
           </div>
 
           {/* Background Removal */}
-          <div className="group relative rounded-2xl border border-slate-200/80 bg-gradient-to-br from-rose-50 to-white p-6 shadow-sm transition-all hover:shadow-lg hover:shadow-rose-100/60 hover:-translate-y-0.5 overflow-hidden">
+          <div className="group relative rounded-2xl border border-border bg-gradient-to-br from-rose-50 to-background p-6 shadow-sm transition-all hover:shadow-lg hover:shadow-rose-100/60 hover:-translate-y-0.5 overflow-hidden">
             <div className="relative w-full h-28 rounded-xl bg-rose-100/50 flex items-center justify-center mb-4 overflow-hidden">
               {/* Person silhouette with removed background effect */}
               <div
@@ -179,13 +179,13 @@ export function LandingFeatures(): JSX.Element {
               </span>
             </div>
             <h3
-              className="text-sm font-bold text-slate-900"
+              className="text-sm font-bold text-foreground"
               style={{ fontFamily: "var(--font-outfit), sans-serif" }}
             >
               Background Removal
             </h3>
             <p
-              className="mt-1.5 text-xs text-slate-500 leading-relaxed"
+              className="mt-1.5 text-xs text-muted-foreground leading-relaxed"
               style={{ fontFamily: "var(--font-outfit), sans-serif" }}
             >
               Remove or blur the background with AI — runs entirely in your
@@ -194,7 +194,7 @@ export function LandingFeatures(): JSX.Element {
           </div>
 
           {/* 25+ Fonts — Visual: font samples */}
-          <div className="group relative rounded-2xl border border-slate-200/80 bg-gradient-to-br from-emerald-50 to-white p-6 shadow-sm transition-all hover:shadow-lg hover:shadow-emerald-100/60 hover:-translate-y-0.5 overflow-hidden">
+          <div className="group relative rounded-2xl border border-border bg-gradient-to-br from-emerald-50 to-background p-6 shadow-sm transition-all hover:shadow-lg hover:shadow-emerald-100/60 hover:-translate-y-0.5 overflow-hidden">
             <div className="relative w-full h-28 rounded-xl bg-emerald-100/40 flex flex-col items-center justify-center mb-4 gap-1">
               <span
                 className="text-xl font-bold text-emerald-700/70 select-none"
@@ -216,13 +216,13 @@ export function LandingFeatures(): JSX.Element {
               </span>
             </div>
             <h3
-              className="text-sm font-bold text-slate-900"
+              className="text-sm font-bold text-foreground"
               style={{ fontFamily: "var(--font-outfit), sans-serif" }}
             >
               25+ Fonts & Custom Styles
             </h3>
             <p
-              className="mt-1.5 text-xs text-slate-500 leading-relaxed"
+              className="mt-1.5 text-xs text-muted-foreground leading-relaxed"
               style={{ fontFamily: "var(--font-outfit), sans-serif" }}
             >
               Colors, shadows, emphasis effects, and word-by-word highlighting.
@@ -230,7 +230,7 @@ export function LandingFeatures(): JSX.Element {
           </div>
 
           {/* 100+ Languages */}
-          <div className="group relative rounded-2xl border border-slate-200/80 bg-gradient-to-br from-sky-50 to-white p-6 shadow-sm transition-all hover:shadow-lg hover:shadow-sky-100/60 hover:-translate-y-0.5 overflow-hidden">
+          <div className="group relative rounded-2xl border border-border bg-gradient-to-br from-sky-50 to-background p-6 shadow-sm transition-all hover:shadow-lg hover:shadow-sky-100/60 hover:-translate-y-0.5 overflow-hidden">
             <div className="relative w-full h-28 rounded-xl bg-sky-100/40 flex items-center justify-center mb-4">
               <Globe className="h-16 w-16 text-sky-400" strokeWidth={0.8} />
               <div className="absolute inset-0 flex flex-wrap items-center justify-center gap-1.5 p-3">
@@ -250,13 +250,13 @@ export function LandingFeatures(): JSX.Element {
               </div>
             </div>
             <h3
-              className="text-sm font-bold text-slate-900"
+              className="text-sm font-bold text-foreground"
               style={{ fontFamily: "var(--font-outfit), sans-serif" }}
             >
               100+ Languages
             </h3>
             <p
-              className="mt-1.5 text-xs text-slate-500 leading-relaxed"
+              className="mt-1.5 text-xs text-muted-foreground leading-relaxed"
               style={{ fontFamily: "var(--font-outfit), sans-serif" }}
             >
               Whisper AI understands speech in over 100 languages out of the
@@ -266,18 +266,18 @@ export function LandingFeatures(): JSX.Element {
 
           {/* Bottom row: 3 simple cards */}
           {/* Export */}
-          <div className="group relative rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm transition-all hover:shadow-lg hover:shadow-slate-200/60 hover:-translate-y-0.5">
-            <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 ring-1 ring-slate-200/80 text-slate-600 mb-3">
+          <div className="group relative rounded-2xl border border-border bg-background p-5 shadow-sm transition-all hover:shadow-lg hover:-translate-y-0.5">
+            <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-muted ring-1 ring-border text-muted-foreground mb-3">
               <Download className="h-5 w-5" strokeWidth={1.5} />
             </div>
             <h3
-              className="text-sm font-bold text-slate-900"
+              className="text-sm font-bold text-foreground"
               style={{ fontFamily: "var(--font-outfit), sans-serif" }}
             >
               Export with Baked-in Subs
             </h3>
             <p
-              className="mt-1.5 text-xs text-slate-500 leading-relaxed"
+              className="mt-1.5 text-xs text-muted-foreground leading-relaxed"
               style={{ fontFamily: "var(--font-outfit), sans-serif" }}
             >
               Download video with subtitles permanently rendered in.
@@ -285,18 +285,18 @@ export function LandingFeatures(): JSX.Element {
           </div>
 
           {/* Works Offline */}
-          <div className="group relative rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm transition-all hover:shadow-lg hover:shadow-slate-200/60 hover:-translate-y-0.5">
-            <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 ring-1 ring-slate-200/80 text-slate-600 mb-3">
+          <div className="group relative rounded-2xl border border-border bg-background p-5 shadow-sm transition-all hover:shadow-lg hover:-translate-y-0.5">
+            <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-muted ring-1 ring-border text-muted-foreground mb-3">
               <WifiOff className="h-5 w-5" strokeWidth={1.5} />
             </div>
             <h3
-              className="text-sm font-bold text-slate-900"
+              className="text-sm font-bold text-foreground"
               style={{ fontFamily: "var(--font-outfit), sans-serif" }}
             >
               Works Offline
             </h3>
             <p
-              className="mt-1.5 text-xs text-slate-500 leading-relaxed"
+              className="mt-1.5 text-xs text-muted-foreground leading-relaxed"
               style={{ fontFamily: "var(--font-outfit), sans-serif" }}
             >
               After the first load, everything is cached. Process videos
@@ -305,18 +305,18 @@ export function LandingFeatures(): JSX.Element {
           </div>
 
           {/* Free */}
-          <div className="group relative rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm transition-all hover:shadow-lg hover:shadow-slate-200/60 hover:-translate-y-0.5">
-            <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 ring-1 ring-slate-200/80 text-slate-600 mb-3">
+          <div className="group relative rounded-2xl border border-border bg-background p-5 shadow-sm transition-all hover:shadow-lg hover:-translate-y-0.5">
+            <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-muted ring-1 ring-border text-muted-foreground mb-3">
               <BadgeCheck className="h-5 w-5" strokeWidth={1.5} />
             </div>
             <h3
-              className="text-sm font-bold text-slate-900"
+              className="text-sm font-bold text-foreground"
               style={{ fontFamily: "var(--font-outfit), sans-serif" }}
             >
               Free. No Sign-up. No Watermarks.
             </h3>
             <p
-              className="mt-1.5 text-xs text-slate-500 leading-relaxed"
+              className="mt-1.5 text-xs text-muted-foreground leading-relaxed"
               style={{ fontFamily: "var(--font-outfit), sans-serif" }}
             >
               No accounts, no paywalls, no limitations. Your videos, your

@@ -3,7 +3,7 @@ import {
   processTranscriptChunks,
   binarySearchActiveChunk,
   type WordStyleOverride,
-} from "@/lib/utils";
+} from "@/lib/transcript-utils";
 import { resolveFontFamily } from "@/lib/font-config";
 
 interface TranscriptData {

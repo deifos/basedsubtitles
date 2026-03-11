@@ -27,10 +27,54 @@ import {
   Plus_Jakarta_Sans,
   Outfit,
   Lilita_One,
+  Noto_Sans,
+  Jost,
+  Rubik,
+  Roboto_Mono,
 } from "next/font/google";
 import { Toaster } from "sonner";
 import { PwaInstallBanner } from "@/components/pwa-install-banner";
 import "./globals.css";
+import { cn } from "@/lib/utils";
+
+const robotoMono = Roboto_Mono({
+  subsets: [
+    "cyrillic",
+    "cyrillic-ext",
+    "greek",
+    "latin",
+    "latin-ext",
+    "vietnamese",
+  ],
+  weight: ["100", "200", "300", "400", "500", "600", "700"],
+  variable: "--font-roboto-mono",
+});
+
+const rubik = Rubik({
+  subsets: [
+    "arabic",
+    "cyrillic",
+    "cyrillic-ext",
+    "hebrew",
+    "latin",
+    "latin-ext",
+  ],
+  weight: ["300", "400", "500", "600", "700", "800", "900"],
+  variable: "--font-rubik",
+});
+
+const jost = Jost({
+  subsets: ["cyrillic", "latin", "latin-ext"],
+  weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
+  variable: "--font-jost",
+});
+
+const notoSans = Noto_Sans({
+  variable: "--font-sans",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+});
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -306,7 +350,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html
+      lang="en"
+      className={cn(
+        notoSans.variable,
+        "font-jost",
+        "font-rubik",
+        "font-roboto-mono",
+        jost.variable,
+        rubik.variable,
+        robotoMono.variable,
+      )}
+    >
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${montserrat.variable} ${bebasNeue.variable} ${poppins.variable} ${oswald.variable} ${anton.variable} ${bangers.variable} ${fredoka.variable} ${righteous.variable} ${nunito.variable} ${roboto.variable} ${openSans.variable} ${inter.variable} ${permanentMarker.variable} ${pacifico.variable} ${lobster.variable} ${alfaSlabOne.variable} ${staatliches.variable} ${fugazOne.variable} ${chewy.variable} ${playfairDisplay.variable} ${lora.variable} ${plusJakartaSans.variable} ${outfit.variable} ${lilitaOne.variable} antialiased`}
       >

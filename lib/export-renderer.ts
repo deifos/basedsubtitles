@@ -1,5 +1,8 @@
 import { SubtitleStyle } from "@/components/subtitle-styling";
-import { type WordStyleOverride, processTranscriptChunks } from "@/lib/utils";
+import {
+  type WordStyleOverride,
+  processTranscriptChunks,
+} from "@/lib/transcript-utils";
 import { resolveFontFamily } from "@/lib/font-config";
 import { type FaceBounds } from "@/lib/render-subtitle";
 

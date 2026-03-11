@@ -49,8 +49,8 @@ export function LandingHowItWorks(): JSX.Element {
         }}
       />
       <div className="pointer-events-none absolute inset-0 -z-10">
-        <div className="absolute inset-0 bg-gradient-to-b from-white via-transparent to-white" />
-        <div className="absolute inset-0 bg-gradient-to-r from-white via-transparent to-white" />
+        <div className="absolute inset-0 bg-gradient-to-b from-background via-transparent to-background" />
+        <div className="absolute inset-0 bg-gradient-to-r from-background via-transparent to-background" />
       </div>
 
       <div className="mx-auto max-w-7xl px-6">
@@ -63,7 +63,7 @@ export function LandingHowItWorks(): JSX.Element {
             How it works
           </span>
           <h2
-            className="mt-3 text-3xl sm:text-4xl font-bold tracking-tight text-slate-900"
+            className="mt-3 text-3xl sm:text-4xl font-bold tracking-tight text-foreground"
             style={{ fontFamily: "var(--font-outfit), sans-serif" }}
           >
             Three steps. That&apos;s it.
@@ -77,33 +77,33 @@ export function LandingHowItWorks(): JSX.Element {
             return (
               <div
                 key={step.number}
-                className="relative text-center group rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm shadow-slate-100 transition-all hover:shadow-lg hover:shadow-slate-200/60"
+                className="relative text-center group rounded-2xl border border-border bg-background p-6 shadow-sm transition-all hover:shadow-lg"
               >
                 {/* Step number + icon visual */}
                 <div
                   className={`relative w-20 h-20 mx-auto ${step.bg} rounded-2xl flex items-center justify-center mb-5`}
                 >
                   <span
-                    className={`absolute -top-2 -right-2 text-xs font-black ${step.text} bg-white rounded-full w-7 h-7 flex items-center justify-center ring-2 ring-white shadow-sm`}
+                    className={`absolute -top-2 -right-2 text-xs font-black ${step.text} bg-background rounded-full w-7 h-7 flex items-center justify-center ring-2 ring-background shadow-sm`}
                     style={{ fontFamily: "var(--font-outfit), sans-serif" }}
                   >
                     {step.number}
                   </span>
                   <div
-                    className={`inline-flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-b ${step.accent} text-white shadow-md`}
+                    className={`inline-flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-b ${step.accent} text-primary-foreground shadow-md`}
                   >
                     <Icon className="h-5 w-5" strokeWidth={1.5} />
                   </div>
                 </div>
 
                 <h3
-                  className="text-base font-semibold text-slate-900"
+                  className="text-base font-semibold text-foreground"
                   style={{ fontFamily: "var(--font-outfit), sans-serif" }}
                 >
                   {step.title}
                 </h3>
                 <p
-                  className="mt-1.5 text-xs text-slate-500 leading-relaxed max-w-xs mx-auto"
+                  className="mt-1.5 text-xs text-muted-foreground leading-relaxed max-w-xs mx-auto"
                   style={{ fontFamily: "var(--font-outfit), sans-serif" }}
                 >
                   {step.description}

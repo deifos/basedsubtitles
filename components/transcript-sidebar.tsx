@@ -8,7 +8,7 @@ import {
   processTranscriptChunks,
   type ProcessedChunk,
   type ProcessedWord,
-} from "@/lib/utils";
+} from "@/lib/transcript-utils";
 import { Button } from "@/components/ui/button";
 import { Edit, Ban, EyeOff, SkipForward, Filter } from "lucide-react";
 
@@ -345,7 +345,7 @@ export function TranscriptSidebar({
             onClick={() => setHideSkipped((v) => !v)}
             className={`inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs font-medium transition-colors ${
               hideSkipped
-                ? "bg-slate-900 text-white"
+                ? "bg-primary text-primary-foreground"
                 : "bg-yellow-100 text-yellow-800 hover:bg-yellow-200"
             }`}
             title={
@@ -393,7 +393,7 @@ export function TranscriptSidebar({
                     : ""
                 } ${
                   isDisabled
-                    ? "opacity-50 bg-gray-100 border-l-4 border-red-400"
+                    ? "opacity-50 bg-muted border-l-4 border-red-400"
                     : ""
                 } ${
                   isHidden && !isDisabled
@@ -446,7 +446,7 @@ export function TranscriptSidebar({
                   <div>
                     <div className="flex justify-between items-start">
                       <p
-                        className={`${isActive ? "font-medium" : ""} ${isDisabled ? "line-through text-gray-500" : ""} ${isHidden && !isDisabled ? "italic text-yellow-700" : ""}`}
+                        className={`${isActive ? "font-medium" : ""} ${isDisabled ? "line-through text-muted-foreground" : ""} ${isHidden && !isDisabled ? "italic text-yellow-700" : ""}`}
                       >
                         {chunk.text}
                       </p>
@@ -484,7 +484,7 @@ export function TranscriptSidebar({
                           ) : isHidden ? (
                             <EyeOff className="h-3 w-3 text-yellow-600" />
                           ) : (
-                            <Ban className="h-3 w-3 text-gray-500" />
+                            <Ban className="h-3 w-3 text-muted-foreground" />
                           )}
                         </Button>
                       </div>

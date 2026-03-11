@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { extractAudioFromVideo } from "@/lib/audio-utils";
-import type { WordStyleOverride } from "@/lib/utils";
+import type { WordStyleOverride } from "@/lib/transcript-utils";
 
 type DeviceType = "webgpu" | "wasm";
 export type ModelSize = "tiny" | "base" | "small";
@@ -266,65 +266,76 @@ export function useTranscription() {
     updateStatus("ready");
   };
 
-  const startTranscription = async (
-    file: File,
-    language: string = "en",
-    modelSize: ModelSize = "base",
-  ) => {
-    try {
-      // Reset states
-      setError(null);
-      setResult(null);
-      setLiveText("");
-      setProgress(0);
+  const transcribingRef = useRef(false);
 
-      updateStatus("processing");
-      setProgress(5);
+  const startTranscription = useCallback(
+    async (
+      file: File,
+      language: string = "en",
+      modelSize: ModelSize = "base",
+    ) => {
+      // Guard against double calls (React Strict Mode, double-clicks, etc.)
+      if (transcribingRef.current) return;
+      transcribingRef.current = true;
 
-      if (!modelReadyRef.current || modelSizeRef.current !== modelSize) {
-        updateStatus("loading");
-        await ensureModelLoaded(modelSize);
+      try {
+        // Reset states
+        setError(null);
+        setResult(null);
+        setLiveText("");
+        setProgress(0);
+
+        updateStatus("processing");
+        setProgress(5);
+
+        if (!modelReadyRef.current || modelSizeRef.current !== modelSize) {
+          updateStatus("loading");
+          await ensureModelLoaded(modelSize);
+        }
+
+        updateStatus("extracting");
+        setProgress(30);
+        const audioData = await extractAudioFromVideo(file);
+
+        if (!worker.current) {
+          throw new Error("Worker not initialized properly");
+        }
+
+        updateStatus("transcribing");
+        setProgress(60);
+        worker.current.postMessage({
+          type: "run",
+          data: {
+            audio: audioData,
+            language,
+            device: deviceRef.current,
+            modelSize,
+          },
+        });
+      } catch (err) {
+        console.error("Error in startTranscription:", err);
+        if (err instanceof Error) {
+          console.error("Error stack:", err.stack);
+        }
+        setError(err instanceof Error ? err.message : String(err));
+        updateStatus("idle");
+        setProgress(0);
+        modelReadyRef.current = false;
+        modelLoadingPromiseRef.current = null;
+        modelLoadResolveRef.current = null;
+        modelLoadRejectRef.current = null;
+
+        // Reset worker on error
+        if (worker.current) {
+          worker.current.terminate();
+          worker.current = null;
+        }
+      } finally {
+        transcribingRef.current = false;
       }
-
-      updateStatus("extracting");
-      setProgress(30);
-      const audioData = await extractAudioFromVideo(file);
-
-      if (!worker.current) {
-        throw new Error("Worker not initialized properly");
-      }
-
-      updateStatus("transcribing");
-      setProgress(60);
-      worker.current.postMessage({
-        type: "run",
-        data: {
-          audio: audioData,
-          language,
-          device: deviceRef.current,
-          modelSize,
-        },
-      });
-    } catch (err) {
-      console.error("Error in startTranscription:", err);
-      if (err instanceof Error) {
-        console.error("Error stack:", err.stack);
-      }
-      setError(err instanceof Error ? err.message : String(err));
-      updateStatus("idle");
-      setProgress(0);
-      modelReadyRef.current = false;
-      modelLoadingPromiseRef.current = null;
-      modelLoadResolveRef.current = null;
-      modelLoadRejectRef.current = null;
-
-      // Reset worker on error
-      if (worker.current) {
-        worker.current.terminate();
-        worker.current = null;
-      }
-    }
-  };
+    },
+    [ensureModelLoaded, updateStatus],
+  );
 
   const resetTranscription = () => {
     // Reset states
@@ -367,6 +378,7 @@ export function useTranscription() {
     progress,
     device,
     setResult,
+    setStatus: updateStatus,
     handleVideoSelect,
     startTranscription,
     resetTranscription,

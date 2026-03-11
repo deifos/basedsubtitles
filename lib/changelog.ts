@@ -8,7 +8,7 @@
  * - PATCH: Bug fixes and small improvements
  */
 
-export const APP_VERSION = "2.4.0";
+export const APP_VERSION = "2.5.1";
 
 export interface ChangelogEntry {
   version: string;
@@ -21,6 +21,115 @@ export interface ChangelogEntry {
 }
 
 export const changelog: ChangelogEntry[] = [
+  {
+    version: "2.5.1",
+    date: "2026-03-11",
+    title: "UX Polish, Double-Transcription Fix & Cleanup",
+    changes: [
+      {
+        type: "fixed",
+        description:
+          "Double audio extraction / transcription triggered by clicking Transcribe twice — added ref guard in useTranscription to prevent concurrent calls",
+      },
+      {
+        type: "fixed",
+        description:
+          "1-2 second idle gap between language modal closing and processing overlay appearing — status now set synchronously in the same render batch as modal close",
+      },
+      {
+        type: "changed",
+        description:
+          "Aspect ratio tabs now use rectangle icons (horizontal/vertical) instead of plain text, with labels on desktop",
+      },
+      {
+        type: "changed",
+        description:
+          "Mobile Styling/Edit tabs restyled with primary color active state and bolder font to establish clear visual hierarchy above the Word/Phrase sub-tabs",
+      },
+      {
+        type: "added",
+        description:
+          "Bottom fade shadow on mobile scroll area to hint that more content is available below",
+      },
+      {
+        type: "removed",
+        description:
+          "Removed drag-to-pan and fit/crop toggle for portrait-in-landscape — face tracking handles intelligent cropping; cleaned up all related code from video-upload, main-app, and export hook",
+      },
+      {
+        type: "fixed",
+        description:
+          "Font subset error from fonttrio install — removed invalid 'menu' subset from Jost, Rubik, and Roboto_Mono declarations in layout.tsx",
+      },
+      {
+        type: "changed",
+        description:
+          "Disabled React Strict Mode to prevent dev-only double-mount side effects (double worker init, double audio extraction)",
+      },
+    ],
+  },
+  {
+    version: "2.5.0",
+    date: "2026-03-11",
+    title: "Mobile-First Redesign & shadcn Theming",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Full mobile-first layout: viewport-locked page with no page scroll, inline Styling/Edit tabs below the download button with internal scrolling, and an expand button for full-screen editing",
+      },
+      {
+        type: "changed",
+        description:
+          "Converted entire codebase from hardcoded Tailwind colors to semantic theme variables (bg-primary, text-foreground, bg-muted, etc.) so shadcn presets apply correctly",
+      },
+      {
+        type: "changed",
+        description:
+          "Moved custom utility functions out of lib/utils.ts into lib/transcript-utils.ts so shadcn preset installs no longer overwrite app code",
+      },
+      {
+        type: "changed",
+        description:
+          "All mobile controls now use shadcn Button component with proper variants and sizes for consistent touch targets and interaction states",
+      },
+      {
+        type: "changed",
+        description:
+          "Regenerate Subs button (formerly Change Language) now opens the language modal without auto-starting processing, letting users pick a different language first",
+      },
+      {
+        type: "added",
+        description:
+          "Confirmation dialog (shadcn AlertDialog) when uploading a new video to prevent accidental loss of current subtitles and styling",
+      },
+      {
+        type: "added",
+        description:
+          "Confirmation dialog for background removal on videos longer than 1 minute warning about processing time",
+      },
+      {
+        type: "added",
+        description:
+          "Cancel button with live progress shown inline during background removal processing",
+      },
+      {
+        type: "added",
+        description:
+          "Slim progress bar below controls during background removal on mobile",
+      },
+      {
+        type: "fixed",
+        description:
+          "Mobile bottom sheets (Styling/Edit) no longer blink and fail to open — replaced dual-SheetContent pattern with separate Sheet components",
+      },
+      {
+        type: "fixed",
+        description:
+          "Language selection modal now properly resets state when reopened, preventing stale Processing state from previous transcription",
+      },
+    ],
+  },
   {
     version: "2.4.0",
     date: "2026-03-10",

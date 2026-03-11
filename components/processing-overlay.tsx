@@ -24,8 +24,8 @@ export function ProcessingOverlay({
   if (!isVisible) return null;
 
   return (
-    <div className="fixed inset-0 bg-white/70 dark:bg-gray-800/70 backdrop-blur-md flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-900 p-8 rounded-lg shadow-xl max-w-md w-full space-y-6 border border-border">
+    <div className="fixed inset-0 bg-background/70 backdrop-blur-md flex items-center justify-center z-50">
+      <div className="bg-background p-6 lg:p-8 rounded-lg shadow-xl max-w-md w-full mx-4 space-y-6 border border-border">
         <div className="flex flex-col items-center justify-center space-y-5">
           <Loader2 className="h-14 w-14 animate-spin text-primary" />
           <h3 className="text-2xl font-medium text-center">{statusMessage}</h3>
@@ -37,8 +37,8 @@ export function ProcessingOverlay({
           </div>
           {/* Live transcription preview — grows token by token while Whisper runs */}
           {liveText && (
-            <div className="w-full max-h-40 overflow-y-auto rounded-md bg-slate-50 border border-slate-200 p-3">
-              <p className="text-xs text-slate-700 leading-relaxed font-mono whitespace-pre-wrap">
+            <div className="w-full max-h-40 overflow-y-auto rounded-md bg-muted border border-border p-3">
+              <p className="text-xs text-foreground leading-relaxed font-mono whitespace-pre-wrap">
                 {liveText}
               </p>
             </div>

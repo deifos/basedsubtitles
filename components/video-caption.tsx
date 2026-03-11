@@ -8,7 +8,7 @@ import {
   type ProcessedChunk,
   type ProcessedWord,
   type WordStyleOverride,
-} from "@/lib/utils";
+} from "@/lib/transcript-utils";
 import { cn } from "@/lib/utils";
 
 const fontOptions = Object.values(FONT_FAMILIES);

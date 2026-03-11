@@ -13,7 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { useCameraRecording } from "@/hooks/useCameraRecording";
-import { formatTime } from "@/lib/utils";
+import { formatTime } from "@/lib/transcript-utils";
 
 interface CameraRecorderProps {
   onVideoReady: (file: File) => void;
@@ -63,10 +63,12 @@ export function CameraRecorder({
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
         <Loader2
-          className="h-8 w-8 animate-spin text-slate-400"
+          className="h-8 w-8 animate-spin text-muted-foreground"
           strokeWidth={1.5}
         />
-        <p className="mt-4 text-sm text-slate-600">Requesting camera access…</p>
+        <p className="mt-4 text-sm text-muted-foreground">
+          Requesting camera access…
+        </p>
       </div>
     );
   }
@@ -78,19 +80,19 @@ export function CameraRecorder({
         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-50">
           <AlertCircle className="h-6 w-6 text-red-500" strokeWidth={1.5} />
         </div>
-        <p className="mt-4 max-w-sm text-sm text-slate-700">{error}</p>
+        <p className="mt-4 max-w-sm text-sm text-foreground">{error}</p>
         <div className="mt-5 flex items-center gap-3">
           <button
             type="button"
             onClick={() => openCamera()}
-            className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800"
+            className="inline-flex items-center gap-2 rounded-md bg-primary px-3.5 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/80"
           >
             Try Again
           </button>
           <button
             type="button"
             onClick={handleCancel}
-            className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+            className="inline-flex items-center gap-2 rounded-md border border-border bg-background px-3.5 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
           >
             Cancel
           </button>
@@ -104,10 +106,10 @@ export function CameraRecorder({
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
         <Loader2
-          className="h-8 w-8 animate-spin text-slate-400"
+          className="h-8 w-8 animate-spin text-muted-foreground"
           strokeWidth={1.5}
         />
-        <p className="mt-4 text-sm text-slate-600">Processing video…</p>
+        <p className="mt-4 text-sm text-muted-foreground">Processing video…</p>
       </div>
     );
   }
@@ -137,7 +139,7 @@ export function CameraRecorder({
           <button
             type="button"
             onClick={handleAccept}
-            className="inline-flex items-center gap-2 rounded-md bg-white px-3.5 py-2 text-sm font-medium text-slate-900 transition-colors hover:bg-slate-100"
+            className="inline-flex items-center gap-2 rounded-md bg-background px-3.5 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
           >
             <Video className="h-4 w-4" strokeWidth={1.5} />
             Use this video

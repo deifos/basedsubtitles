@@ -9,11 +9,11 @@ export function LandingHeader(): JSX.Element {
       <div className="mx-auto max-w-7xl px-6">
         <div className="flex items-center justify-between py-5">
           <Link href="#" className="inline-flex items-center gap-2.5 group">
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-sm font-bold tracking-tight text-white transition-transform group-hover:scale-105">
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-foreground text-sm font-bold tracking-tight text-background transition-transform group-hover:scale-105">
               BS
             </span>
             <span
-              className="text-sm font-semibold tracking-tight text-slate-900"
+              className="text-sm font-semibold tracking-tight text-foreground"
               style={{ fontFamily: "var(--font-outfit), sans-serif" }}
             >
               basedsubtitles
@@ -29,7 +29,7 @@ export function LandingHeader(): JSX.Element {
             </span>
             <a
               href="#dropzone"
-              className="inline-flex items-center rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white transition-all hover:bg-slate-800 hover:shadow-lg"
+              className="inline-flex items-center rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground transition-all hover:bg-primary/80 hover:shadow-lg"
               style={{ fontFamily: "var(--font-outfit), sans-serif" }}
             >
               Get Started

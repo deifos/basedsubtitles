@@ -49,7 +49,7 @@ export function LandingPage({ onVideoSelect }: LandingPageProps): JSX.Element {
 
   return (
     <div
-      className="flex min-h-screen flex-col bg-white text-slate-800 relative"
+      className="flex min-h-screen flex-col bg-background text-foreground relative"
       onDrop={handlePageDrop}
       onDragOver={handlePageDragOver}
       onDragLeave={handlePageDragLeave}
@@ -57,15 +57,15 @@ export function LandingPage({ onVideoSelect }: LandingPageProps): JSX.Element {
       {/* Full-page drop overlay */}
       {isPageDragOver && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-amber-500/10 backdrop-blur-sm pointer-events-none">
-          <div className="rounded-2xl border-2 border-dashed border-amber-400 bg-white/90 px-10 py-8 shadow-2xl text-center">
+          <div className="rounded-2xl border-2 border-dashed border-amber-400 bg-background/90 px-10 py-8 shadow-2xl text-center">
             <p
-              className="text-lg font-semibold text-slate-900"
+              className="text-lg font-semibold text-foreground"
               style={{ fontFamily: "var(--font-outfit), sans-serif" }}
             >
               Drop your video anywhere
             </p>
             <p
-              className="mt-1 text-sm text-slate-500"
+              className="mt-1 text-sm text-muted-foreground"
               style={{ fontFamily: "var(--font-outfit), sans-serif" }}
             >
               MP4, MOV, WebM
