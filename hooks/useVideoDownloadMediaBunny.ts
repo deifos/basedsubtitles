@@ -277,10 +277,16 @@ export function useVideoDownloadMediaBunny({
       cancelContextRef.current.output = output;
 
       // Add video track
+      const videoCodec = format === "webm" ? "vp9" : "avc";
       const videoSource = new CanvasSource(canvas, {
-        codec: format === "webm" ? "vp9" : "avc",
+        codec: videoCodec,
         bitrate: qualityMap[quality],
-        keyFrameInterval: 2,
+        ...(videoCodec === "avc"
+          ? {
+              bitrateMode: "constant",
+              latencyMode: "realtime",
+            }
+          : {}),
       });
       output.addVideoTrack(videoSource, { frameRate: fps });
       cancelContextRef.current.videoSource = videoSource;
