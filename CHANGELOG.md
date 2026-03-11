@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Active-word emphasis is now split into independent `resize` and `recolor` controls
 - Light and transparent preset buttons now use stronger contrast so the active `Formal` preset stays visible in the styling panel
 - Mobile MP4 export now uses more conservative compatibility settings during the playback-freeze investigation, including explicit AVC settings on mobile, lighter mobile export caps, and on-screen export diagnostics for codec, MIME type, bitrate, and source-track details
+- HEVC-source export startup now streams audio samples alongside video rendering and resolves the output MIME type asynchronously so the ongoing `0%` stall investigation is no longer front-loaded on whole-file audio preparation
 
 ### Fixed
 

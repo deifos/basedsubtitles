@@ -72,6 +72,11 @@ export const changelog: ChangelogEntry[] = [
           "Mobile MP4 export now uses more conservative compatibility settings during the playback-freeze investigation, including explicit AVC settings on mobile, lighter mobile export caps, and on-screen export diagnostics for codec, MIME type, bitrate, and source-track details",
       },
       {
+        type: "changed",
+        description:
+          "HEVC-source export startup now streams audio samples alongside video rendering and resolves the output MIME type asynchronously so the ongoing 0% stall investigation is no longer front-loaded on whole-file audio preparation",
+      },
+      {
         type: "fixed",
         description:
           "Canvas context state (transforms, composite ops) no longer resets every frame during compositing export — blur, foreground, and mask canvases are sized once and cleared instead of recreated",
