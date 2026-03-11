@@ -170,20 +170,20 @@ export function useVideoDownloadMediaBunny({
         exportHeight = cropH;
       }
 
-      // Ensure a minimum export resolution — low-res sources (e.g. 720p webcam
-      // cropped to 9:16 → 405×720) get scaled up so the output isn't tiny.
+      const isMobile =
+        /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+        (navigator.maxTouchPoints > 0 && window.innerWidth < 1024);
       const MIN_EXPORT_DIMENSION = 1080;
-      if (Math.max(exportWidth, exportHeight) < MIN_EXPORT_DIMENSION) {
+      if (
+        !isMobile &&
+        Math.max(exportWidth, exportHeight) < MIN_EXPORT_DIMENSION
+      ) {
         const scale =
           MIN_EXPORT_DIMENSION / Math.max(exportWidth, exportHeight);
         exportWidth = Math.round(exportWidth * scale);
         exportHeight = Math.round(exportHeight * scale);
       }
-
-      const isMobile =
-        /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
-        (navigator.maxTouchPoints > 0 && window.innerWidth < 1024);
-      const MAX_MOBILE_DIMENSION = 1920; // cap at 1080p
+      const MAX_MOBILE_DIMENSION = 1280;
       if (
         isMobile &&
         Math.max(exportWidth, exportHeight) > MAX_MOBILE_DIMENSION
@@ -197,6 +197,7 @@ export function useVideoDownloadMediaBunny({
       // H.264 requires even dimensions
       exportWidth = exportWidth % 2 === 0 ? exportWidth : exportWidth - 1;
       exportHeight = exportHeight % 2 === 0 ? exportHeight : exportHeight - 1;
+      const exportFps = isMobile ? Math.min(fps, 24) : fps;
 
       canvas.width = exportWidth;
       canvas.height = exportHeight;
@@ -297,7 +298,7 @@ export function useVideoDownloadMediaBunny({
             }
           : {}),
       });
-      output.addVideoTrack(videoSource, { frameRate: fps });
+      output.addVideoTrack(videoSource, { frameRate: exportFps });
       cancelContextRef.current.videoSource = videoSource;
 
       // Handle audio if present
@@ -387,12 +388,12 @@ export function useVideoDownloadMediaBunny({
         }
       }
 
-      const totalFrames = Math.ceil(duration * fps);
+      const totalFrames = Math.ceil(duration * exportFps);
       setStatus("Rendering video frames...");
 
       const timestampIterator = (async function* () {
         for (let frameIndex = 0; frameIndex < totalFrames; frameIndex++) {
-          yield frameIndex / fps;
+          yield frameIndex / exportFps;
         }
       })();
 
@@ -444,12 +445,12 @@ export function useVideoDownloadMediaBunny({
           break;
         }
 
-        const time = frameIndex / fps;
+        const time = frameIndex / exportFps;
 
         // Update progress ~once per second (every fps frames) to avoid
         // excessive React re-renders which freeze mobile devices.
         const progressPercent = Math.min(100, (frameIndex / totalFrames) * 100);
-        if (frameIndex % fps === 0 || frameIndex === totalFrames - 1) {
+        if (frameIndex % exportFps === 0 || frameIndex === totalFrames - 1) {
           setProgress(progressPercent);
           setStatus(
             `Rendering: ${Math.round(time)}s / ${Math.round(duration)}s (${Math.round(progressPercent)}%)`,
@@ -580,7 +581,7 @@ export function useVideoDownloadMediaBunny({
               subtitleStyle.brandingWatermark,
             );
             try {
-              await videoSource.add(time, 1 / fps);
+              await videoSource.add(time, 1 / exportFps);
             } catch {}
             continue;
           }
@@ -779,7 +780,7 @@ export function useVideoDownloadMediaBunny({
         }
 
         try {
-          await videoSource.add(time, 1 / fps);
+          await videoSource.add(time, 1 / exportFps);
         } catch (error) {
           if (cancelContextRef.current.cancelRequested) {
             cancelled = true;
