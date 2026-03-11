@@ -3,9 +3,8 @@ import {
   Input,
   Output,
   CanvasSource,
-  AudioBufferSource,
-  EncodedAudioPacketSource,
-  EncodedPacketSink,
+  AudioSampleSink,
+  AudioSampleSource,
   Mp4OutputFormat,
   WebMOutputFormat,
   StreamTarget,
@@ -279,9 +278,6 @@ export function useVideoDownloadMediaBunny({
         (originalVideoTrack &&
           (await originalVideoTrack.getCodecParameterString())) ||
         undefined;
-      const originalAudioDecoderConfig = originalAudioTrack
-        ? await originalAudioTrack.getDecoderConfig()
-        : null;
       const sourceCodec =
         originalVideoDecoderConfig?.codec ?? originalVideoCodecString;
       const sourceCanDecode = originalVideoTrack
@@ -403,81 +399,27 @@ export function useVideoDownloadMediaBunny({
         await output.start();
         outputStarted = true;
       };
+      let audioSource: AudioSampleSource | null = null;
+      let audioPumpPromise: Promise<void> | null = null;
+      let audioPumpError: Error | null = null;
 
       // Handle audio if present
-      let audioSource: AudioBufferSource | null = null;
       if (originalAudioTrack) {
-        const canCopyEncodedAudio =
-          format === "mp4" &&
-          originalAudioTrack.codec === "aac" &&
-          !!originalAudioDecoderConfig;
-        try {
-          if (canCopyEncodedAudio) {
-            setStatus("Copying audio...");
-            const encodedAudioSource = new EncodedAudioPacketSource(
-              originalAudioTrack.codec,
-            );
-            output.addAudioTrack(encodedAudioSource);
-            await ensureOutputStarted();
-
-            const audioPacketSink = new EncodedPacketSink(originalAudioTrack);
-            let sentAudioDecoderConfig = false;
-            for await (const packet of audioPacketSink.packets()) {
-              await encodedAudioSource.add(
-                packet,
-                !sentAudioDecoderConfig
-                  ? {
-                      decoderConfig: originalAudioDecoderConfig,
-                    }
-                  : undefined,
-              );
-              sentAudioDecoderConfig = true;
-            }
-            encodedAudioSource.close();
-          } else {
-            setStatus("Processing audio...");
-            let audioContext: AudioContext | null = null;
-            try {
-              const arrayBuffer = await videoBlob.arrayBuffer();
-              audioContext =
-                new // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                (window.AudioContext || (window as any).webkitAudioContext)();
-              const audioBuffer = await audioContext.decodeAudioData(
-                arrayBuffer.slice(0),
-              );
-
-              audioSource = new AudioBufferSource({
-                codec: format === "webm" ? "opus" : "aac",
-                bitrate: 128_000,
-              });
-              output.addAudioTrack(audioSource);
-
-              await ensureOutputStarted();
-              await audioSource.add(audioBuffer);
-              audioSource.close();
-            } finally {
-              if (audioContext) {
-                try {
-                  await audioContext.close();
-                } catch {}
-              }
-            }
-          }
-        } catch {
-          await ensureOutputStarted();
-        }
-      } else {
-        await ensureOutputStarted();
+        audioSource = new AudioSampleSource({
+          codec: format === "webm" ? "opus" : "aac",
+          bitrate: 128_000,
+        });
+        output.addAudioTrack(audioSource);
       }
+      await ensureOutputStarted();
 
-      const outputMimeType = await output.getMimeType();
       console.info("[MediaBunny export] Output started", {
         exportFps,
         exportHeight,
         exportWidth,
         format,
         isMobile,
-        mimeType: outputMimeType,
+        mimeType: "pending",
         quality,
         ratio,
         selectedVideoBitrate,
@@ -486,10 +428,18 @@ export function useVideoDownloadMediaBunny({
         sourceIsHevc,
         videoCodec,
       });
-      setExportDiagnostics((previous) => ({
-        ...(previous ?? baseExportDiagnostics),
-        mimeType: outputMimeType,
-      }));
+      void output
+        .getMimeType()
+        .then((outputMimeType) => {
+          console.info("[MediaBunny export] MIME resolved", {
+            mimeType: outputMimeType,
+          });
+          setExportDiagnostics((previous) => ({
+            ...(previous ?? baseExportDiagnostics),
+            mimeType: outputMimeType,
+          }));
+        })
+        .catch(() => {});
 
       let videoSampleSink: VideoSampleSink | null = null;
       if (originalVideoTrack && sourceCanDecode) {
@@ -542,6 +492,34 @@ export function useVideoDownloadMediaBunny({
 
       const totalFrames = Math.ceil(duration * exportFps);
       setStatus("Rendering video frames...");
+
+      if (originalAudioTrack && audioSource) {
+        const audioSampleSink = new AudioSampleSink(originalAudioTrack);
+        audioPumpPromise = (async () => {
+          try {
+            for await (const audioSample of audioSampleSink.samples(
+              0,
+              duration,
+            )) {
+              if (cancelContextRef.current.cancelRequested) break;
+              try {
+                await audioSource.add(audioSample);
+              } finally {
+                audioSample.close();
+              }
+            }
+            audioSource.close();
+          } catch (error) {
+            audioPumpError =
+              error instanceof Error
+                ? error
+                : new Error("Failed to process audio samples");
+            try {
+              audioSource.close();
+            } catch {}
+          }
+        })();
+      }
 
       const timestampIterator = (async function* () {
         for (let frameIndex = 0; frameIndex < totalFrames; frameIndex++) {
@@ -1000,11 +978,20 @@ export function useVideoDownloadMediaBunny({
       }
 
       if (cancelled) {
+        if (audioPumpPromise) {
+          await audioPumpPromise.catch(() => {});
+        }
         await output.cancel();
         setProgress(0);
         setStatus("Download cancelled");
       } else {
         setStatus("Finalizing video...");
+        if (audioPumpPromise) {
+          await audioPumpPromise;
+        }
+        if (audioPumpError) {
+          throw audioPumpError;
+        }
         await output.finalize();
 
         // Build download blob from StreamTarget buffer
