@@ -211,9 +211,7 @@ export function useVideoDownloadMediaBunny({
         setStatus("Analyzing face positions...");
         faceTimeline = await buildExportTimeline(video, (percent) => {
           setProgress(percent);
-          setStatus(
-            `Analyzing face positions... ${Math.round(percent)}%`,
-          );
+          setStatus(`Analyzing face positions... ${Math.round(percent)}%`);
         });
       }
 
@@ -614,10 +612,7 @@ export function useVideoDownloadMediaBunny({
 
           // Step 3: Draw masked foreground (reuse canvases across frames)
           if (!reusableFgCanvas) {
-            reusableFgCanvas = new OffscreenCanvas(
-              canvas.width,
-              canvas.height,
-            );
+            reusableFgCanvas = new OffscreenCanvas(canvas.width, canvas.height);
             reusableFgCtx = reusableFgCanvas.getContext(
               "2d",
             ) as OffscreenCanvasRenderingContext2D;
