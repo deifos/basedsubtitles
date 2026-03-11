@@ -4,6 +4,8 @@ import {
   Output,
   CanvasSource,
   AudioBufferSource,
+  EncodedAudioPacketSource,
+  EncodedPacketSink,
   Mp4OutputFormat,
   WebMOutputFormat,
   StreamTarget,
@@ -277,6 +279,9 @@ export function useVideoDownloadMediaBunny({
         (originalVideoTrack &&
           (await originalVideoTrack.getCodecParameterString())) ||
         undefined;
+      const originalAudioDecoderConfig = originalAudioTrack
+        ? await originalAudioTrack.getDecoderConfig()
+        : null;
       const sourceCodec =
         originalVideoDecoderConfig?.codec ?? originalVideoCodecString;
       const sourceCanDecode = originalVideoTrack
@@ -392,43 +397,77 @@ export function useVideoDownloadMediaBunny({
       );
       output.addVideoTrack(videoSource, { frameRate: exportFps });
       cancelContextRef.current.videoSource = videoSource;
+      let outputStarted = false;
+      const ensureOutputStarted = async () => {
+        if (outputStarted) return;
+        await output.start();
+        outputStarted = true;
+      };
 
       // Handle audio if present
       let audioSource: AudioBufferSource | null = null;
       if (originalAudioTrack) {
-        setStatus("Processing audio...");
-        let audioContext: AudioContext | null = null;
+        const canCopyEncodedAudio =
+          format === "mp4" &&
+          originalAudioTrack.codec === "aac" &&
+          !!originalAudioDecoderConfig;
         try {
-          const arrayBuffer = await videoBlob.arrayBuffer();
-          audioContext =
-            new // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (window.AudioContext || (window as any).webkitAudioContext)();
-          const audioBuffer = await audioContext.decodeAudioData(
-            arrayBuffer.slice(0),
-          );
+          if (canCopyEncodedAudio) {
+            setStatus("Copying audio...");
+            const encodedAudioSource = new EncodedAudioPacketSource(
+              originalAudioTrack.codec,
+            );
+            output.addAudioTrack(encodedAudioSource);
+            await ensureOutputStarted();
 
-          audioSource = new AudioBufferSource({
-            codec: format === "webm" ? "opus" : "aac",
-            bitrate: 128_000,
-          });
-          output.addAudioTrack(audioSource);
-
-          // Start output and add audio
-          await output.start();
-          await audioSource.add(audioBuffer);
-          audioSource.close();
-        } catch {
-          await output.start();
-        } finally {
-          // Always close AudioContext to free audio memory
-          if (audioContext) {
+            const audioPacketSink = new EncodedPacketSink(originalAudioTrack);
+            let sentAudioDecoderConfig = false;
+            for await (const packet of audioPacketSink.packets()) {
+              await encodedAudioSource.add(
+                packet,
+                !sentAudioDecoderConfig
+                  ? {
+                      decoderConfig: originalAudioDecoderConfig,
+                    }
+                  : undefined,
+              );
+              sentAudioDecoderConfig = true;
+            }
+            encodedAudioSource.close();
+          } else {
+            setStatus("Processing audio...");
+            let audioContext: AudioContext | null = null;
             try {
-              await audioContext.close();
-            } catch {}
+              const arrayBuffer = await videoBlob.arrayBuffer();
+              audioContext =
+                new // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                (window.AudioContext || (window as any).webkitAudioContext)();
+              const audioBuffer = await audioContext.decodeAudioData(
+                arrayBuffer.slice(0),
+              );
+
+              audioSource = new AudioBufferSource({
+                codec: format === "webm" ? "opus" : "aac",
+                bitrate: 128_000,
+              });
+              output.addAudioTrack(audioSource);
+
+              await ensureOutputStarted();
+              await audioSource.add(audioBuffer);
+              audioSource.close();
+            } finally {
+              if (audioContext) {
+                try {
+                  await audioContext.close();
+                } catch {}
+              }
+            }
           }
+        } catch {
+          await ensureOutputStarted();
         }
       } else {
-        await output.start();
+        await ensureOutputStarted();
       }
 
       const outputMimeType = await output.getMimeType();
