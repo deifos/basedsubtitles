@@ -31,7 +31,7 @@ export function LandingCTA(): JSX.Element {
               Ready to add subtitles?
             </h2>
             <p
-              className="mt-3 text-sm sm:text-base text-muted-foreground max-w-md mx-auto"
+              className="mt-3 text-sm sm:text-base text-primary-foreground/80 max-w-md mx-auto"
               style={{ fontFamily: "var(--font-outfit), sans-serif" }}
             >
               Drop your video above and get started in seconds. No account

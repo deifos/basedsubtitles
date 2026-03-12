@@ -30,8 +30,7 @@ import {
   Noto_Sans,
   Jost,
   Rubik,
-  Roboto_Mono,
-} from "next/font/google";
+  Roboto_Mono, Nunito_Sans, Figtree } from "next/font/google";
 import { Toaster } from "sonner";
 import { PwaInstallBanner } from "@/components/pwa-install-banner";
 import "./globals.css";
@@ -69,12 +68,7 @@ const jost = Jost({
   variable: "--font-jost",
 });
 
-const notoSans = Noto_Sans({
-  variable: "--font-sans",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  display: "swap",
-});
+const figtree = Figtree({subsets:['latin'],variable:'--font-sans'});
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -353,13 +347,11 @@ export default function RootLayout({
     <html
       lang="en"
       className={cn(
-        notoSans.variable,
-        "font-jost",
-        "font-rubik",
-        "font-roboto-mono",
+        figtree.variable,
         jost.variable,
         rubik.variable,
         robotoMono.variable,
+        "font-sans",
       )}
     >
       <body

@@ -6,14 +6,12 @@
   "tailwind": {
     "config": "",
     "css": "app/globals.css",
-    "baseColor": "neutral",
+    "baseColor": "mauve",
     "cssVariables": true,
     "prefix": ""
   },
   "iconLibrary": "tabler",
   "rtl": false,
-  "menuColor": "default-translucent",
-  "menuAccent": "subtle",
   "aliases": {
     "components": "@/components",
     "utils": "@/lib/utils",
@@ -21,6 +19,8 @@
     "lib": "@/lib",
     "hooks": "@/hooks"
   },
+  "menuColor": "inverted-translucent",
+  "menuAccent": "subtle",
   "registries": {
     "@fonttrio": "https://www.fonttrio.xyz/r/{name}.json"
   }
