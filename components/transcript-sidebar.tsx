@@ -484,7 +484,7 @@ export function TranscriptSidebar({
                           ) : isHidden ? (
                             <EyeOff className="h-3 w-3 text-yellow-600" />
                           ) : (
-                            <Ban className="h-3 w-3 text-muted-foreground" />
+                            <Ban className="h-3 w-3" />
                           )}
                         </Button>
                       </div>
