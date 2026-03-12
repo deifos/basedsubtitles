@@ -1104,7 +1104,8 @@ export function MainApp({
                             }}
                           />
                         </div>
-                        {exportDiagnostics && (
+                        {/* FOR DEBUGGING PURPOSES ONLY */}
+                        {/* {exportDiagnostics && (
                           <div
                             className="hidden lg:block rounded-lg border border-border bg-muted px-3 py-2 text-[11px] text-muted-foreground space-y-1"
                             style={{
@@ -1166,7 +1167,7 @@ export function MainApp({
                               </div>
                             )}
                           </div>
-                        )}
+                        )} */}
                         <Button
                           variant="outline"
                           size="sm"
