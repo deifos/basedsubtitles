@@ -2,8 +2,8 @@
 
 import { useCallback, useRef, useState } from "react";
 import type { JSX, DragEvent, ChangeEvent } from "react";
-import { Film, FolderOpen, Plus, Video } from "lucide-react";
-import { CameraRecorder } from "./camera-recorder";
+
+import { Film, FolderOpen, Plus } from "lucide-react";
 
 interface LandingDropzoneProps {
   onVideoSelect?: (file: File) => void;
@@ -14,7 +14,6 @@ export function LandingDropzone({
 }: LandingDropzoneProps): JSX.Element {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
-  const [showCamera, setShowCamera] = useState(false);
   const dragCounterRef = useRef(0);
 
   const handleFile = useCallback(
@@ -92,51 +91,31 @@ export function LandingDropzone({
         className={`absolute inset-0 -z-10 rounded-xl transition-colors ${isDragOver ? "bg-amber-50/40" : "bg-muted"}`}
       />
 
-      {showCamera ? (
-        <CameraRecorder
-          onVideoReady={(file) => {
-            setShowCamera(false);
-            onVideoSelect?.(file);
-          }}
-          onCancel={() => setShowCamera(false)}
-        />
-      ) : (
-        <div className="flex flex-col items-center justify-center py-5 text-center">
-          <div className="relative flex h-11 w-11 items-center justify-center rounded-lg border border-border bg-background text-foreground">
-            <Film className="h-5 w-5" strokeWidth={1.5} />
-            <div className="pointer-events-none absolute -bottom-1.5 -right-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm ring-2 ring-background">
-              <Plus className="h-3 w-3" strokeWidth={1.5} />
-            </div>
-          </div>
-          <h2 className="mt-3 text-base font-semibold tracking-tight text-foreground">
-            Drop a video here
-          </h2>
-          <p className="mt-1 text-xs text-muted-foreground">
-            MP4, MOV, WebM • processed locally in your browser
-          </p>
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
-            <button
-              type="button"
-              onClick={openFilePicker}
-              className="inline-flex items-center gap-2 rounded-md bg-primary px-3.5 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              <FolderOpen className="h-4 w-4" strokeWidth={1.5} />
-              Browse files
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowCamera(true)}
-              className="inline-flex items-center gap-2 rounded-md border border-border bg-background px-3.5 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              <Video className="h-4 w-4" strokeWidth={1.5} />
-              Record video
-            </button>
-            <span className="text-xs text-muted-foreground">
-              or drag & drop
-            </span>
+      <div className="flex flex-col items-center justify-center py-5 text-center">
+        <div className="relative flex h-11 w-11 items-center justify-center rounded-lg border border-border bg-background text-foreground">
+          <Film className="h-5 w-5" strokeWidth={1.5} />
+          <div className="pointer-events-none absolute -bottom-1.5 -right-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm ring-2 ring-background">
+            <Plus className="h-3 w-3" strokeWidth={1.5} />
           </div>
         </div>
-      )}
+        <h2 className="mt-3 text-base font-semibold tracking-tight text-foreground">
+          Drop a video here
+        </h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          MP4, MOV, WebM • processed locally in your browser
+        </p>
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={openFilePicker}
+            className="inline-flex items-center gap-2 rounded-md bg-primary px-3.5 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            <FolderOpen className="h-4 w-4" strokeWidth={1.5} />
+            Browse files
+          </button>
+          <span className="text-xs text-muted-foreground">or drag & drop</span>
+        </div>
+      </div>
 
       <input
         ref={inputRef}

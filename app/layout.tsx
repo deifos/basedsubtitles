@@ -30,7 +30,10 @@ import {
   Noto_Sans,
   Jost,
   Rubik,
-  Roboto_Mono, Nunito_Sans, Figtree } from "next/font/google";
+  Roboto_Mono,
+  Nunito_Sans,
+  Figtree,
+} from "next/font/google";
 import { Toaster } from "sonner";
 import { PwaInstallBanner } from "@/components/pwa-install-banner";
 import "./globals.css";
@@ -68,7 +71,7 @@ const jost = Jost({
   variable: "--font-jost",
 });
 
-const figtree = Figtree({subsets:['latin'],variable:'--font-sans'});
+const figtree = Figtree({ subsets: ["latin"], variable: "--font-sans" });
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
