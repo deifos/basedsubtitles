@@ -33,12 +33,12 @@ import {
   formatTime,
   type WordStyleOverride,
 } from "@/lib/transcript-utils";
-import { ProcessingOverlay } from "@/components/processing-overlay";
 import {
   useTranscription,
   STATUS_MESSAGES,
   type TranscriptionResult,
   type ModelSize,
+  type TranscriptionStatus,
 } from "@/hooks/useTranscription";
 import { useVideoDownloadMediaBunny } from "@/hooks/useVideoDownloadMediaBunny";
 import { useBackgroundRemoval } from "@/hooks/useBackgroundRemoval";
@@ -66,6 +66,16 @@ import {
 import { Settings, FileText, Eraser, Maximize2 } from "lucide-react";
 import { APP_VERSION } from "@/lib/changelog";
 import { toast } from "sonner";
+
+const PRE_TRANSCRIPTION_DETAILS: Record<TranscriptionStatus, string> = {
+  idle: "Ready when you are.",
+  ready: "Ready when you are.",
+  processing: "Starting the local worker.",
+  loading: "First run can take a minute while the speech model gets ready.",
+  extracting: "Reading audio from your video.",
+  uploading: "Preparing the video.",
+  transcribing: "Words will appear as soon as the first chunk finishes.",
+};
 
 interface MainAppProps {
   initialFile?: File | null;
@@ -480,13 +490,36 @@ export function MainApp({
   }, [processedPhraseChunks, currentTime]);
 
   const isProcessing = status !== "idle" && status !== "ready";
-  // Full blocking overlay during model load / audio extraction / first chunk.
-  // Once partial chunks arrive (result != null) switch to the slim header banner.
-  const isBlockingOverlay = isProcessing && result === null;
+  const isPreparingTranscription = isProcessing && result === null;
   const isTranscribingBanner = isProcessing && result !== null;
   const statusMessage = STATUS_MESSAGES[status] ?? "Processing video...";
   const latestTranscribedTime = result?.chunks?.at(-1)?.timestamp?.[1] ?? null;
   const isLongVideo = (result?.chunks?.at(-1)?.timestamp?.[1] ?? 0) > 30 * 60;
+  const visibleProgress = Math.max(
+    isProcessing ? 5 : 0,
+    Math.min(100, Math.round(progress)),
+  );
+  const deviceLabel = device === "webgpu" ? "WebGPU" : "CPU";
+  const preparationSteps = [
+    {
+      label: "Model",
+      active: status === "processing" || status === "loading",
+      complete:
+        status === "extracting" ||
+        status === "transcribing" ||
+        isTranscribingBanner,
+    },
+    {
+      label: "Audio",
+      active: status === "extracting",
+      complete: status === "transcribing" || isTranscribingBanner,
+    },
+    {
+      label: "Words",
+      active: status === "transcribing",
+      complete: isTranscribingBanner,
+    },
+  ];
 
   return (
     <main className="flex flex-col relative bg-background h-dvh overflow-hidden lg:h-auto lg:min-h-screen lg:overflow-auto">
@@ -518,7 +551,7 @@ export function MainApp({
             </div>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 items-center">
-            {uploadedFile && !result && (
+            {uploadedFile && !result && !isProcessing && (
               <Button
                 onClick={() => setShowLanguageModal(true)}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/80 shadow-sm"
@@ -528,18 +561,30 @@ export function MainApp({
                 Transcribe Video
               </Button>
             )}
-            {isTranscribingBanner && (
-              <div className="flex items-center gap-3">
-                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground shrink-0" />
+            {isProcessing && (
+              <div
+                className="flex max-w-[calc(100vw-1rem)] items-center gap-2 rounded-lg border border-border bg-muted/60 px-2.5 py-1.5"
+                role="status"
+                aria-live="polite"
+              >
+                <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0" />
                 <span
-                  className="text-sm text-muted-foreground font-medium"
+                  className="min-w-0 truncate text-xs sm:text-sm text-muted-foreground font-medium"
                   style={{ fontFamily: "var(--font-outfit), sans-serif" }}
                 >
-                  Transcribing
-                  {latestTranscribedTime !== null
-                    ? ` ${formatTime(latestTranscribedTime)}`
-                    : ""}{" "}
-                  · {Math.round(progress)}%{" "}
+                  {isTranscribingBanner ? (
+                    <>
+                      Transcribing
+                      {latestTranscribedTime !== null
+                        ? ` ${formatTime(latestTranscribedTime)}`
+                        : ""}{" "}
+                      - {visibleProgress}%
+                    </>
+                  ) : (
+                    <>
+                      {statusMessage} - {visibleProgress}%
+                    </>
+                  )}{" "}
                   <span
                     className={
                       device === "webgpu"
@@ -547,7 +592,7 @@ export function MainApp({
                         : "text-muted-foreground"
                     }
                   >
-                    ({device === "webgpu" ? "WebGPU" : "CPU"})
+                    ({deviceLabel})
                   </span>
                 </span>
                 <Button
@@ -816,6 +861,78 @@ export function MainApp({
                     getCenterX={getCenterX}
                     isFaceTrackingActive={isFaceTrackingActive}
                   />
+                  {isPreparingTranscription && (
+                    <div
+                      className="absolute inset-x-2 top-2 z-40 sm:inset-x-4 sm:top-4"
+                      role="status"
+                      aria-live="polite"
+                    >
+                      <div className="rounded-lg border border-white/15 bg-black/85 text-white shadow-xl backdrop-blur-md">
+                        <div className="flex items-start gap-3 p-3 sm:p-4">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10">
+                            <Loader2 className="h-5 w-5 animate-spin text-white" />
+                          </div>
+                          <div
+                            className="min-w-0 flex-1"
+                            style={{
+                              fontFamily: "var(--font-outfit), sans-serif",
+                            }}
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="truncate text-sm font-semibold leading-tight">
+                                {statusMessage}
+                              </p>
+                              <span className="shrink-0 text-xs font-semibold tabular-nums text-white/80">
+                                {visibleProgress}%
+                              </span>
+                            </div>
+                            <p className="mt-1 text-xs leading-snug text-white/70">
+                              {PRE_TRANSCRIPTION_DETAILS[status]}
+                            </p>
+                            <div
+                              className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/15"
+                              role="progressbar"
+                              aria-valuemin={0}
+                              aria-valuemax={100}
+                              aria-valuenow={visibleProgress}
+                            >
+                              <div
+                                className="h-full rounded-full bg-primary transition-all duration-500"
+                                style={{ width: `${visibleProgress}%` }}
+                              />
+                            </div>
+                            <div className="mt-3 grid grid-cols-3 gap-1.5 text-[10px] font-semibold uppercase text-white/45">
+                              {preparationSteps.map((step) => (
+                                <div
+                                  key={step.label}
+                                  className={`rounded-md px-2 py-1 text-center transition-colors ${
+                                    step.complete
+                                      ? "bg-primary text-primary-foreground"
+                                      : step.active
+                                        ? "bg-white/15 text-white"
+                                        : "bg-white/5"
+                                  }`}
+                                >
+                                  {step.label}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={cancelTranscription}
+                            className="hidden shrink-0 border-white/25 bg-white/10 text-white hover:bg-white/20 hover:text-white sm:inline-flex"
+                            style={{
+                              fontFamily: "var(--font-outfit), sans-serif",
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   {/* Desktop: full overlay popover on video */}
                   {selectedWordInfo && selectedWordTimestamp && (
                     <WordStylePopover
@@ -1357,7 +1474,7 @@ export function MainApp({
                                 {latestTranscribedTime !== null
                                   ? ` ${formatTime(latestTranscribedTime)}`
                                   : ""}{" "}
-                                · {Math.round(progress)}%
+                                - {visibleProgress}%
                               </>
                             ) : (
                               <>
@@ -1379,14 +1496,20 @@ export function MainApp({
                             fontFamily: "var(--font-outfit), sans-serif",
                           }}
                         >
-                          {device === "webgpu" ? "WebGPU" : "CPU"}
+                          {deviceLabel}
                         </span>
                       </div>
                       {isTranscribingBanner && (
-                        <div className="w-full bg-amber-100 rounded-full h-1.5 overflow-hidden">
+                        <div
+                          className="w-full bg-amber-100 rounded-full h-1.5 overflow-hidden"
+                          role="progressbar"
+                          aria-valuemin={0}
+                          aria-valuemax={100}
+                          aria-valuenow={visibleProgress}
+                        >
                           <div
                             className="bg-amber-500 h-1.5 rounded-full transition-all duration-500"
-                            style={{ width: `${progress}%` }}
+                            style={{ width: `${visibleProgress}%` }}
                           />
                         </div>
                       )}
@@ -1586,16 +1709,6 @@ export function MainApp({
           </div>
         </SheetContent>
       </Sheet>
-
-      {/* Processing Overlay — blocks UI during model load and audio extraction.
-          Hidden once the first transcription chunk arrives (result != null). */}
-      <ProcessingOverlay
-        isVisible={isBlockingOverlay}
-        statusMessage={statusMessage}
-        progress={progress}
-        canCancel={status !== "idle" && status !== "ready"}
-        onCancel={cancelTranscription}
-      />
 
       <div className="hidden lg:block">
         <SiteFooter />

@@ -73,6 +73,44 @@ let activeDevice: DeviceType | null = null;
 let activeModelSize: ModelSize | null = null;
 let loadPromise: Promise<void> | null = null;
 
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function shouldFallbackToWasm(
+  error: unknown,
+  device: DeviceType,
+  fallbackAttempted: boolean,
+): boolean {
+  if (device !== "webgpu" || fallbackAttempted) {
+    return false;
+  }
+
+  const message = getErrorMessage(error).toLowerCase();
+  return (
+    message.includes("gpudevice") ||
+    message.includes("createbuffer") ||
+    message.includes("mappedatcreation") ||
+    message.includes("webgpu") ||
+    message.includes("out of memory")
+  );
+}
+
+function resetPipelineState(): void {
+  PipelineSingleton.resetInstance();
+  activeDevice = null;
+  activeModelSize = null;
+  loadPromise = null;
+}
+
+function notifyWasmFallback(): void {
+  self.postMessage({
+    status: "fallback",
+    device: "wasm",
+    data: "WebGPU ran out of memory. Switching to CPU...",
+  });
+}
+
 // Handle messages from the main thread - simplified like sample app
 self.addEventListener("message", async (e: MessageEvent) => {
   const { type, data } = e.data;
@@ -95,9 +133,11 @@ self.addEventListener("message", async (e: MessageEvent) => {
 async function handleLoad({
   device = "wasm",
   modelSize = "base" as ModelSize,
+  fallbackAttempted = false,
 }: {
   device?: DeviceType;
   modelSize?: ModelSize;
+  fallbackAttempted?: boolean;
 }) {
   if (
     !loadPromise ||
@@ -138,9 +178,7 @@ async function handleLoad({
           });
         }
       } catch (error) {
-        PipelineSingleton.resetInstance();
-        activeDevice = null;
-        activeModelSize = null;
+        resetPipelineState();
         throw error;
       }
     })();
@@ -151,10 +189,21 @@ async function handleLoad({
     self.postMessage({ status: "ready" });
   } catch (error) {
     console.error("Worker: Error loading model:", error);
+    if (shouldFallbackToWasm(error, device, fallbackAttempted)) {
+      resetPipelineState();
+      notifyWasmFallback();
+      await handleLoad({
+        device: "wasm",
+        modelSize,
+        fallbackAttempted: true,
+      });
+      return;
+    }
+
     loadPromise = null;
     self.postMessage({
       status: "error",
-      data: error instanceof Error ? error.message : "Unknown error occurred",
+      data: getErrorMessage(error),
     });
   }
 }
@@ -171,11 +220,13 @@ async function handleRun({
   language = "en",
   device,
   modelSize,
+  fallbackAttempted = false,
 }: {
   audio: Float32Array;
   language?: string;
   device?: DeviceType;
   modelSize?: ModelSize;
+  fallbackAttempted?: boolean;
 }) {
   try {
     if (loadPromise) {
@@ -186,9 +237,14 @@ async function handleRun({
     const targetModelSize = modelSize ?? activeModelSize ?? "base";
     const transcriber = await PipelineSingleton.getInstance(
       targetModelSize,
-      undefined,
+      (progressInfo) => {
+        self.postMessage(progressInfo);
+      },
       targetDevice,
     );
+    activeDevice = targetDevice;
+    activeModelSize = targetModelSize;
+    self.postMessage({ status: "transcribing", device: targetDevice });
 
     // Access the pipeline's internal components (same as _call_whisper uses)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -317,12 +373,24 @@ async function handleRun({
     });
   } catch (error) {
     console.error("Worker: Error in transcription:", error);
-    PipelineSingleton.resetInstance();
-    activeDevice = null;
-    loadPromise = null;
+    const failedDevice = device ?? activeDevice ?? "wasm";
+    if (shouldFallbackToWasm(error, failedDevice, fallbackAttempted)) {
+      resetPipelineState();
+      notifyWasmFallback();
+      await handleRun({
+        audio,
+        language,
+        device: "wasm",
+        modelSize,
+        fallbackAttempted: true,
+      });
+      return;
+    }
+
+    resetPipelineState();
     self.postMessage({
       status: "error",
-      data: error instanceof Error ? error.message : "Unknown error occurred",
+      data: getErrorMessage(error),
     });
   }
 }

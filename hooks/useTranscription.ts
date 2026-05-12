@@ -29,13 +29,22 @@ export interface TranscriptionResult {
 
 export const STATUS_MESSAGES: Record<TranscriptionStatus, string> = {
   idle: "Ready to start",
-  loading: "Loading model...",
+  loading: "Loading speech model...",
   extracting: "Extracting audio...",
   uploading: "Uploading video...",
-  transcribing: "Trying to understand your gibberish...",
-  processing: "Processing video...",
+  transcribing: "Transcribing speech...",
+  processing: "Starting transcription...",
   ready: "Ready",
 };
+
+function normalizeProgressValue(progressValue: number): number {
+  const percent =
+    progressValue > 0 && progressValue <= 1
+      ? progressValue * 100
+      : progressValue;
+
+  return Math.max(0, Math.min(100, Math.round(percent)));
+}
 
 async function detectPreferredDevice(): Promise<DeviceType> {
   if (
@@ -72,6 +81,7 @@ export function useTranscription() {
   const loadIdRef = useRef(0);
   const activeLoadIdRef = useRef(0);
   const statusRef = useRef<TranscriptionStatus>("idle");
+  const transcribingRef = useRef(false);
 
   const updateStatus = useCallback((nextStatus: TranscriptionStatus) => {
     statusRef.current = nextStatus;
@@ -100,16 +110,35 @@ export function useTranscription() {
         case "loading":
           updateStatus("loading");
           modelReadyRef.current = false;
+          setProgress((prev) => Math.max(prev, 10));
+          break;
+
+        case "fallback":
+          setDevice("wasm");
+          deviceRef.current = "wasm";
+          modelReadyRef.current = false;
+          setError(null);
+          updateStatus("loading");
+          setProgress((prev) => Math.max(prev, 10));
+          break;
+
+        case "transcribing":
+          if (e.data.device === "webgpu" || e.data.device === "wasm") {
+            setDevice(e.data.device);
+            deviceRef.current = e.data.device;
+          }
+          updateStatus("transcribing");
+          setProgress((prev) => Math.max(prev, 60));
           break;
 
         case "ready":
           // Only resolve if this "ready" matches the most recent load request
           if (activeLoadIdRef.current === loadIdRef.current) {
             modelReadyRef.current = true;
-            if (statusRef.current === "loading") {
+            if (statusRef.current === "loading" && !transcribingRef.current) {
               updateStatus("ready");
             }
-            setProgress((prev) => Math.max(prev, 90));
+            setProgress((prev) => Math.max(prev, 50));
             if (modelLoadResolveRef.current) {
               modelLoadResolveRef.current();
             }
@@ -128,7 +157,8 @@ export function useTranscription() {
             setLiveText(e.data.text);
           }
           if (typeof e.data.progress === "number") {
-            setProgress(e.data.progress);
+            const nextProgress = normalizeProgressValue(e.data.progress);
+            setProgress((prev) => Math.max(prev, nextProgress));
           }
           break;
         }
@@ -142,6 +172,7 @@ export function useTranscription() {
           setResult(resultWithTime);
           updateStatus("ready");
           setProgress(100);
+          transcribingRef.current = false;
 
           // Terminate worker to free model memory (~800MB-1.2GB for Whisper)
           // Worker will be re-created if user transcribes again
@@ -161,6 +192,7 @@ export function useTranscription() {
           setError(e.data.data);
           updateStatus("idle");
           setProgress(0);
+          transcribingRef.current = false;
           modelReadyRef.current = false;
           if (modelLoadRejectRef.current) {
             modelLoadRejectRef.current(new Error(e.data.data));
@@ -175,8 +207,12 @@ export function useTranscription() {
         case "download":
         case "done":
           if (typeof e.data.progress === "number") {
-            const clamped = Math.max(0, Math.min(1, e.data.progress));
-            setProgress(Math.round(clamped * 100));
+            const rawProgress = normalizeProgressValue(e.data.progress);
+            const nextProgress =
+              statusRef.current === "loading"
+                ? Math.round(10 + rawProgress * 0.4)
+                : rawProgress;
+            setProgress((prev) => Math.max(prev, nextProgress));
           }
           break;
       }
@@ -263,10 +299,9 @@ export function useTranscription() {
     setError(null);
     setResult(null);
     setProgress(0);
+    transcribingRef.current = false;
     updateStatus("ready");
   };
-
-  const transcribingRef = useRef(false);
 
   const startTranscription = useCallback(
     async (
@@ -290,11 +325,12 @@ export function useTranscription() {
 
         if (!modelReadyRef.current || modelSizeRef.current !== modelSize) {
           updateStatus("loading");
+          setProgress((prev) => Math.max(prev, 10));
           await ensureModelLoaded(modelSize);
         }
 
         updateStatus("extracting");
-        setProgress(30);
+        setProgress((prev) => Math.max(prev, 35));
         const audioData = await extractAudioFromVideo(file);
 
         if (!worker.current) {
@@ -302,7 +338,7 @@ export function useTranscription() {
         }
 
         updateStatus("transcribing");
-        setProgress(60);
+        setProgress((prev) => Math.max(prev, 60));
         worker.current.postMessage({
           type: "run",
           data: {
@@ -324,14 +360,13 @@ export function useTranscription() {
         modelLoadingPromiseRef.current = null;
         modelLoadResolveRef.current = null;
         modelLoadRejectRef.current = null;
+        transcribingRef.current = false;
 
         // Reset worker on error
         if (worker.current) {
           worker.current.terminate();
           worker.current = null;
         }
-      } finally {
-        transcribingRef.current = false;
       }
     },
     [ensureModelLoaded, updateStatus],
@@ -342,6 +377,7 @@ export function useTranscription() {
     setError(null);
     setResult(null);
     setLiveText("");
+    transcribingRef.current = false;
     updateStatus(modelReadyRef.current ? "ready" : "idle");
     setProgress(0);
 
@@ -354,6 +390,7 @@ export function useTranscription() {
     setError(null);
     setResult(null);
     setLiveText("");
+    transcribingRef.current = false;
     updateStatus("idle");
     setProgress(0);
     modelReadyRef.current = false;
