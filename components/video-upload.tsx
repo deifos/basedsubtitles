@@ -12,8 +12,22 @@ import { cn } from "@/lib/utils";
 import { formatTime, type WordStyleOverride } from "@/lib/transcript-utils";
 import { VideoCaption } from "./video-caption";
 import { SubtitleStyle } from "./subtitle-styling";
-import { UploadIcon, Play, Pause, Volume2, VolumeX } from "lucide-react";
+import {
+  Camera,
+  UploadIcon,
+  Play,
+  Pause,
+  Volume2,
+  VolumeX,
+} from "lucide-react";
 import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { CameraRecorder } from "@/components/landing-page/camera-recorder";
 import {
   SAMPLE_FPS as SAMPLE_MASK_FPS,
   type MaskData,
@@ -83,6 +97,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
     const [isPlaying, setIsPlaying] = useState(false);
     const [duration, setDuration] = useState(0);
     const [isMuted, setIsMuted] = useState(false);
+    const [isRecorderOpen, setIsRecorderOpen] = useState(false);
     // Local time state: updated directly from video's timeupdate without going through main-app
     const [localTime, setLocalTime] = useState(0);
     const processedFileRef = useRef<File | null>(null);
@@ -213,6 +228,14 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
         }
       },
       [onVideoSelect, onAspectRatioDetected, revokeVideoObjectUrl],
+    );
+
+    const handleRecordedVideo = useCallback(
+      async (file: File) => {
+        setIsRecorderOpen(false);
+        await handleFile(file);
+      },
+      [handleFile],
     );
 
     const handleDrop = useCallback(
@@ -973,12 +996,38 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
             <p className="text-xs text-muted-foreground">
               Supports MP4, WebM, and MOV formats, max 1 GB
             </p>
+            <button
+              type="button"
+              onClick={() => setIsRecorderOpen(true)}
+              className="relative z-20 mt-4 inline-flex items-center gap-2 rounded-md border border-red-500 bg-red-600 px-3.5 py-2 text-sm font-semibold text-white shadow-lg shadow-red-500/25 transition-colors hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
+            >
+              <span className="pointer-events-none absolute -inset-1 -z-10 rounded-lg bg-red-500/30 animate-ping" />
+              <span className="h-2 w-2 rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.9)]" />
+              <Camera className="h-4 w-4" strokeWidth={1.5} />
+              Record with camera
+            </button>
           </div>
         )}
 
         {error && (
           <p className="text-sm text-destructive text-center mt-2">{error}</p>
         )}
+
+        <Dialog open={isRecorderOpen} onOpenChange={setIsRecorderOpen}>
+          <DialogContent
+            className="overflow-hidden p-0 sm:max-w-2xl"
+            showCloseButton={false}
+          >
+            <DialogTitle className="sr-only">Record a video</DialogTitle>
+            <DialogDescription className="sr-only">
+              Record a video with an available camera and use it for subtitles.
+            </DialogDescription>
+            <CameraRecorder
+              onVideoReady={(file) => void handleRecordedVideo(file)}
+              onCancel={() => setIsRecorderOpen(false)}
+            />
+          </DialogContent>
+        </Dialog>
       </div>
     );
   },

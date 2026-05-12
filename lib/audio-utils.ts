@@ -7,13 +7,18 @@ declare global {
 export async function extractAudioFromVideo(
   videoFile: File,
 ): Promise<Float32Array> {
-  // Read file as ArrayBuffer
-  const buffer = await new Promise<ArrayBuffer>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => resolve(e.target?.result as ArrayBuffer);
-    reader.onerror = reject;
-    reader.readAsArrayBuffer(videoFile);
-  });
+  let buffer: ArrayBuffer;
+  try {
+    buffer = await videoFile.arrayBuffer();
+  } catch (error) {
+    const message =
+      error instanceof DOMException && error.name === "NotReadableError"
+        ? "The video file could not be read. Please try recording again or choose a saved video file."
+        : `The video file could not be read: ${
+            error instanceof Error ? error.message : String(error)
+          }`;
+    throw new Error(message);
+  }
 
   console.log("File size:", buffer.byteLength, "bytes");
 

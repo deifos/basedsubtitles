@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { RefObject } from "react";
 import {
   Output,
   BufferTarget,
@@ -19,18 +20,28 @@ export type CameraState =
   | "recorded"
   | "error";
 
+export interface CameraDevice {
+  deviceId: string;
+  label: string;
+}
+
 export interface UseCameraRecordingReturn {
   state: CameraState;
   error: string | null;
   elapsedSeconds: number;
   recordedVideoUrl: string | null;
   facingMode: "user" | "environment";
-  previewRef: React.RefObject<HTMLVideoElement | null>;
+  videoDevices: CameraDevice[];
+  selectedDeviceId: string | null;
+  selectedDeviceLabel: string | null;
+  canSwitchCamera: boolean;
+  previewRef: RefObject<HTMLVideoElement | null>;
 
   openCamera: () => Promise<void>;
   startRecording: () => void;
   stopRecording: () => void;
   flipCamera: () => Promise<void>;
+  selectCamera: (deviceId: string) => Promise<void>;
   acceptRecording: () => File | null;
   discardRecording: () => void;
   closeCamera: () => void;
@@ -39,6 +50,27 @@ export interface UseCameraRecordingReturn {
 const MAX_RECORDING_SECONDS = 300;
 const FRAME_RATE = 24;
 const MAX_DIMENSION = 1280; // cap at 720p
+
+function getFacingModeFromLabel(label: string): "user" | "environment" | null {
+  const normalized = label.toLowerCase();
+  if (/(front|user|face|facetime|selfie)/.test(normalized)) return "user";
+  if (/(back|rear|environment|world|main)/.test(normalized)) {
+    return "environment";
+  }
+  return null;
+}
+
+function getDeviceLabel(
+  device: MediaDeviceInfo,
+  index: number,
+  activeDeviceId?: string | null,
+): string {
+  if (device.label) return device.label;
+  if (activeDeviceId && device.deviceId === activeDeviceId) {
+    return "Current camera";
+  }
+  return `Camera ${index + 1}`;
+}
 
 function getErrorMessage(err: unknown): string {
   if (err instanceof DOMException) {
@@ -62,11 +94,15 @@ export function useCameraRecording(): UseCameraRecordingReturn {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [recordedVideoUrl, setRecordedVideoUrl] = useState<string | null>(null);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
+  const [videoDevices, setVideoDevices] = useState<CameraDevice[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
 
   const previewRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const blobRef = useRef<Blob | null>(null);
+  const recordedBytesRef = useRef<Uint8Array | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const selectedDeviceIdRef = useRef<string | null>(null);
 
   // MediaBunny refs
   const outputRef = useRef<Output | null>(null);
@@ -106,6 +142,53 @@ export function useCameraRecording(): UseCameraRecordingReturn {
     }
   }, []);
 
+  const refreshDevices = useCallback(
+    async (activeDeviceId?: string | null): Promise<CameraDevice[]> => {
+      if (typeof navigator.mediaDevices?.enumerateDevices !== "function") {
+        return [];
+      }
+
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const cameras = devices
+        .filter((device) => device.kind === "videoinput")
+        .map((device, index) => ({
+          deviceId: device.deviceId,
+          label: getDeviceLabel(device, index, activeDeviceId),
+        }));
+
+      setVideoDevices(cameras);
+      return cameras;
+    },
+    [],
+  );
+
+  const syncActiveCamera = useCallback(
+    async (stream: MediaStream, fallbackFacing: "user" | "environment") => {
+      const [track] = stream.getVideoTracks();
+      const settings = track?.getSettings();
+      const activeDeviceId = settings?.deviceId ?? null;
+
+      selectedDeviceIdRef.current = activeDeviceId;
+      setSelectedDeviceId(activeDeviceId);
+
+      const cameras = await refreshDevices(activeDeviceId);
+      const activeDevice = cameras.find(
+        (camera) => camera.deviceId === activeDeviceId,
+      );
+      const settingsFacing =
+        settings?.facingMode === "user" ||
+        settings?.facingMode === "environment"
+          ? settings.facingMode
+          : null;
+      const inferredFacing =
+        settingsFacing ??
+        (activeDevice ? getFacingModeFromLabel(activeDevice.label) : null);
+
+      setFacingMode(inferredFacing ?? fallbackFacing);
+    },
+    [refreshDevices],
+  );
+
   // On mobile, the <video> element doesn't exist during "requesting" state
   // (component renders a spinner instead). When state transitions to "previewing"
   // the element mounts but srcObject was never set. This effect re-attaches it.
@@ -122,7 +205,30 @@ export function useCameraRecording(): UseCameraRecordingReturn {
   }, [state]);
 
   const requestStream = useCallback(
-    async (facing: "user" | "environment"): Promise<MediaStream> => {
+    async ({
+      deviceId,
+      facing,
+    }: {
+      deviceId?: string | null;
+      facing: "user" | "environment";
+    }): Promise<MediaStream> => {
+      if (deviceId) {
+        try {
+          return await navigator.mediaDevices.getUserMedia({
+            video: { deviceId: { exact: deviceId } },
+            audio: true,
+          });
+        } catch (err) {
+          if (
+            !(err instanceof DOMException) ||
+            (err.name !== "OverconstrainedError" &&
+              err.name !== "NotFoundError")
+          ) {
+            throw err;
+          }
+        }
+      }
+
       try {
         // Use exact facingMode so the browser doesn't silently pick the wrong camera
         return await navigator.mediaDevices.getUserMedia({
@@ -157,14 +263,18 @@ export function useCameraRecording(): UseCameraRecordingReturn {
     }
 
     try {
-      const stream = await requestStream(facingMode);
+      const stream = await requestStream({
+        deviceId: selectedDeviceIdRef.current,
+        facing: facingMode,
+      });
       attachStream(stream);
+      await syncActiveCamera(stream, facingMode);
       setState("previewing");
     } catch (err) {
       setError(getErrorMessage(err));
       setState("error");
     }
-  }, [facingMode, requestStream, attachStream]);
+  }, [facingMode, requestStream, attachStream, syncActiveCamera]);
 
   const startRecording = useCallback(async () => {
     if (state !== "previewing" || !streamRef.current || !previewRef.current)
@@ -294,6 +404,7 @@ export function useCameraRecording(): UseCameraRecordingReturn {
 
     // Show spinner while MP4 is being finalized
     setState("finalizing");
+    recordedBytesRef.current = null;
 
     try {
       videoSourceRef.current?.close();
@@ -311,7 +422,9 @@ export function useCameraRecording(): UseCameraRecordingReturn {
         throw new Error("No output buffer from MP4 encoder.");
       }
 
-      const blob = new Blob([buffer], { type: "video/mp4" });
+      const recordedBytes = new Uint8Array(buffer).slice();
+      const blob = new Blob([recordedBytes], { type: "video/mp4" });
+      recordedBytesRef.current = recordedBytes;
       blobRef.current = blob;
 
       // Stop camera stream so it's not running during review
@@ -330,13 +443,59 @@ export function useCameraRecording(): UseCameraRecordingReturn {
       console.error("Error finalizing MP4:", err);
       outputRef.current?.cancel();
       outputRef.current = null;
+      recordedBytesRef.current = null;
       setError("Failed to finalize recording.");
       setState("error");
     }
   }, [clearTimer, clearFrameInterval, stopTracks]);
 
+  const selectCamera = useCallback(
+    async (deviceId: string) => {
+      selectedDeviceIdRef.current = deviceId;
+      setSelectedDeviceId(deviceId);
+
+      if (state !== "previewing") return;
+
+      stopTracks();
+      setState("requesting");
+      setError(null);
+
+      try {
+        const stream = await requestStream({ deviceId, facing: facingMode });
+        attachStream(stream);
+        await syncActiveCamera(stream, facingMode);
+        setState("previewing");
+      } catch (err) {
+        setError(getErrorMessage(err));
+        setState("error");
+      }
+    },
+    [
+      state,
+      facingMode,
+      stopTracks,
+      requestStream,
+      attachStream,
+      syncActiveCamera,
+    ],
+  );
+
   const flipCamera = useCallback(async () => {
     if (state !== "previewing") return;
+
+    const cameras =
+      videoDevices.length > 0
+        ? videoDevices
+        : await refreshDevices(selectedDeviceIdRef.current);
+
+    if (cameras.length > 1) {
+      const currentIndex = cameras.findIndex(
+        (camera) => camera.deviceId === selectedDeviceIdRef.current,
+      );
+      const nextCamera = cameras[(currentIndex + 1) % cameras.length];
+      await selectCamera(nextCamera.deviceId);
+      return;
+    }
 
     stopTracks();
     const newFacing = facingMode === "user" ? "environment" : "user";
@@ -344,24 +503,39 @@ export function useCameraRecording(): UseCameraRecordingReturn {
     setState("requesting");
 
     try {
-      const stream = await requestStream(newFacing);
+      const stream = await requestStream({ facing: newFacing });
       attachStream(stream);
+      await syncActiveCamera(stream, newFacing);
       setState("previewing");
     } catch (err) {
       setError(getErrorMessage(err));
       setState("error");
     }
-  }, [state, facingMode, stopTracks, requestStream, attachStream]);
+  }, [
+    state,
+    videoDevices,
+    refreshDevices,
+    stopTracks,
+    facingMode,
+    requestStream,
+    attachStream,
+    syncActiveCamera,
+    selectCamera,
+  ]);
 
   const acceptRecording = useCallback((): File | null => {
-    if (!blobRef.current) return null;
+    if (!blobRef.current || !recordedBytesRef.current) return null;
 
-    const file = new File([blobRef.current], "camera-recording.mp4", {
+    const fileBytes = recordedBytesRef.current.slice();
+
+    const file = new File([fileBytes], "camera-recording.mp4", {
       type: "video/mp4",
+      lastModified: Date.now(),
     });
 
     if (recordedVideoUrl) URL.revokeObjectURL(recordedVideoUrl);
     setRecordedVideoUrl(null);
+    recordedBytesRef.current = null;
     blobRef.current = null;
     stopTracks();
     setState("idle");
@@ -373,18 +547,29 @@ export function useCameraRecording(): UseCameraRecordingReturn {
   const discardRecording = useCallback(async () => {
     if (recordedVideoUrl) URL.revokeObjectURL(recordedVideoUrl);
     setRecordedVideoUrl(null);
+    recordedBytesRef.current = null;
     blobRef.current = null;
 
     try {
-      const stream = await requestStream(facingMode);
+      const stream = await requestStream({
+        deviceId: selectedDeviceIdRef.current,
+        facing: facingMode,
+      });
       attachStream(stream);
+      await syncActiveCamera(stream, facingMode);
       setState("previewing");
     } catch (err) {
       setError(getErrorMessage(err));
       setState("error");
     }
     setElapsedSeconds(0);
-  }, [recordedVideoUrl, facingMode, requestStream, attachStream]);
+  }, [
+    recordedVideoUrl,
+    facingMode,
+    requestStream,
+    attachStream,
+    syncActiveCamera,
+  ]);
 
   const closeCamera = useCallback(() => {
     clearTimer();
@@ -408,6 +593,7 @@ export function useCameraRecording(): UseCameraRecordingReturn {
     }
     if (recordedVideoUrl) URL.revokeObjectURL(recordedVideoUrl);
     setRecordedVideoUrl(null);
+    recordedBytesRef.current = null;
     blobRef.current = null;
     setElapsedSeconds(0);
     setError(null);
@@ -419,6 +605,7 @@ export function useCameraRecording(): UseCameraRecordingReturn {
       if (timerRef.current) clearInterval(timerRef.current);
       if (frameIntervalRef.current) clearInterval(frameIntervalRef.current);
       streamRef.current?.getTracks().forEach((t) => t.stop());
+      recordedBytesRef.current = null;
       if (outputRef.current) {
         videoSourceRef.current?.close();
         for (const src of audioSourcesRef.current) src.close();
@@ -427,17 +614,30 @@ export function useCameraRecording(): UseCameraRecordingReturn {
     };
   }, []);
 
+  const selectedDeviceLabel = useMemo(
+    () =>
+      videoDevices.find((device) => device.deviceId === selectedDeviceId)
+        ?.label ?? null,
+    [selectedDeviceId, videoDevices],
+  );
+  const canSwitchCamera = videoDevices.length > 1 || !selectedDeviceId;
+
   return {
     state,
     error,
     elapsedSeconds,
     recordedVideoUrl,
     facingMode,
+    videoDevices,
+    selectedDeviceId,
+    selectedDeviceLabel,
+    canSwitchCamera,
     previewRef,
     openCamera,
     startRecording,
     stopRecording,
     flipCamera,
+    selectCamera,
     acceptRecording,
     discardRecording,
     closeCamera,

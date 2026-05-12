@@ -30,11 +30,16 @@ export function CameraRecorder({
     elapsedSeconds,
     recordedVideoUrl,
     facingMode,
+    videoDevices,
+    selectedDeviceId,
+    selectedDeviceLabel,
+    canSwitchCamera,
     previewRef,
     openCamera,
     startRecording,
     stopRecording,
     flipCamera,
+    selectCamera,
     acceptRecording,
     discardRecording,
     closeCamera,
@@ -173,6 +178,24 @@ export function CameraRecorder({
             </span>
           </div>
         )}
+
+        {state === "previewing" && videoDevices.length > 1 && (
+          <label className="absolute right-3 top-3 inline-flex max-w-[min(14rem,calc(100%-1.5rem))] items-center gap-2 rounded-full bg-black/60 px-3 py-1.5 text-white shadow-sm backdrop-blur-sm">
+            <Video className="h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />
+            <select
+              value={selectedDeviceId ?? ""}
+              onChange={(event) => void selectCamera(event.target.value)}
+              className="min-w-0 flex-1 bg-transparent text-xs font-medium outline-none"
+              title="Choose camera"
+            >
+              {videoDevices.map((device) => (
+                <option key={device.deviceId} value={device.deviceId}>
+                  {device.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
       </div>
 
       {/* Controls bar */}
@@ -192,10 +215,13 @@ export function CameraRecorder({
           <button
             type="button"
             onClick={startRecording}
-            className="flex h-14 w-14 items-center justify-center rounded-full border-[3px] border-white transition-transform hover:scale-105"
+            className="relative isolate flex h-16 w-16 items-center justify-center rounded-full border-[3px] border-white bg-red-600 shadow-lg shadow-red-500/40 transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
             title="Start recording"
           >
-            <Circle className="h-10 w-10 fill-red-500 text-red-500" />
+            <span className="pointer-events-none absolute -inset-2 -z-10 rounded-full bg-red-500/35 animate-ping" />
+            <span className="relative flex h-11 w-11 items-center justify-center rounded-full bg-red-500 animate-pulse">
+              <Circle className="h-8 w-8 fill-white text-white" />
+            </span>
           </button>
         ) : (
           <button
@@ -212,12 +238,16 @@ export function CameraRecorder({
         )}
 
         {/* Flip camera — only visible in previewing state */}
-        {state === "previewing" ? (
+        {state === "previewing" && canSwitchCamera ? (
           <button
             type="button"
             onClick={flipCamera}
             className="flex h-10 w-10 items-center justify-center rounded-full text-white/70 transition-colors hover:bg-white/10 hover:text-white"
-            title="Flip camera"
+            title={
+              selectedDeviceLabel
+                ? `Switch camera (${selectedDeviceLabel})`
+                : "Switch camera"
+            }
           >
             <SwitchCamera className="h-5 w-5" strokeWidth={1.5} />
           </button>

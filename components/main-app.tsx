@@ -525,19 +525,19 @@ export function MainApp({
     <main className="flex flex-col relative bg-background h-dvh overflow-hidden lg:h-auto lg:min-h-screen lg:overflow-auto">
       {/* Header */}
       <header className="w-full border-b-2 border-black/10 bg-background">
-        <div className="container mx-auto px-4 md:px-6 py-2 lg:py-3 flex flex-row items-center justify-between gap-2">
-          <div className="flex items-center gap-2 lg:gap-3">
+        <div className="container mx-auto flex flex-wrap items-center justify-between gap-2 px-4 py-2 md:px-6 lg:flex-nowrap lg:py-3">
+          <div className="flex min-w-0 items-center gap-2 lg:gap-3">
             <Button
               variant="default"
               size="icon-sm"
-              className="bg-foreground text-sm font-bold tracking-tight text-primary-foreground lg:cursor-default"
+              className="shrink-0 bg-foreground text-sm font-bold tracking-tight text-primary-foreground lg:cursor-default"
               onClick={() => setShowAboutSheet(true)}
             >
               BS
             </Button>
-            <div className="text-left">
+            <div className="min-w-0 text-left">
               <h1
-                className="text-sm lg:text-lg font-bold text-foreground leading-tight"
+                className="truncate text-sm font-bold leading-tight text-foreground lg:text-lg"
                 style={{ fontFamily: "var(--font-outfit), sans-serif" }}
               >
                 Based Subtitles
@@ -550,11 +550,11 @@ export function MainApp({
               </p>
             </div>
           </div>
-          <div className="flex flex-col sm:flex-row gap-2 items-center">
+          <div className="flex min-w-0 basis-full flex-col items-stretch gap-2 sm:basis-auto sm:flex-row sm:items-center">
             {uploadedFile && !result && !isProcessing && (
               <Button
                 onClick={() => setShowLanguageModal(true)}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/80 shadow-sm"
+                className="flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/80"
                 style={{ fontFamily: "var(--font-outfit), sans-serif" }}
               >
                 <Video className="w-4 h-4" />
@@ -563,7 +563,7 @@ export function MainApp({
             )}
             {isProcessing && (
               <div
-                className="flex max-w-[calc(100vw-1rem)] items-center gap-2 rounded-lg border border-border bg-muted/60 px-2.5 py-1.5"
+                className="flex min-w-0 max-w-full items-center gap-2 overflow-hidden rounded-lg border border-border bg-muted/60 px-2.5 py-1.5"
                 role="status"
                 aria-live="polite"
               >
@@ -599,6 +599,7 @@ export function MainApp({
                   size="sm"
                   variant="outline"
                   onClick={cancelTranscription}
+                  className="h-8 shrink-0 px-2.5 sm:px-3"
                   style={{ fontFamily: "var(--font-outfit), sans-serif" }}
                 >
                   Cancel
