@@ -559,7 +559,7 @@ export function SubtitleStyling({
 
   const previewStyles = useMemo(() => {
     const base: CSSProperties = {
-      fontFamily: style.fontFamily,
+      fontFamily: currentFontCss,
       fontSize: style.fontSize,
       fontWeight: style.fontWeight,
       color: style.color,
@@ -578,7 +578,7 @@ export function SubtitleStyling({
       ...base,
       backgroundColor: style.backgroundColor,
     };
-  }, [style]);
+  }, [currentFontCss, style]);
 
   const wordEmphasisEnabled = style.wordEmphasisEnabled ?? false;
   const wordEmphasisColorEnabled = style.wordEmphasisColorEnabled ?? false;
@@ -1197,7 +1197,7 @@ export function SubtitleStyling({
         <div className="flex items-start gap-2.5">
           <Switch
             id="branding-watermark"
-            checked={style.brandingWatermark}
+            checked={style.brandingWatermark !== false}
             onCheckedChange={(checked) =>
               onChange({ ...style, brandingWatermark: checked })
             }

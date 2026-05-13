@@ -51,11 +51,11 @@ export function drawBrandingWatermark(
   h: number,
   enabled?: boolean,
 ) {
-  if (!enabled) return;
+  if (enabled === false) return;
   const fontSize = Math.max(10, Math.round(h * 0.012));
   const padding = w * 0.03;
   ctx.save();
-  ctx.font = `700 ${fontSize}px system-ui, -apple-system, sans-serif`;
+  ctx.font = `700 ${fontSize}px Arial, Helvetica, "Segoe UI", Roboto, sans-serif`;
   ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
   ctx.textAlign = "left";
   ctx.textBaseline = "bottom";

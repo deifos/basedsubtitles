@@ -38,6 +38,7 @@ import {
   renderDynamicFrontText,
   estimateFaceFromMask,
 } from "@/lib/render-subtitle";
+import { drawBrandingWatermark } from "@/lib/export-renderer";
 import { computeCropX } from "@/lib/person-tracking";
 
 interface VideoUploadProps {
@@ -569,21 +570,12 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
         }
 
         // Step 5: Branding watermark
-        if (subtitleStyle.brandingWatermark) {
-          const fontSize = Math.max(10, Math.round(h * 0.012));
-          const padding = w * 0.03;
-          ctx.save();
-          ctx.font = `700 ${fontSize}px system-ui, -apple-system, sans-serif`;
-          ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
-          ctx.textAlign = "left";
-          ctx.textBaseline = "bottom";
-          ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
-          ctx.shadowBlur = 3;
-          ctx.shadowOffsetX = 0;
-          ctx.shadowOffsetY = 1;
-          ctx.fillText("basedsubs.getbasedapps.com", padding, h - h * 0.03);
-          ctx.restore();
-        }
+        drawBrandingWatermark(
+          ctx,
+          w,
+          h,
+          subtitleStyle.brandingWatermark,
+        );
 
         animFrameRef.current = requestAnimationFrame(render);
       };
@@ -803,7 +795,8 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
                   </div>
                 )}
                 {/* Branding watermark DOM overlay (non-compositing mode) */}
-                {subtitleStyle.brandingWatermark && !compositingActive && (
+                {subtitleStyle.brandingWatermark !== false &&
+                  !compositingActive && (
                   <div
                     className="absolute bottom-[3%] left-[3%] pointer-events-none z-20"
                     style={{
