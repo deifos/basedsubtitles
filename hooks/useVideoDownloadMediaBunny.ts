@@ -35,6 +35,19 @@ import {
   renderDynamicBehindInExport,
   renderDynamicFrontInExport,
 } from "@/lib/export-renderer";
+import {
+  adjustTranscriptChunksForSilenceRemoval,
+  createSilenceRemovalPlan,
+  isSourceTimeRemoved,
+  outputTimeToSourceTime,
+  sourceTimeToOutputTime,
+  type TimeRange,
+} from "@/lib/silence-removal";
+import {
+  createAutoZoomCutSchedule,
+  drawImageWithAutoZoom,
+  getAutoZoomCutIndex,
+} from "@/lib/auto-zoom";
 
 interface UseVideoDownloadMediaBunnyProps {
   video: HTMLVideoElement | null;
@@ -57,6 +70,8 @@ interface UseVideoDownloadMediaBunnyProps {
     videoElement: HTMLVideoElement,
     onProgress?: (percent: number) => void,
   ) => Promise<PositionTimeline>;
+  silenceRemovalRanges?: TimeRange[];
+  autoZoomEnabled?: boolean;
 }
 
 interface ExportDiagnostics {
@@ -121,6 +136,8 @@ export function useVideoDownloadMediaBunny({
   processFrame: bgProcessFrame,
   getMaskAtTime,
   buildExportTimeline,
+  silenceRemovalRanges = [],
+  autoZoomEnabled = false,
 }: UseVideoDownloadMediaBunnyProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -233,6 +250,7 @@ export function useVideoDownloadMediaBunny({
       // Build face tracking timeline for dynamic crop or left-right split during export
       const needsFaceTimeline =
         needsCrop ||
+        autoZoomEnabled ||
         (subtitleStyle.splitSubtitleMode === "left-right" && !needsCrop);
       let faceTimeline: PositionTimeline | null = null;
       if (needsFaceTimeline && buildExportTimeline) {
@@ -245,7 +263,7 @@ export function useVideoDownloadMediaBunny({
 
       // For crop mode, sample.draw() doesn't support source crop, so decode
       // to a full-resolution canvas first, then blit the cropped region.
-      if (needsCrop) {
+      if (needsCrop || autoZoomEnabled) {
         decodeCanvas = new OffscreenCanvas(srcW, srcH);
         decodeCtx = decodeCanvas.getContext("2d", {
           alpha: false,
@@ -268,6 +286,31 @@ export function useVideoDownloadMediaBunny({
 
       // Get video metadata
       const duration = await input.computeDuration();
+      const silenceRemovalPlan =
+        silenceRemovalRanges.length > 0
+          ? createSilenceRemovalPlan(duration, silenceRemovalRanges)
+          : null;
+      const outputDuration =
+        silenceRemovalPlan?.outputDuration &&
+        silenceRemovalPlan.outputDuration > 0
+          ? silenceRemovalPlan.outputDuration
+          : duration;
+      const sourceTimeForOutput = (outputTime: number) =>
+        silenceRemovalPlan
+          ? outputTimeToSourceTime(outputTime, silenceRemovalPlan)
+          : outputTime;
+      const transcriptChunksForExport = silenceRemovalPlan
+        ? adjustTranscriptChunksForSilenceRemoval(
+            transcriptChunks,
+            silenceRemovalPlan,
+          )
+        : transcriptChunks;
+      const autoZoomCutSchedule = createAutoZoomCutSchedule(
+        transcriptChunksForExport
+          .filter((chunk) => !chunk.disabled)
+          .map((chunk) => chunk.timestamp[0]),
+        outputDuration,
+      );
       const originalVideoTrack = await input.getPrimaryVideoTrack();
       const originalAudioTrack = await input.getPrimaryAudioTrack();
       const originalVideoDecoderConfig = originalVideoTrack
@@ -449,7 +492,7 @@ export function useVideoDownloadMediaBunny({
       // When dynamic is enabled, use phrase mode with dynamicEnabled flag
       const isDynamic = subtitleStyle.dynamicEnabled;
       const processedChunks = processTranscriptChunks(
-        { chunks: transcriptChunks },
+        { chunks: transcriptChunksForExport },
         isDynamic ? "phrase" : mode,
         subtitleStyle.maxWordsPerLine,
         isDynamic,
@@ -457,7 +500,7 @@ export function useVideoDownloadMediaBunny({
       const enabledChunks = processedChunks.filter((chunk) => {
         if ((mode === "phrase" || isDynamic) && isPhraseChunk(chunk)) {
           return !chunk.words.some((word) => {
-            const originalChunk = transcriptChunks.find(
+            const originalChunk = transcriptChunksForExport.find(
               (candidate) =>
                 candidate.timestamp[0] === word.timestamp[0] &&
                 candidate.timestamp[1] === word.timestamp[1],
@@ -484,12 +527,15 @@ export function useVideoDownloadMediaBunny({
           const startTime = chunk.timestamp[0];
           phraseFaceXMap.set(
             startTime,
-            interpolateCenterX(faceTimeline, startTime + FACE_TRACK_LOOKAHEAD),
+            interpolateCenterX(
+              faceTimeline,
+              sourceTimeForOutput(startTime) + FACE_TRACK_LOOKAHEAD,
+            ),
           );
         }
       }
 
-      const totalFrames = Math.ceil(duration * exportFps);
+      const totalFrames = Math.ceil(outputDuration * exportFps);
       setStatus("Rendering video frames...");
 
       if (originalAudioTrack && audioSource) {
@@ -502,6 +548,24 @@ export function useVideoDownloadMediaBunny({
             )) {
               if (cancelContextRef.current.cancelRequested) break;
               try {
+                if (silenceRemovalPlan) {
+                  const sampleMidpoint =
+                    audioSample.timestamp + audioSample.duration / 2;
+                  if (
+                    isSourceTimeRemoved(
+                      sampleMidpoint,
+                      silenceRemovalPlan.removedRanges,
+                    )
+                  ) {
+                    continue;
+                  }
+                  audioSample.setTimestamp(
+                    sourceTimeToOutputTime(
+                      audioSample.timestamp,
+                      silenceRemovalPlan,
+                    ),
+                  );
+                }
                 await audioSource.add(audioSample);
               } finally {
                 audioSample.close();
@@ -522,7 +586,7 @@ export function useVideoDownloadMediaBunny({
 
       const timestampIterator = (async function* () {
         for (let frameIndex = 0; frameIndex < totalFrames; frameIndex++) {
-          yield frameIndex / exportFps;
+          yield sourceTimeForOutput(frameIndex / exportFps);
         }
       })();
 
@@ -540,10 +604,14 @@ export function useVideoDownloadMediaBunny({
         queuedSequentialSample = initialSequentialResult.value ?? null;
       }
       let iteratorResult: IteratorResult<VideoSample | null> | undefined;
+      let currentAutoZoomCutIndex = -1;
+      let currentAutoZoomFaceX = 0.5;
 
       const drawFrameFromVideoElement = async (
         time: number,
         frameCropX: number,
+        outputTime: number,
+        autoZoomFaceX: number,
       ) => {
         video.currentTime = time;
         await new Promise<void>((resolve) => {
@@ -557,7 +625,24 @@ export function useVideoDownloadMediaBunny({
             resolve();
           }
         });
-        if (needsCrop) {
+        if (autoZoomEnabled) {
+          drawImageWithAutoZoom(
+            ctx,
+            video,
+            frameCropX,
+            cropY,
+            cropW,
+            cropH,
+            0,
+            0,
+            canvas.width,
+            canvas.height,
+            outputTime,
+            outputDuration,
+            autoZoomFaceX,
+            autoZoomCutSchedule,
+          );
+        } else if (needsCrop) {
           ctx.drawImage(
             video,
             frameCropX,
@@ -573,20 +658,44 @@ export function useVideoDownloadMediaBunny({
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         }
       };
-      const drawSampleToCanvas = (sample: VideoSample, frameCropX: number) => {
-        if (needsCrop && decodeCanvas && decodeCtx) {
+      const drawSampleToCanvas = (
+        sample: VideoSample,
+        frameCropX: number,
+        outputTime: number,
+        autoZoomFaceX: number,
+      ) => {
+        if ((needsCrop || autoZoomEnabled) && decodeCanvas && decodeCtx) {
           sample.draw(decodeCtx, 0, 0, srcW, srcH);
-          ctx.drawImage(
-            decodeCanvas,
-            frameCropX,
-            cropY,
-            cropW,
-            cropH,
-            0,
-            0,
-            canvas.width,
-            canvas.height,
-          );
+          if (autoZoomEnabled) {
+            drawImageWithAutoZoom(
+              ctx,
+              decodeCanvas,
+              frameCropX,
+              cropY,
+              cropW,
+              cropH,
+              0,
+              0,
+              canvas.width,
+              canvas.height,
+              outputTime,
+              outputDuration,
+              autoZoomFaceX,
+              autoZoomCutSchedule,
+            );
+          } else {
+            ctx.drawImage(
+              decodeCanvas,
+              frameCropX,
+              cropY,
+              cropW,
+              cropH,
+              0,
+              0,
+              canvas.width,
+              canvas.height,
+            );
+          }
         } else {
           sample.draw(ctx, 0, 0, canvas.width, canvas.height);
         }
@@ -603,6 +712,7 @@ export function useVideoDownloadMediaBunny({
         }
 
         const time = frameIndex / exportFps;
+        const sourceTime = sourceTimeForOutput(time);
 
         // Update progress ~once per second (every fps frames) to avoid
         // excessive React re-renders which freeze mobile devices.
@@ -610,7 +720,7 @@ export function useVideoDownloadMediaBunny({
         if (frameIndex % exportFps === 0 || frameIndex === totalFrames - 1) {
           setProgress(progressPercent);
           setStatus(
-            `Rendering: ${Math.round(time)}s / ${Math.round(duration)}s (${Math.round(progressPercent)}%)`,
+            `Rendering: ${Math.round(time)}s / ${Math.round(outputDuration)}s (${Math.round(progressPercent)}%)`,
           );
         }
 
@@ -618,13 +728,29 @@ export function useVideoDownloadMediaBunny({
         // Look ahead slightly to compensate for EMA smoothing lag — during
         // preview the crop and detection run in the same rAF tick so the
         // lag is imperceptible, but in export it manifests as a visible delay.
+        const sourceFaceX = faceTimeline
+          ? interpolateCenterX(faceTimeline, sourceTime + FACE_TRACK_LOOKAHEAD)
+          : 0.5;
         const frameCropX = faceTimeline
-          ? computeCropX(
-              interpolateCenterX(faceTimeline, time + FACE_TRACK_LOOKAHEAD),
-              srcW,
-              cropW,
-            )
+          ? computeCropX(sourceFaceX, srcW, cropW)
           : cropX;
+        const autoZoomFaceX =
+          needsCrop && cropW > 0
+            ? Math.max(
+                0,
+                Math.min(1, (sourceFaceX * srcW - frameCropX) / cropW),
+              )
+            : sourceFaceX;
+        if (autoZoomEnabled) {
+          const nextAutoZoomCutIndex = getAutoZoomCutIndex(
+            time,
+            autoZoomCutSchedule,
+          );
+          if (nextAutoZoomCutIndex !== currentAutoZoomCutIndex) {
+            currentAutoZoomCutIndex = nextAutoZoomCutIndex;
+            currentAutoZoomFaceX = autoZoomFaceX;
+          }
+        }
 
         // Clear canvas every frame — skipping this causes duplicate-frame
         // stutters when a decode silently fails (catch block below skips the
@@ -637,7 +763,8 @@ export function useVideoDownloadMediaBunny({
           try {
             while (
               queuedSequentialSample &&
-              queuedSequentialSample.timestamp <= time + sourceFrameTolerance
+              queuedSequentialSample.timestamp <=
+                sourceTime + sourceFrameTolerance
             ) {
               if (
                 activeSequentialSample &&
@@ -653,12 +780,22 @@ export function useVideoDownloadMediaBunny({
             const sequentialSample =
               activeSequentialSample ?? queuedSequentialSample;
             if (sequentialSample) {
-              drawSampleToCanvas(sequentialSample, frameCropX);
+              drawSampleToCanvas(
+                sequentialSample,
+                frameCropX,
+                time,
+                currentAutoZoomFaceX,
+              );
               drewSourceFrame = true;
             }
           } catch {}
           if (!drewSourceFrame) {
-            await drawFrameFromVideoElement(time, frameCropX);
+            await drawFrameFromVideoElement(
+              sourceTime,
+              frameCropX,
+              time,
+              currentAutoZoomFaceX,
+            );
             drewSourceFrame = true;
           }
         } else if (videoSampleSink && sampleIterator) {
@@ -666,17 +803,32 @@ export function useVideoDownloadMediaBunny({
             iteratorResult = await sampleIterator.next();
             const sample = iteratorResult.value ?? null;
             if (sample) {
-              drawSampleToCanvas(sample, frameCropX);
+              drawSampleToCanvas(
+                sample,
+                frameCropX,
+                time,
+                currentAutoZoomFaceX,
+              );
               drewSourceFrame = true;
               sample.close();
             }
           } catch {}
           if (!drewSourceFrame) {
-            await drawFrameFromVideoElement(time, frameCropX);
+            await drawFrameFromVideoElement(
+              sourceTime,
+              frameCropX,
+              time,
+              currentAutoZoomFaceX,
+            );
             drewSourceFrame = true;
           }
         } else {
-          await drawFrameFromVideoElement(time, frameCropX);
+          await drawFrameFromVideoElement(
+            sourceTime,
+            frameCropX,
+            time,
+            currentAutoZoomFaceX,
+          );
           drewSourceFrame = true;
         }
 
@@ -714,7 +866,7 @@ export function useVideoDownloadMediaBunny({
           // Use pre-computed masks (5fps cache) when available — avoids costly per-frame AI inference
           // Falls back to live inference only if cached masks aren't available
           let mask: MaskData;
-          const cachedMask = getMaskAtTime?.(time);
+          const cachedMask = getMaskAtTime?.(sourceTime);
           if (cachedMask) {
             mask = cachedMask;
           } else if (bgProcessFrame) {
@@ -1080,6 +1232,8 @@ export function useVideoDownloadMediaBunny({
     bgProcessFrame,
     getMaskAtTime,
     buildExportTimeline,
+    silenceRemovalRanges,
+    autoZoomEnabled,
   ]);
 
   const cancelDownload = useCallback(() => {

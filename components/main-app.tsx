@@ -18,6 +18,8 @@ import {
   RefreshCw,
   RectangleHorizontal,
   RectangleVertical,
+  AudioLines,
+  Clapperboard,
 } from "lucide-react";
 import { TranscriptSidebar } from "@/components/transcript-sidebar";
 import {
@@ -27,6 +29,13 @@ import {
 } from "@/components/subtitle-styling";
 import { WordStylePopover } from "@/components/word-style-popover";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   processTranscriptChunks,
   binarySearchActiveChunk,
@@ -65,6 +74,14 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Settings, FileText, Eraser, Maximize2 } from "lucide-react";
 import { APP_VERSION } from "@/lib/changelog";
+import { extractAudioFromVideo } from "@/lib/audio-utils";
+import {
+  createSilenceRemovalPlan,
+  detectSilenceRanges,
+  SILENCE_REMOVAL_LEVELS,
+  type SilenceRemovalLevel,
+  type TimeRange,
+} from "@/lib/silence-removal";
 import { toast } from "sonner";
 
 const PRE_TRANSCRIPTION_DETAILS: Record<TranscriptionStatus, string> = {
@@ -89,12 +106,14 @@ const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
   fontWeight: "600",
   color: "#FFFFFF",
   backgroundColor: "transparent",
+  backgroundStyle: "solid",
   borderWidth: 1,
   borderColor: "#1A1A1A",
   dropShadowIntensity: 0.55,
   wordEmphasisEnabled: false,
   wordEmphasisColorEnabled: true,
   wordEmphasisColor: "#F2D21B",
+  windEnabled: false,
   position: "bottom",
   maxWordsPerLine: 3,
   backgroundRemovalEnabled: false,
@@ -124,9 +143,11 @@ export function MainApp({
   const [mode, setMode] = useState<"word" | "phrase">("phrase");
   const [ratio, setRatio] = useState<"16:9" | "9:16">("16:9");
   const [zoomPortrait, setZoomPortrait] = useState(false);
+  const [autoZoomEnabled, setAutoZoomEnabled] = useState(false);
   const [language, setLanguage] = useState<LanguageCode>("en");
   const [modelSize, setModelSize] = useState<ModelSize>("base");
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [videoDuration, setVideoDuration] = useState(0);
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [mobileTab, setMobileTab] = useState<"styling" | "edit">("styling");
   const [showAboutSheet, setShowAboutSheet] = useState(false);
@@ -173,7 +194,7 @@ export function MainApp({
   const [isFaceTrackingActive, setIsFaceTrackingActive] = useState(false);
   const [isVideoLandscape, setIsVideoLandscape] = useState(false);
 
-  // Start/stop face tracking: runs when split subtitle is active OR manual toggle is on
+  // Start/stop face tracking: runs when split subtitles, auto zoom, or manual tracking is on
   const splitActive = subtitleStyle.splitSubtitleMode !== "none";
   useEffect(() => {
     const videoEl = videoRef.current;
@@ -181,7 +202,7 @@ export function MainApp({
       return;
     }
 
-    const shouldTrack = faceTrackingEnabled || splitActive;
+    const shouldTrack = faceTrackingEnabled || splitActive || autoZoomEnabled;
 
     const tryStart = () => {
       if (!videoEl.videoWidth) return; // metadata not loaded yet
@@ -208,11 +229,22 @@ export function MainApp({
       stopTracking();
       setIsFaceTrackingActive(false);
     };
-  }, [ratio, faceTrackingEnabled, splitActive, startTracking, stopTracking]);
+  }, [
+    ratio,
+    faceTrackingEnabled,
+    splitActive,
+    autoZoomEnabled,
+    startTracking,
+    stopTracking,
+  ]);
 
   const handleVideoSelect = useCallback(
     (file: File) => {
       setUploadedFile(file);
+      silenceDetectionRunIdRef.current += 1;
+      setSilenceRemovalLevel("off");
+      setSilenceRemovedRanges([]);
+      setIsDetectingSilence(false);
       handleVideoSelectBase(file);
       // Show language selection modal after video loads
       setShowLanguageModal(true);
@@ -256,6 +288,71 @@ export function MainApp({
   const [exportQuality, setExportQuality] = useState<"medium" | "high">(
     "medium",
   );
+  const [silenceRemovalLevel, setSilenceRemovalLevel] =
+    useState<SilenceRemovalLevel>("off");
+  const [silenceRemovedRanges, setSilenceRemovedRanges] = useState<TimeRange[]>(
+    [],
+  );
+  const [isDetectingSilence, setIsDetectingSilence] = useState(false);
+  const silenceDetectionRunIdRef = useRef(0);
+  const sourceDuration = videoDuration || videoRef.current?.duration || 0;
+  const silenceRemovalPlan = useMemo(
+    () =>
+      sourceDuration > 0 &&
+      silenceRemovalLevel !== "off" &&
+      silenceRemovedRanges.length > 0
+        ? createSilenceRemovalPlan(sourceDuration, silenceRemovedRanges)
+        : null,
+    [sourceDuration, silenceRemovalLevel, silenceRemovedRanges],
+  );
+  const silenceDurationLabel =
+    silenceRemovalLevel !== "off" && sourceDuration > 0
+      ? `${formatTime(silenceRemovalPlan?.outputDuration ?? sourceDuration)} / ${formatTime(sourceDuration)}`
+      : null;
+
+  const handleSilenceRemovalLevelChange = useCallback(
+    async (value: string) => {
+      const nextLevel = value as SilenceRemovalLevel;
+      const runId = silenceDetectionRunIdRef.current + 1;
+      silenceDetectionRunIdRef.current = runId;
+      setSilenceRemovalLevel(nextLevel);
+
+      if (nextLevel === "off") {
+        setSilenceRemovedRanges([]);
+        setIsDetectingSilence(false);
+        return;
+      }
+
+      if (!uploadedFile) {
+        setSilenceRemovedRanges([]);
+        toast.error("Upload a video before enabling silence removal.");
+        return;
+      }
+
+      const levelConfig = SILENCE_REMOVAL_LEVELS[nextLevel];
+      setIsDetectingSilence(true);
+      try {
+        const audioData = await extractAudioFromVideo(uploadedFile);
+        const ranges = detectSilenceRanges(audioData, levelConfig.minDuration);
+        if (silenceDetectionRunIdRef.current !== runId) return;
+        setSilenceRemovedRanges(ranges);
+        if (ranges.length === 0) {
+          toast.info("No matching silent sections found.");
+        }
+      } catch (error) {
+        if (silenceDetectionRunIdRef.current !== runId) return;
+        setSilenceRemovedRanges([]);
+        toast.error(
+          `Silence detection failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      } finally {
+        if (silenceDetectionRunIdRef.current === runId) {
+          setIsDetectingSilence(false);
+        }
+      }
+    },
+    [uploadedFile],
+  );
 
   const {
     downloadVideo,
@@ -276,7 +373,11 @@ export function MainApp({
     bgRemovalReady,
     processFrame: bgProcessFrame,
     getMaskAtTime,
-    buildExportTimeline: faceTrackingEnabled ? buildExportTimeline : undefined,
+    buildExportTimeline:
+      faceTrackingEnabled || autoZoomEnabled ? buildExportTimeline : undefined,
+    silenceRemovalRanges:
+      silenceRemovalLevel === "off" ? [] : silenceRemovedRanges,
+    autoZoomEnabled,
   });
 
   const handleRemoveBackground = useCallback(async () => {
@@ -326,6 +427,10 @@ export function MainApp({
 
     // Reset background removal
     resetBgRemoval();
+    silenceDetectionRunIdRef.current += 1;
+    setSilenceRemovalLevel("off");
+    setSilenceRemovedRanges([]);
+    setIsDetectingSilence(false);
     setSubtitleStyle((prev) => ({
       ...prev,
       backgroundRemovalEnabled: false,
@@ -333,6 +438,8 @@ export function MainApp({
 
     // Clear uploaded file
     setUploadedFile(null);
+    setVideoDuration(0);
+    setAutoZoomEnabled(false);
 
     // Reset current time
     setCurrentTime(0);
@@ -848,6 +955,7 @@ export function MainApp({
                     className="w-full"
                     onVideoSelect={handleVideoSelect}
                     onAspectRatioDetected={handleAspectRatioDetected}
+                    onDurationChange={setVideoDuration}
                     ref={videoRef}
                     onTimeUpdate={handleTimeUpdate}
                     transcript={result}
@@ -861,6 +969,10 @@ export function MainApp({
                     getMaskAtTime={getMaskAtTime}
                     getCenterX={getCenterX}
                     isFaceTrackingActive={isFaceTrackingActive}
+                    silenceRemovalRanges={
+                      silenceRemovalLevel === "off" ? [] : silenceRemovedRanges
+                    }
+                    autoZoomEnabled={autoZoomEnabled}
                   />
                   {isPreparingTranscription && (
                     <div
@@ -1171,6 +1283,64 @@ export function MainApp({
                         </p>
                       </div>
                     )}
+                    <div
+                      className="flex w-full max-w-md items-center justify-between gap-2 rounded-lg border border-border/60 bg-muted/40 px-3 py-2"
+                      style={{ fontFamily: "var(--font-outfit), sans-serif" }}
+                    >
+                      <div className="flex min-w-0 items-center gap-2">
+                        {isDetectingSilence ? (
+                          <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary" />
+                        ) : (
+                          <AudioLines className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        )}
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold">
+                            Silence removal
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {silenceRemovalLevel === "off"
+                              ? "Off"
+                              : isDetectingSilence
+                                ? "Detecting quiet sections..."
+                                : `${silenceRemovedRanges.length} removed${silenceDurationLabel ? ` - ${silenceDurationLabel}` : ""}`}
+                          </p>
+                        </div>
+                      </div>
+                      <Select
+                        value={silenceRemovalLevel}
+                        disabled={isDetectingSilence || isDownloadProcessing}
+                        onValueChange={handleSilenceRemovalLevelChange}
+                      >
+                        <SelectTrigger className="h-9 w-[170px] rounded-lg border-border bg-background text-xs font-semibold">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent align="end">
+                          <SelectItem value="off">Off</SelectItem>
+                          <SelectItem value="aggressive">
+                            {SILENCE_REMOVAL_LEVELS.aggressive.label}
+                          </SelectItem>
+                          <SelectItem value="default">
+                            {SILENCE_REMOVAL_LEVELS.default.label}
+                          </SelectItem>
+                          <SelectItem value="conservative">
+                            {SILENCE_REMOVAL_LEVELS.conservative.label}
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button
+                      type="button"
+                      variant={autoZoomEnabled ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setAutoZoomEnabled((value) => !value)}
+                      className="flex w-full max-w-md items-center justify-center gap-2 rounded-lg font-semibold"
+                      style={{ fontFamily: "var(--font-outfit), sans-serif" }}
+                    >
+                      <Clapperboard className="h-4 w-4" />
+                      {autoZoomEnabled
+                        ? "Auto zoom cuts on"
+                        : "Auto zoom cuts off"}
+                    </Button>
                     <div
                       className="flex items-center gap-2 w-full max-w-md"
                       style={{ fontFamily: "var(--font-outfit), sans-serif" }}

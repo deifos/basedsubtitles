@@ -49,12 +49,14 @@ export interface SubtitleStyle {
   fontWeight: string;
   color: string;
   backgroundColor: string;
+  backgroundStyle: "solid" | "glass";
   borderWidth: number;
   borderColor: string;
   dropShadowIntensity: number;
   wordEmphasisEnabled: boolean;
   wordEmphasisColorEnabled: boolean;
   wordEmphasisColor: string;
+  windEnabled: boolean; // reveal words with a small wind-in motion as they are spoken
   position: "top" | "middle" | "bottom";
   maxWordsPerLine: number;
   backgroundRemovalEnabled: boolean;
@@ -255,7 +257,13 @@ const fontWeightOptions = [
   { value: "700", label: "Bold" },
 ];
 
-type SubtitlePresetName = "green" | "gold" | "subtitle" | "gamer" | "formal";
+type SubtitlePresetName =
+  | "green"
+  | "gold"
+  | "subtitle"
+  | "gamer"
+  | "formal"
+  | "glass";
 
 interface SubtitlePreset {
   name: SubtitlePresetName;
@@ -267,6 +275,35 @@ interface SubtitlePreset {
 
 const PRESETS: SubtitlePreset[] = [
   {
+    name: "glass",
+    label: "Glass",
+    previewText: "GLASS",
+    style: {
+      fontFamily: FONT_FAMILIES.outfit.value,
+      fontSize: 22,
+      fontWeight: "500",
+      color: "#FFFFFF",
+      backgroundColor: "rgba(255, 255, 255, 0.22)",
+      backgroundStyle: "glass",
+      borderWidth: 0,
+      borderColor: "rgba(255, 255, 255, 0.45)",
+      dropShadowIntensity: 0.45,
+      position: "bottom",
+      maxWordsPerLine: 6,
+    },
+    inactiveStyles: {
+      color: "#FFFFFF",
+      backgroundColor: "rgba(255, 255, 255, 0.18)",
+      borderRadius: "0.5rem",
+      paddingInline: "0.75rem",
+      paddingBlock: "0.35rem",
+      boxShadow:
+        "inset 0 0 0 1px rgba(255,255,255,0.35), 0 6px 18px rgba(0,0,0,0.22)",
+      backdropFilter: "blur(8px)",
+      WebkitBackdropFilter: "blur(8px)",
+    },
+  },
+  {
     name: "formal",
     label: "Formal",
     previewText: "FORMAL",
@@ -276,6 +313,7 @@ const PRESETS: SubtitlePreset[] = [
       fontWeight: "600",
       color: "#FFFFFF",
       backgroundColor: "transparent",
+      backgroundStyle: "solid",
       borderWidth: 1,
       borderColor: "#1A1A1A",
       dropShadowIntensity: 0.55,
@@ -301,6 +339,7 @@ const PRESETS: SubtitlePreset[] = [
       fontWeight: "600",
       color: "#00FF41",
       backgroundColor: "#0B0B0B",
+      backgroundStyle: "solid",
       borderWidth: 0,
       borderColor: "#000000",
       dropShadowIntensity: 0.4,
@@ -325,6 +364,7 @@ const PRESETS: SubtitlePreset[] = [
       fontWeight: "600",
       color: "#F4D35E",
       backgroundColor: "#1F1300",
+      backgroundStyle: "solid",
       borderWidth: 0,
       borderColor: "#000000",
       dropShadowIntensity: 0.4,
@@ -349,6 +389,7 @@ const PRESETS: SubtitlePreset[] = [
       fontWeight: "500",
       color: "#FFFFFF",
       backgroundColor: "rgba(0, 0, 0, 0.75)",
+      backgroundStyle: "solid",
       borderWidth: 0,
       borderColor: "#000000",
       dropShadowIntensity: 0.3,
@@ -373,6 +414,7 @@ const PRESETS: SubtitlePreset[] = [
       fontWeight: "700",
       color: "#94FBAB",
       backgroundColor: "#141414",
+      backgroundStyle: "solid",
       borderWidth: 0,
       borderColor: "#FF00FF",
       dropShadowIntensity: 0.6,
@@ -407,31 +449,73 @@ function PresetButton({ preset, isActive, onApply }: PresetButtonProps) {
     fontFamily: presetCssFont,
     fontWeight: preset.style.fontWeight as CSSProperties["fontWeight"],
   };
+  const isGlassPreset = preset.style.backgroundStyle === "glass";
+  const glassBackdropStyles: CSSProperties = {
+    background:
+      "linear-gradient(135deg, #8a6a4a 0%, #c3b296 31%, #5b473a 32%, #302a2a 58%, #9f8f72 59%, #f2e8d4 100%)",
+    backgroundSize: "180% 180%",
+    color: preset.style.color,
+    boxShadow: isActive
+      ? "inset 0 0 0 1px rgba(255,255,255,0.35), 0 0 0 1px rgba(0,0,0,0.55)"
+      : "inset 0 0 0 1px rgba(0,0,0,0.25)",
+    ...fontStyles,
+  };
 
   return (
     <Button
       onClick={onApply}
       variant={isActive ? "default" : "ghost"}
-      className="group relative h-10 w-full rounded-lg text-xs transition-all"
+      className="group relative h-10 w-full overflow-hidden rounded-lg text-xs transition-all"
       style={
-        isActive
-          ? {
-              backgroundColor: isTransparentColor(
-                preset.style.backgroundColor ?? "",
-              )
-                ? "#111111"
-                : (preset.style.backgroundColor ?? "var(--primary)"),
-              color: preset.style.color,
-              boxShadow:
-                preset.style.borderWidth && preset.style.borderWidth > 0
-                  ? `inset 0 0 0 1px #000000, 0 0 0 ${preset.style.borderWidth}px ${preset.style.borderColor}`
-                  : "inset 0 0 0 1px #000000, 0 0 0 2px rgba(255,255,255,0.7)",
-              ...fontStyles,
-            }
-          : { ...preset.inactiveStyles, ...fontStyles }
+        isGlassPreset
+          ? glassBackdropStyles
+          : isActive
+            ? {
+                backgroundColor: isTransparentColor(
+                  preset.style.backgroundColor ?? "",
+                )
+                  ? "#111111"
+                  : (preset.style.backgroundColor ?? "var(--primary)"),
+                color: preset.style.color,
+                boxShadow:
+                  preset.style.backgroundStyle === "glass"
+                    ? "inset 0 0 0 1px rgba(255,255,255,0.45), 0 0 0 1px rgba(0,0,0,0.2)"
+                    : preset.style.borderWidth && preset.style.borderWidth > 0
+                      ? `inset 0 0 0 1px #000000, 0 0 0 ${preset.style.borderWidth}px ${preset.style.borderColor}`
+                      : "inset 0 0 0 1px #000000, 0 0 0 2px rgba(255,255,255,0.7)",
+                backdropFilter:
+                  preset.style.backgroundStyle === "glass"
+                    ? "blur(8px)"
+                    : undefined,
+                WebkitBackdropFilter:
+                  preset.style.backgroundStyle === "glass"
+                    ? "blur(8px)"
+                    : undefined,
+                ...fontStyles,
+              }
+            : { ...preset.inactiveStyles, ...fontStyles }
       }
     >
-      {preset.label.toUpperCase()}
+      {isGlassPreset ? (
+        <>
+          <span className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_22%_30%,rgba(255,255,255,0.45),transparent_24%),linear-gradient(90deg,rgba(0,0,0,0.28),transparent_45%,rgba(255,255,255,0.18))]" />
+          <span
+            className="relative z-10 rounded-md px-3 py-1 text-[11px] font-semibold uppercase"
+            style={{
+              backgroundColor: preset.style.backgroundColor,
+              boxShadow:
+                "inset 0 0 0 1px rgba(255,255,255,0.5), 0 6px 14px rgba(0,0,0,0.28)",
+              backdropFilter: "blur(8px) saturate(1.25)",
+              WebkitBackdropFilter: "blur(8px) saturate(1.25)",
+              textShadow: "0 1px 3px rgba(0,0,0,0.55)",
+            }}
+          >
+            {preset.label.toUpperCase()}
+          </span>
+        </>
+      ) : (
+        preset.label.toUpperCase()
+      )}
       <span
         className={`pointer-events-none absolute inset-0 rounded-lg border-2 transition-colors ${
           isActive
@@ -523,7 +607,7 @@ export function SubtitleStyling({
   };
 
   const handleBackgroundColorChange = (color: string) => {
-    onChange({ ...style, backgroundColor: color });
+    onChange({ ...style, backgroundColor: color, backgroundStyle: "solid" });
   };
 
   const handleBorderColorChange = (color: string) => {
@@ -577,12 +661,22 @@ export function SubtitleStyling({
     return {
       ...base,
       backgroundColor: style.backgroundColor,
+      ...(style.backgroundStyle === "glass"
+        ? {
+            borderColor: "rgba(255, 255, 255, 0.38)",
+            boxShadow:
+              "inset 0 0 0 1px rgba(255,255,255,0.32), 0 8px 24px rgba(0,0,0,0.2)",
+            backdropFilter: "blur(10px)",
+            WebkitBackdropFilter: "blur(10px)",
+          }
+        : {}),
     };
   }, [currentFontCss, style]);
 
   const wordEmphasisEnabled = style.wordEmphasisEnabled ?? false;
   const wordEmphasisColorEnabled = style.wordEmphasisColorEnabled ?? false;
   const wordEmphasisColor = style.wordEmphasisColor ?? "#F2D21B";
+  const windEnabled = style.windEnabled ?? false;
   const fontSizeSliderIndex = fontSizeToSliderIndex(style.fontSize);
 
   return (
@@ -961,9 +1055,17 @@ export function SubtitleStyling({
                 checked={isTransparentColor(style.backgroundColor)}
                 onCheckedChange={(checked) => {
                   if (checked) {
-                    onChange({ ...style, backgroundColor: "transparent" });
+                    onChange({
+                      ...style,
+                      backgroundColor: "transparent",
+                      backgroundStyle: "solid",
+                    });
                   } else {
-                    onChange({ ...style, backgroundColor: "#000000" });
+                    onChange({
+                      ...style,
+                      backgroundColor: "#000000",
+                      backgroundStyle: "solid",
+                    });
                   }
                 }}
               />
@@ -1092,6 +1194,25 @@ export function SubtitleStyling({
                 </div>
               </div>
             )}
+
+            <div className="flex items-center justify-between rounded-lg border border-border/50 px-3 py-2">
+              <div>
+                <p className="text-sm font-medium">Wind</p>
+                <p className="text-xs text-muted-foreground">
+                  {mode === "word"
+                    ? "Only available in phrase mode"
+                    : "Words drift in as they are spoken."}
+                </p>
+              </div>
+              <Switch
+                checked={windEnabled}
+                onCheckedChange={(checked) =>
+                  onChange({ ...style, windEnabled: checked })
+                }
+                disabled={mode === "word"}
+                aria-label="Toggle wind word reveal"
+              />
+            </div>
           </div>
         )}
 

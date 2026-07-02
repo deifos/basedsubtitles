@@ -52,18 +52,19 @@ export function drawBrandingWatermark(
   enabled?: boolean,
 ) {
   if (enabled === false) return;
-  const fontSize = Math.max(10, Math.round(h * 0.012));
-  const padding = w * 0.03;
+  const fontSize = Math.max(8, Math.round(h * 0.01));
+  const paddingX = w * 0.025;
+  const paddingY = h * 0.018;
   ctx.save();
   ctx.font = `700 ${fontSize}px Arial, Helvetica, "Segoe UI", Roboto, sans-serif`;
-  ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
-  ctx.textAlign = "left";
+  ctx.fillStyle = "rgba(255, 255, 255, 0.42)";
+  ctx.textAlign = "right";
   ctx.textBaseline = "bottom";
   ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
   ctx.shadowBlur = 3;
   ctx.shadowOffsetX = 0;
   ctx.shadowOffsetY = 1;
-  ctx.fillText("basedsubs.getbasedapps.com", padding, h - h * 0.03);
+  ctx.fillText("basedsubs.getbasedapps.com", w - paddingX, h - paddingY);
   ctx.restore();
 }
 
@@ -136,6 +137,55 @@ function isLightColor(color: string): boolean {
     return luminance > 0.5;
   }
   return false;
+}
+
+function drawCaptionBackground(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+  style: SubtitleStyle,
+  baseScale: number,
+) {
+  if (!style.backgroundColor || style.backgroundColor === "transparent") {
+    return;
+  }
+
+  if (style.backgroundStyle === "glass") {
+    const blurBleed = 18 * baseScale;
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(x, y, width, height, radius);
+    ctx.clip();
+    ctx.filter = `blur(${Math.max(4, 10 * baseScale)}px) saturate(1.2)`;
+    ctx.drawImage(
+      ctx.canvas,
+      x - blurBleed,
+      y - blurBleed,
+      width + blurBleed * 2,
+      height + blurBleed * 2,
+      x - blurBleed,
+      y - blurBleed,
+      width + blurBleed * 2,
+      height + blurBleed * 2,
+    );
+    ctx.restore();
+  }
+
+  ctx.save();
+  ctx.fillStyle = style.backgroundColor;
+  ctx.beginPath();
+  ctx.roundRect(x, y, width, height, radius);
+  ctx.fill();
+
+  if (style.backgroundStyle === "glass") {
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.42)";
+    ctx.lineWidth = Math.max(1, baseScale);
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 /** Build a font string, optionally applying per-word overrides. */
@@ -437,6 +487,7 @@ export function renderPhraseLineWithEmphasis(
   // Fade constants
   const fadeOutDuration = 0.25; // 250ms chunk fade-out
   const useTextFade = style.textFadeIn ?? false;
+  const useWindReveal = style.windEnabled ?? false;
 
   words.forEach((word, index) => {
     const displayText = displayTexts[index];
@@ -461,7 +512,17 @@ export function renderPhraseLineWithEmphasis(
           )
         : 1;
     const isSpoken = currentTime >= word.timestamp[0];
-    const wordAlpha = style.dynamicFollowWord && !isSpoken ? 0.2 : chunkFadeOut;
+    const windProgress = useWindReveal
+      ? Math.min(1, Math.max(0, timeSinceWordStart / 0.22))
+      : 1;
+    const windOffsetX = useWindReveal
+      ? (1 - windProgress) * finalFontSize * 0.45
+      : 0;
+    const wordAlpha = useWindReveal
+      ? windProgress * chunkFadeOut
+      : style.dynamicFollowWord && !isSpoken
+        ? 0.2
+        : chunkFadeOut;
 
     ctx.save();
     ctx.globalAlpha = wordAlpha;
@@ -476,7 +537,7 @@ export function renderPhraseLineWithEmphasis(
       ctx.fillStyle = emphasisBgColor;
       ctx.beginPath();
       ctx.roundRect(
-        wordCenterX - boxWidth / 2,
+        wordCenterX + windOffsetX - boxWidth / 2,
         centerY - boxHeight / 2,
         boxWidth,
         boxHeight,
@@ -526,7 +587,7 @@ export function renderPhraseLineWithEmphasis(
     drawWordText(
       ctx,
       displayText,
-      wordCenterX,
+      wordCenterX + windOffsetX,
       centerY,
       style,
       baseScale,
@@ -554,7 +615,7 @@ export function renderPhraseLineWithEmphasis(
       ctx.fillStyle = "#000000";
       ctx.fillText(
         word.styleOverride.emojiOverlay,
-        wordCenterX,
+        wordCenterX + windOffsetX,
         centerY - effectiveFontSize * 1.2 * emojiScale,
       );
       ctx.restore();
@@ -645,6 +706,7 @@ export function renderSplitSubtitleOnCanvas(
     (style.wordEmphasisEnabled ||
       style.wordEmphasisColorEnabled ||
       style.textFadeIn ||
+      style.windEnabled ||
       style.dynamicFollowWord ||
       hasSplitOverrides) &&
     mode === "phrase" &&
@@ -827,7 +889,7 @@ export function renderSubtitle(
     ].filter(Boolean);
   }
 
-  const lineHeight = finalFontSize;
+  const lineHeight = finalFontSize * 1.2;
   const lineGap = 4 * videoScale;
   const totalHeight =
     lines.length * lineHeight + Math.max(0, lines.length - 1) * lineGap;
@@ -862,7 +924,7 @@ export function renderSubtitle(
   if (style.backgroundColor && style.backgroundColor !== "transparent") {
     const borderRadius = 8 * videoScale;
     const paddingX = 12 * videoScale;
-    const paddingY = 8 * videoScale;
+    const paddingY = (style.backgroundStyle === "glass" ? 10 : 8) * videoScale;
 
     // Measure maximum line width
     let maxWidth = 0;
@@ -877,10 +939,16 @@ export function renderSubtitle(
     const bgWidth = maxWidth + paddingX * 2;
     const bgHeight = totalHeight + paddingY * 2;
 
-    ctx.fillStyle = style.backgroundColor;
-    ctx.beginPath();
-    ctx.roundRect(bgX, bgY, bgWidth, bgHeight, borderRadius);
-    ctx.fill();
+    drawCaptionBackground(
+      ctx,
+      bgX,
+      bgY,
+      bgWidth,
+      bgHeight,
+      borderRadius,
+      style,
+      videoScale,
+    );
   }
 
   const phraseWords = Array.isArray(chunkWords) ? chunkWords : undefined;
@@ -888,6 +956,7 @@ export function renderSubtitle(
     (style.wordEmphasisEnabled ||
       style.wordEmphasisColorEnabled ||
       style.textFadeIn ||
+      style.windEnabled ||
       style.dynamicFollowWord) &&
     mode === "phrase" &&
     phraseWords &&
@@ -1274,6 +1343,8 @@ export function renderDynamicWordWithOptions(
     (style.textFadeIn ?? false) && wordTimings && currentTime != null;
   const useSpokenWordOpacity =
     (style.dynamicFollowWord ?? false) && wordTimings && currentTime != null;
+  const useWindReveal =
+    (style.windEnabled ?? false) && wordTimings && currentTime != null;
   const fadeOutDuration = 0.25;
   const chunkFadeOut =
     useTextFade && chunkEndTime != null
@@ -1284,7 +1355,8 @@ export function renderDynamicWordWithOptions(
       : 1;
 
   const needsWordByWord =
-    (hasOverrides || useTextFade || useSpokenWordOpacity) && wordTimings;
+    (hasOverrides || useTextFade || useSpokenWordOpacity || useWindReveal) &&
+    wordTimings;
 
   for (let i = 0; i < lines.length; i++) {
     const lineY = startY + i * lineHeight;
@@ -1349,14 +1421,27 @@ export function renderDynamicWordWithOptions(
         const isSpoken = w.timing
           ? currentTime! >= w.timing.timestamp[0]
           : true;
-        const wordAlpha = useSpokenWordOpacity && !isSpoken ? 0.2 : 1;
+        const timeSinceWordStart = w.timing
+          ? currentTime! - w.timing.timestamp[0]
+          : 1;
+        const windProgress = useWindReveal
+          ? Math.min(1, Math.max(0, timeSinceWordStart / 0.22))
+          : 1;
+        const windOffsetX = useWindReveal
+          ? (1 - windProgress) * fontSize * 0.45
+          : 0;
+        const wordAlpha = useWindReveal
+          ? windProgress
+          : useSpokenWordOpacity && !isSpoken
+            ? 0.2
+            : 1;
 
         ctx.save();
         ctx.globalAlpha = wordAlpha * chunkFadeOut;
         renderDynamicSingleWord(
           ctx,
           w.text,
-          wordX,
+          wordX + windOffsetX,
           lineY,
           style,
           wordColor,
@@ -1387,7 +1472,7 @@ export function renderDynamicWordWithOptions(
           ctx.fillStyle = "#000000";
           ctx.fillText(
             w.override.emojiOverlay,
-            wordX,
+            wordX + windOffsetX,
             lineY - effectiveFontSize * 1.2 * emojiScale,
           );
           ctx.restore();

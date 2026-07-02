@@ -41,6 +41,55 @@ function isLightColor(color: string): boolean {
   return false;
 }
 
+function drawCaptionBackground(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+  style: SubtitleStyle,
+  baseScale: number,
+) {
+  if (!style.backgroundColor || style.backgroundColor === "transparent") {
+    return;
+  }
+
+  if (style.backgroundStyle === "glass") {
+    const blurBleed = 18 * baseScale;
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(x, y, width, height, radius);
+    ctx.clip();
+    ctx.filter = `blur(${Math.max(4, 10 * baseScale)}px) saturate(1.2)`;
+    ctx.drawImage(
+      ctx.canvas,
+      x - blurBleed,
+      y - blurBleed,
+      width + blurBleed * 2,
+      height + blurBleed * 2,
+      x - blurBleed,
+      y - blurBleed,
+      width + blurBleed * 2,
+      height + blurBleed * 2,
+    );
+    ctx.restore();
+  }
+
+  ctx.save();
+  ctx.fillStyle = style.backgroundColor;
+  ctx.beginPath();
+  ctx.roundRect(x, y, width, height, radius);
+  ctx.fill();
+
+  if (style.backgroundStyle === "glass") {
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.42)";
+    ctx.lineWidth = Math.max(1, baseScale);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 /**
  * Render the current subtitle for a given time onto a canvas context.
  * Used by both the preview compositing (video-upload.tsx) and export (useVideoDownloadMediaBunny.ts).
@@ -170,6 +219,7 @@ function renderSplitSubtitleToCanvas(
     (style.wordEmphasisEnabled ||
       style.wordEmphasisColorEnabled ||
       style.textFadeIn ||
+      style.windEnabled ||
       style.dynamicFollowWord ||
       hasSplitOverrides) &&
     mode === "phrase" &&
@@ -499,6 +549,8 @@ function renderDynamicTextBlock(
     (style.textFadeIn ?? false) && wordTimings && currentTime != null;
   const useSpokenWordOpacity =
     (style.dynamicFollowWord ?? false) && wordTimings && currentTime != null;
+  const useWindReveal =
+    (style.windEnabled ?? false) && wordTimings && currentTime != null;
   const fadeOutDuration = 0.25;
   const chunkFadeOut =
     useTextFade && chunkEndTime != null
@@ -510,7 +562,8 @@ function renderDynamicTextBlock(
 
   // Need word-by-word rendering when we have overrides OR textFadeIn
   const needsWordByWord =
-    (hasOverrides || useTextFade || useSpokenWordOpacity) && wordTimings;
+    (hasOverrides || useTextFade || useSpokenWordOpacity || useWindReveal) &&
+    wordTimings;
 
   for (let i = 0; i < lines.length; i++) {
     const lineY = startY + i * lineHeight;
@@ -577,14 +630,27 @@ function renderDynamicTextBlock(
         const isSpoken = w.timing
           ? currentTime! >= w.timing.timestamp[0]
           : true;
-        const wordAlpha = useSpokenWordOpacity && !isSpoken ? 0.2 : 1;
+        const timeSinceWordStart = w.timing
+          ? currentTime! - w.timing.timestamp[0]
+          : 1;
+        const windProgress = useWindReveal
+          ? Math.min(1, Math.max(0, timeSinceWordStart / 0.22))
+          : 1;
+        const windOffsetX = useWindReveal
+          ? (1 - windProgress) * fontSize * 0.45
+          : 0;
+        const wordAlpha = useWindReveal
+          ? windProgress
+          : useSpokenWordOpacity && !isSpoken
+            ? 0.2
+            : 1;
 
         ctx.save();
         ctx.globalAlpha = wordAlpha * chunkFadeOut;
         renderDynamicWord(
           ctx,
           w.text,
-          wordX,
+          wordX + windOffsetX,
           lineY,
           style,
           wordColor,
@@ -615,7 +681,7 @@ function renderDynamicTextBlock(
           ctx.fillStyle = "#000000";
           ctx.fillText(
             w.override.emojiOverlay,
-            wordX,
+            wordX + windOffsetX,
             lineY - effectiveFontSize * 1.2 * emojiScale,
           );
           ctx.restore();
@@ -825,7 +891,7 @@ function renderChunkToCanvas(
     ].filter(Boolean);
   }
 
-  const lineHeight = finalFontSize;
+  const lineHeight = finalFontSize * 1.2;
   const lineGap = 4 * videoScale;
   const totalHeight =
     lines.length * lineHeight + Math.max(0, lines.length - 1) * lineGap;
@@ -859,7 +925,7 @@ function renderChunkToCanvas(
   if (style.backgroundColor && style.backgroundColor !== "transparent") {
     const borderRadius = 8 * videoScale;
     const paddingX = 12 * videoScale;
-    const paddingY = 8 * videoScale;
+    const paddingY = (style.backgroundStyle === "glass" ? 10 : 8) * videoScale;
 
     let maxWidth = 0;
     lines.forEach((line) => {
@@ -872,10 +938,16 @@ function renderChunkToCanvas(
     const bgWidth = maxWidth + paddingX * 2;
     const bgHeight = totalHeight + paddingY * 2;
 
-    ctx.fillStyle = style.backgroundColor;
-    ctx.beginPath();
-    ctx.roundRect(bgX, bgY, bgWidth, bgHeight, borderRadius);
-    ctx.fill();
+    drawCaptionBackground(
+      ctx,
+      bgX,
+      bgY,
+      bgWidth,
+      bgHeight,
+      borderRadius,
+      style,
+      videoScale,
+    );
   }
 
   const phraseWords = Array.isArray(chunkWords) ? chunkWords : undefined;
@@ -883,6 +955,7 @@ function renderChunkToCanvas(
     (style.wordEmphasisEnabled ||
       style.wordEmphasisColorEnabled ||
       style.textFadeIn ||
+      style.windEnabled ||
       style.dynamicFollowWord) &&
     mode === "phrase" &&
     phraseWords &&
@@ -1166,6 +1239,7 @@ function renderPhraseLineWithEmphasis(
   // Fade constants
   const fadeOutDuration = 0.25; // 250ms chunk fade-out
   const useTextFade = style.textFadeIn ?? false;
+  const useWindReveal = style.windEnabled ?? false;
 
   words.forEach((word, index) => {
     const displayText = displayTexts[index];
@@ -1190,7 +1264,17 @@ function renderPhraseLineWithEmphasis(
           )
         : 1;
     const isSpoken = currentTime >= word.timestamp[0];
-    const wordAlpha = style.dynamicFollowWord && !isSpoken ? 0.2 : chunkFadeOut;
+    const windProgress = useWindReveal
+      ? Math.min(1, Math.max(0, timeSinceWordStart / 0.22))
+      : 1;
+    const windOffsetX = useWindReveal
+      ? (1 - windProgress) * finalFontSize * 0.45
+      : 0;
+    const wordAlpha = useWindReveal
+      ? windProgress * chunkFadeOut
+      : style.dynamicFollowWord && !isSpoken
+        ? 0.2
+        : chunkFadeOut;
 
     ctx.save();
     ctx.globalAlpha = wordAlpha;
@@ -1205,7 +1289,7 @@ function renderPhraseLineWithEmphasis(
       ctx.fillStyle = emphasisBgColor;
       ctx.beginPath();
       ctx.roundRect(
-        wordCenterX - boxWidth / 2,
+        wordCenterX + windOffsetX - boxWidth / 2,
         centerY - boxHeight / 2,
         boxWidth,
         boxHeight,
@@ -1250,7 +1334,7 @@ function renderPhraseLineWithEmphasis(
     drawWordText(
       ctx,
       displayText,
-      wordCenterX,
+      wordCenterX + windOffsetX,
       centerY,
       style,
       baseScale,
@@ -1279,7 +1363,7 @@ function renderPhraseLineWithEmphasis(
       ctx.fillStyle = "#000000";
       ctx.fillText(
         word.styleOverride.emojiOverlay,
-        wordCenterX,
+        wordCenterX + windOffsetX,
         centerY - effectiveFontSize * 1.2 * emojiScale,
       );
       ctx.restore();

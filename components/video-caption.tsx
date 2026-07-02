@@ -31,6 +31,28 @@ function isLightColor(color: string): boolean {
   return false;
 }
 
+function getCaptionBackgroundStyles(style: SubtitleStyle): React.CSSProperties {
+  const hasBackground =
+    style.backgroundColor && style.backgroundColor !== "transparent";
+  if (!hasBackground) return {};
+
+  if (style.backgroundStyle === "glass") {
+    return {
+      backgroundColor: style.backgroundColor,
+      borderRadius: "0.5rem",
+      boxShadow:
+        "inset 0 0 0 1px rgba(255,255,255,0.38), 0 8px 24px rgba(0,0,0,0.22)",
+      backdropFilter: "blur(10px) saturate(1.25)",
+      WebkitBackdropFilter: "blur(10px) saturate(1.25)",
+    };
+  }
+
+  return {
+    backgroundColor: style.backgroundColor,
+    borderRadius: "0.5rem",
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
@@ -70,6 +92,10 @@ function PhraseWordList({
           !!isCurrentWord && (style.wordEmphasisEnabled ?? false);
         const recolorActive =
           !!isCurrentWord && (style.wordEmphasisColorEnabled ?? false);
+        const windActive = style.windEnabled ?? false;
+        const windProgress = windActive
+          ? Math.min(1, Math.max(0, (currentTime - word.timestamp[0]) / 0.22))
+          : 1;
 
         const isKnockout = word.styleOverride?.effect === "knockout";
         const overrideStyles: React.CSSProperties = {};
@@ -93,11 +119,13 @@ function PhraseWordList({
         }
 
         // Display on Spoken: dim unspoken words (always in phrase mode here)
-        const wordOpacity = style.dynamicFollowWord
-          ? currentTime >= word.timestamp[0]
-            ? 1
-            : 0.2
-          : 1;
+        const wordOpacity = windActive
+          ? windProgress
+          : style.dynamicFollowWord
+            ? currentTime >= word.timestamp[0]
+              ? 1
+              : 0.2
+            : 1;
 
         const baseWordStyles: React.CSSProperties = {
           ...baseTypographyStyles,
@@ -108,7 +136,9 @@ function PhraseWordList({
             : "transform 0.18s ease, background-color 0.18s ease, color 0.18s ease",
           padding: "0 0.15em",
           borderRadius: "0.35em",
-          transform: isKnockout ? "none" : "scale(1)",
+          transform: isKnockout
+            ? "none"
+            : `translateX(${(1 - windProgress) * 0.45}em) scale(1)`,
           backgroundColor: "transparent",
           opacity: wordOpacity,
           ...overrideStyles,
@@ -125,7 +155,7 @@ function PhraseWordList({
                   filter: "none",
                 }
               : {
-                  transform: resizeActive ? "scale(1.18)" : "scale(1)",
+                  transform: `translateX(${(1 - windProgress) * 0.45}em) scale(${resizeActive ? 1.18 : 1})`,
                   backgroundColor: resizeActive
                     ? emphasisBgColor
                     : "transparent",
@@ -590,11 +620,7 @@ export function VideoCaption({
           fontWeight: style.fontWeight,
         };
         const innerStyle: React.CSSProperties = {
-          backgroundColor: style.backgroundColor,
-          borderRadius:
-            style.backgroundColor && style.backgroundColor !== "transparent"
-              ? "0.5rem"
-              : undefined,
+          ...getCaptionBackgroundStyles(style),
           opacity: isAnimating ? 1 : 0,
         };
         const sharedSplitWordsProps = {
@@ -713,11 +739,7 @@ export function VideoCaption({
         <div
           className="inline-block px-3 py-2"
           style={{
-            backgroundColor: style.backgroundColor,
-            borderRadius:
-              style.backgroundColor && style.backgroundColor !== "transparent"
-                ? "0.5rem"
-                : undefined,
+            ...getCaptionBackgroundStyles(style),
             ...(hasKnockout ? {} : { transform: "scale(1) translateY(0)" }),
             opacity: isAnimating ? 1 : 0,
           }}
@@ -725,7 +747,8 @@ export function VideoCaption({
           <div className="flex flex-col gap-1">
             {mode === "phrase" &&
             shouldSplitText &&
-            !style.dynamicFollowWord ? (
+            !style.dynamicFollowWord &&
+            !style.windEnabled ? (
               <>
                 <span
                   style={{

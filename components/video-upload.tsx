@@ -7,6 +7,7 @@ import {
   useEffect,
   memo,
   useRef,
+  useMemo,
 } from "react";
 import { cn } from "@/lib/utils";
 import { formatTime, type WordStyleOverride } from "@/lib/transcript-utils";
@@ -40,11 +41,23 @@ import {
 } from "@/lib/render-subtitle";
 import { drawBrandingWatermark } from "@/lib/export-renderer";
 import { computeCropX } from "@/lib/person-tracking";
+import {
+  adjustTranscriptChunksForSilenceRemoval,
+  createSilenceRemovalPlan,
+  sourceTimeToOutputTime,
+  type TimeRange,
+} from "@/lib/silence-removal";
+import {
+  createAutoZoomCutSchedule,
+  getAutoZoomCutIndex,
+  getAutoZoomCssTransform,
+} from "@/lib/auto-zoom";
 
 interface VideoUploadProps {
   onVideoSelect: (file: File) => void;
   onTimeUpdate?: (time: number) => void;
   onAspectRatioDetected?: (ratio: "16:9" | "9:16") => void;
+  onDurationChange?: (duration: number) => void;
   className?: string;
   transcript?: {
     text: string;
@@ -66,6 +79,8 @@ interface VideoUploadProps {
   getMaskAtTime?: (time: number, fps?: number) => MaskData | null;
   getCenterX?: () => number;
   isFaceTrackingActive?: boolean;
+  silenceRemovalRanges?: TimeRange[];
+  autoZoomEnabled?: boolean;
 }
 
 const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
@@ -74,6 +89,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
       onVideoSelect,
       onTimeUpdate,
       onAspectRatioDetected,
+      onDurationChange,
       className,
       transcript,
       currentTime = 0,
@@ -86,6 +102,8 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
       getMaskAtTime,
       getCenterX,
       isFaceTrackingActive = false,
+      silenceRemovalRanges = [],
+      autoZoomEnabled = false,
     },
     ref,
   ) => {
@@ -95,6 +113,11 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
     // Track the current blob URL so we can revoke it when it's no longer needed
     const videoObjectUrlRef = useRef<string | null>(null);
     const skipTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const isSkippingRef = useRef(false);
+    const skipWatchFrameRef = useRef<number>(0);
+    const lastAutoZoomSyncRef = useRef(0);
+    const autoZoomCutIndexRef = useRef(-1);
+    const autoZoomFaceXRef = useRef(0.5);
     const [isPlaying, setIsPlaying] = useState(false);
     const [duration, setDuration] = useState(0);
     const [isMuted, setIsMuted] = useState(false);
@@ -160,6 +183,60 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
     const isBgRemovalMode =
       bgRemovalReady && subtitleStyle.backgroundRemovalEnabled && getMaskAtTime;
     const compositingActive = isDynamicMode || isBgRemovalMode;
+    const needsFaceTrackCanvas =
+      isFaceTrackingActive && !compositingActive && ratio === "9:16";
+    const silenceRemovalPlan = useMemo(
+      () =>
+        duration > 0 && silenceRemovalRanges.length > 0
+          ? createSilenceRemovalPlan(duration, silenceRemovalRanges)
+          : null,
+      [duration, silenceRemovalRanges],
+    );
+    // Auto-zoom cuts run on the exported (silence-removed) timeline so the
+    // preview schedule matches what export produces. When silence removal is
+    // off, plan is null and this collapses to the raw source timeline.
+    const autoZoomDuration = silenceRemovalPlan
+      ? silenceRemovalPlan.outputDuration
+      : duration;
+    const autoZoomCutSchedule = useMemo(() => {
+      const chunks = transcript?.chunks ?? [];
+      const outputChunks = silenceRemovalPlan
+        ? adjustTranscriptChunksForSilenceRemoval(chunks, silenceRemovalPlan)
+        : chunks;
+      return createAutoZoomCutSchedule(
+        outputChunks
+          .filter((chunk) => !chunk.disabled)
+          .map((chunk) => chunk.timestamp[0]),
+        autoZoomDuration,
+      );
+    }, [autoZoomDuration, silenceRemovalPlan, transcript]);
+    const autoZoomEvalTime = silenceRemovalPlan
+      ? sourceTimeToOutputTime(localTime, silenceRemovalPlan)
+      : localTime;
+    const autoZoomCutIndex = autoZoomEnabled
+      ? getAutoZoomCutIndex(autoZoomEvalTime, autoZoomCutSchedule)
+      : -1;
+    if (autoZoomEnabled && autoZoomCutIndexRef.current !== autoZoomCutIndex) {
+      autoZoomCutIndexRef.current = autoZoomCutIndex;
+      autoZoomFaceXRef.current = needsFaceTrackCanvas
+        ? 0.5
+        : (getCenterX?.() ?? 0.5);
+    }
+    const autoZoomTransform = autoZoomEnabled
+      ? getAutoZoomCssTransform(
+          autoZoomEvalTime,
+          autoZoomDuration,
+          autoZoomFaceXRef.current,
+          autoZoomCutSchedule,
+        )
+      : "translate(0, 0) scale(1)";
+    const autoZoomStyle = autoZoomEnabled
+      ? {
+          transform: autoZoomTransform,
+          transformOrigin: "center center",
+          transition: "none",
+        }
+      : undefined;
 
     // Reset video source when ref.current.src is empty
     useEffect(() => {
@@ -277,7 +354,12 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
     const getDisabledRanges = useCallback(() => {
       if (!transcript) return [];
 
-      const disabledRanges: Array<[number, number]> = [];
+      const disabledRanges: Array<[number, number]> = silenceRemovalPlan
+        ? silenceRemovalPlan.removedRanges.map((range) => [
+            range.startTime,
+            range.endTime,
+          ])
+        : [];
 
       transcript.chunks.forEach((chunk) => {
         if (chunk.disabled) {
@@ -305,7 +387,50 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
       }
 
       return mergedRanges;
-    }, [transcript]);
+    }, [transcript, silenceRemovalPlan]);
+
+    const syncPreviewTime = useCallback(
+      (time: number) => {
+        setLocalTime(time);
+        if (seekBarFillRef.current && duration > 0) {
+          seekBarFillRef.current.style.width = `${(time / duration) * 100}%`;
+        }
+        if (timeDisplayRef.current) {
+          timeDisplayRef.current.textContent = formatTime(time);
+        }
+        onTimeUpdate?.(time);
+      },
+      [duration, onTimeUpdate],
+    );
+
+    const maybeSkipDisabledRange = useCallback(
+      (video: HTMLVideoElement, lookahead = 0) => {
+        if (seekingRef.current || isSkippingRef.current || !transcript) {
+          return false;
+        }
+
+        const time = video.currentTime;
+        for (const [start, end] of getDisabledRanges()) {
+          if (time >= start - lookahead && time < end) {
+            const nextTime = Math.min(duration || end, end + 0.03);
+            isSkippingRef.current = true;
+            setIsSkipping(true);
+            video.currentTime = nextTime;
+            syncPreviewTime(nextTime);
+
+            if (skipTimeoutRef.current) clearTimeout(skipTimeoutRef.current);
+            skipTimeoutRef.current = setTimeout(() => {
+              isSkippingRef.current = false;
+              setIsSkipping(false);
+            }, 80);
+            return true;
+          }
+        }
+
+        return false;
+      },
+      [duration, getDisabledRanges, syncPreviewTime, transcript],
+    );
 
     // Function to handle time updates and skip disabled segments
     const handleTimeUpdate = useCallback(
@@ -314,45 +439,44 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
         if (seekingRef.current) return;
 
         const video = e.currentTarget;
-        const time = video.currentTime;
-
-        // Update local time for VideoCaption directly — avoids main-app round-trip re-renders
-        setLocalTime(time);
-
-        // Update seek bar + time display via refs (no React state involved)
-        if (seekBarFillRef.current && duration > 0) {
-          seekBarFillRef.current.style.width = `${(time / duration) * 100}%`;
-        }
-        if (timeDisplayRef.current) {
-          timeDisplayRef.current.textContent = formatTime(time);
-        }
-
-        // Notify main-app (throttled to chunk boundaries inside main-app)
-        onTimeUpdate?.(time);
-
-        // Skip disabled segments
-        if (!isSkipping && transcript) {
-          const disabledRanges = getDisabledRanges();
-
-          for (const [start, end] of disabledRanges) {
-            // If current time is within a disabled range, skip to the end
-            if (time >= start && time < end) {
-              setIsSkipping(true);
-              video.currentTime = end + 0.1; // Add small buffer to avoid edge cases
-
-              // Reset skipping flag after a short delay
-              if (skipTimeoutRef.current) clearTimeout(skipTimeoutRef.current);
-              skipTimeoutRef.current = setTimeout(() => {
-                setIsSkipping(false);
-              }, 100);
-              break;
-            }
-          }
-        }
+        syncPreviewTime(video.currentTime);
+        maybeSkipDisabledRange(video);
       },
-      [onTimeUpdate, transcript, isSkipping, getDisabledRanges, duration],
+      [maybeSkipDisabledRange, syncPreviewTime],
     );
 
+    useEffect(() => {
+      const videoEl = ref && typeof ref !== "function" ? ref.current : null;
+      if (!videoEl || !isPlaying) return;
+
+      const watch = () => {
+        if (!videoEl.paused) {
+          if (autoZoomEnabled) {
+            const now = performance.now();
+            if (now - lastAutoZoomSyncRef.current > 90) {
+              lastAutoZoomSyncRef.current = now;
+              syncPreviewTime(videoEl.currentTime);
+            }
+          }
+          maybeSkipDisabledRange(videoEl, 0.08);
+          skipWatchFrameRef.current = requestAnimationFrame(watch);
+        }
+      };
+
+      skipWatchFrameRef.current = requestAnimationFrame(watch);
+      return () => {
+        if (skipWatchFrameRef.current) {
+          cancelAnimationFrame(skipWatchFrameRef.current);
+          skipWatchFrameRef.current = 0;
+        }
+      };
+    }, [
+      autoZoomEnabled,
+      isPlaying,
+      maybeSkipDisabledRange,
+      ref,
+      syncPreviewTime,
+    ]);
     // Canvas compositing loop for background removal preview
     useEffect(() => {
       if (!compositingActive || !canvasRef.current) {
@@ -570,12 +694,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
         }
 
         // Step 5: Branding watermark
-        drawBrandingWatermark(
-          ctx,
-          w,
-          h,
-          subtitleStyle.brandingWatermark,
-        );
+        drawBrandingWatermark(ctx, w, h, subtitleStyle.brandingWatermark);
 
         animFrameRef.current = requestAnimationFrame(render);
       };
@@ -602,9 +721,6 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
     // Non-compositing face tracking canvas loop:
     // When face tracking is active but compositing is NOT active,
     // render a canvas that mirrors the video with dynamic crop.
-    const needsFaceTrackCanvas =
-      isFaceTrackingActive && !compositingActive && ratio === "9:16";
-
     useEffect(() => {
       if (!needsFaceTrackCanvas || !faceTrackCanvasRef.current) {
         if (faceTrackAnimFrameRef.current) {
@@ -703,6 +819,9 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
                 className={cn(
                   "relative flex justify-center",
                   ratio === "16:9" && "max-h-[45vh] lg:max-h-[500px]",
+                  // Clip the CSS zoom transform so a "close" cut doesn't bleed
+                  // over the captions/controls sitting below the video box.
+                  autoZoomEnabled && "overflow-hidden",
                 )}
                 style={{
                   aspectRatio: ratio === "16:9" ? "16/9" : "9/16",
@@ -724,9 +843,11 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
                   onTimeUpdate={handleTimeUpdate}
                   onPlay={() => setIsPlaying(true)}
                   onPause={() => setIsPlaying(false)}
-                  onLoadedMetadata={(e) =>
-                    setDuration(e.currentTarget.duration)
-                  }
+                  onLoadedMetadata={(e) => {
+                    const nextDuration = e.currentTarget.duration;
+                    setDuration(nextDuration);
+                    onDurationChange?.(nextDuration);
+                  }}
                   onClick={() => {
                     if (!compositingActive && !needsFaceTrackCanvas) {
                       const videoEl =
@@ -739,6 +860,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
                   }}
                   style={{
                     aspectRatio: ratio === "16:9" ? "16/9" : "9/16",
+                    ...autoZoomStyle,
                   }}
                 />
                 {/* Canvas overlay for background removal compositing */}
@@ -755,6 +877,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
                     )}
                     style={{
                       aspectRatio: ratio === "16:9" ? "16/9" : "9/16",
+                      ...autoZoomStyle,
                     }}
                     onClick={() => {
                       const videoEl =
@@ -778,6 +901,7 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
                     )}
                     style={{
                       aspectRatio: "9/16",
+                      ...autoZoomStyle,
                     }}
                     onClick={() => {
                       const videoEl =
@@ -797,20 +921,20 @@ const VideoUploadComponent = forwardRef<HTMLVideoElement, VideoUploadProps>(
                 {/* Branding watermark DOM overlay (non-compositing mode) */}
                 {subtitleStyle.brandingWatermark !== false &&
                   !compositingActive && (
-                  <div
-                    className="absolute bottom-[3%] left-[3%] pointer-events-none z-20"
-                    style={{
-                      fontSize: "clamp(8px, 1.2vw, 13px)",
-                      fontWeight: 700,
-                      fontFamily: "system-ui, -apple-system, sans-serif",
-                      color: "rgba(255, 255, 255, 0.6)",
-                      textShadow: "0 1px 3px rgba(0, 0, 0, 0.5)",
-                      letterSpacing: "0.02em",
-                    }}
-                  >
-                    basedsubs.getbasedapps.com
-                  </div>
-                )}
+                    <div
+                      className="absolute bottom-[1.8%] right-[2.5%] pointer-events-none z-20"
+                      style={{
+                        fontSize: "clamp(7px, 1vw, 11px)",
+                        fontWeight: 700,
+                        fontFamily: "system-ui, -apple-system, sans-serif",
+                        color: "rgba(255, 255, 255, 0.42)",
+                        textShadow: "0 1px 3px rgba(0, 0, 0, 0.5)",
+                        letterSpacing: "0.02em",
+                      }}
+                    >
+                      basedsubs.getbasedapps.com
+                    </div>
+                  )}
                 {/* DOM-based captions: visible when not compositing, invisible hit-targets when compositing + word select active */}
                 {transcript && !compositingActive && (
                   <VideoCaption
